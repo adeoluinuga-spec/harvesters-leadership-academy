@@ -1,0 +1,272 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  Award,
+  BookOpenCheck,
+  Brain,
+  CalendarCheck,
+  ChevronRight,
+  ClipboardCheck,
+  Compass,
+  LineChart,
+  Sparkles,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
+
+import { shellItem } from "@/components/layout/dashboard-shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { courses, recommendedCourses, recentlyWatched } from "@/lib/course-data";
+import {
+  defaultLeadershipProfile,
+  getLeadershipProfile,
+  MockLeadershipProfile,
+  MockRole,
+} from "@/lib/mock-auth";
+import { motion } from "framer-motion";
+
+type LearningMetric = {
+  label: string;
+  value: string;
+  detail: string;
+  icon: LucideIcon;
+};
+
+const learningMetrics: LearningMetric[] = [
+  {
+    label: "Assessments",
+    value: "2 pending",
+    detail: "Next leadership readiness check due this week",
+    icon: ClipboardCheck,
+  },
+  {
+    label: "Certificates",
+    value: "3 earned",
+    detail: "1 certificate close to completion",
+    icon: Award,
+  },
+  {
+    label: "Growth pathway",
+    value: "Level 4",
+    detail: "Building toward next leadership responsibility",
+    icon: Compass,
+  },
+  {
+    label: "Course progress",
+    value: "62%",
+    detail: "Quarterly personal learning pace",
+    icon: LineChart,
+  },
+];
+
+const roleContext: Record<MockRole, string> = {
+  Leader: "the leaders you influence and the ministry habits you are forming",
+  "Campus Pastor": "campus participation, inactive leaders, mentorship, and department performance",
+  "Subgroup Pastor": "subgroup health, campus comparisons, leadership performance, and participation trends",
+  "Group Pastor": "strategic ministry intelligence, subgroup analytics, pipeline visibility, and campus growth",
+  Admin: "academy-wide stewardship, platform quality, and learning health across every leadership layer",
+};
+
+export function PersonalLearningLayer({ role }: { role: MockRole }) {
+  const [profile, setProfile] = useState<MockLeadershipProfile>(defaultLeadershipProfile);
+  const activeCourse = courses.find((course) => course.status === "in-progress") ?? courses[0];
+
+  useEffect(() => {
+    function syncProfile() {
+      setProfile(getLeadershipProfile());
+    }
+
+    syncProfile();
+    window.addEventListener("harvesters-profile-change", syncProfile);
+    window.addEventListener("storage", syncProfile);
+
+    return () => {
+      window.removeEventListener("harvesters-profile-change", syncProfile);
+      window.removeEventListener("storage", syncProfile);
+    };
+  }, []);
+
+  const aiInsight = `As a ${role} preparing for ${profile.leadershipAspiration}, prioritize ${activeCourse.title} alongside ${roleContext[role]}.`;
+
+  return (
+    <motion.section variants={shellItem} className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <Badge className="mb-3 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
+            Personal learning layer
+          </Badge>
+          <h2 className="font-heading text-2xl font-semibold tracking-tight text-zinc-950">
+            Your leadership growth continues here
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
+            All leaders are learners. Some leaders also carry oversight responsibility, and this layer stays personal to you.
+          </p>
+        </div>
+        <Badge className="w-fit rounded-md bg-black px-3 py-1.5 text-white hover:bg-black">
+          Learner profile: {profile.currentLeadershipRole}
+        </Badge>
+      </div>
+
+      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+        <CardContent className="grid gap-3 pt-1 md:grid-cols-3">
+          {[
+            ["Current leadership role", profile.currentLeadershipRole],
+            ["Leadership aspiration", profile.leadershipAspiration],
+            ["Learning context", `${profile.department} - ${profile.campus}`],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-zinc-100 bg-zinc-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
+                {label}
+              </p>
+              <p className="font-heading mt-2 font-semibold text-zinc-950">{value}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+          <CardHeader className="border-b border-zinc-100">
+            <CardTitle className="font-heading text-lg font-semibold">Continue learning</CardTitle>
+            <p className="text-sm text-zinc-500">
+              Current course for your {profile.leadershipAspiration} pathway
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-4 pt-1 lg:grid-cols-[1fr_0.78fr]">
+            <div className="rounded-lg border border-zinc-100 p-4">
+              <BookOpenCheck className="mb-4 size-5 text-zinc-500" />
+              <p className="font-heading text-lg font-semibold text-zinc-950">{activeCourse.title}</p>
+              <p className="mt-2 text-sm leading-6 text-zinc-500">{activeCourse.description}</p>
+              <div className="mt-4 flex items-center justify-between text-xs">
+                <span className="text-zinc-500">{activeCourse.category}</span>
+                <span className="font-semibold text-zinc-950">{activeCourse.progress}% complete</span>
+              </div>
+              <Progress
+                value={activeCourse.progress}
+                className="mt-2 h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
+              />
+              <Button asChild className="mt-4 h-10 rounded-lg bg-black text-white hover:bg-zinc-800">
+                <Link href={`/courses/${activeCourse.id}/learn`}>
+                  Continue
+                  <ChevronRight className="size-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-4">
+              <Brain className="mb-4 size-5 text-zinc-600" />
+              <p className="font-heading font-semibold text-zinc-950">AI learning insights</p>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">{aiInsight}</p>
+              <div className="mt-4 rounded-lg bg-white p-3 text-xs leading-5 text-zinc-500">
+                AI adapts to your current role, leadership aspiration, oversight responsibilities, and learning history.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+          <CardHeader className="border-b border-zinc-100">
+            <CardTitle className="font-heading text-lg font-semibold">Recommended courses</CardTitle>
+            <p className="text-sm text-zinc-500">Personalized next steps</p>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-1">
+            {recommendedCourses.map((course) => (
+              <div key={course.title} className="flex items-start gap-3 rounded-lg border border-zinc-100 p-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
+                  <Sparkles className="size-4" />
+                </div>
+                <div>
+                  <p className="font-medium text-zinc-950">{course.title}</p>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    {course.category} - {course.duration}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {learningMetrics.map((metric) => (
+          <Card key={metric.label} className="rounded-xl border-zinc-200 bg-white shadow-sm">
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">
+                  {metric.label}
+                </p>
+                <CardTitle className="font-heading mt-3 text-2xl font-semibold text-zinc-950">
+                  {metric.value}
+                </CardTitle>
+              </div>
+              <div className="flex size-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
+                <metric.icon className="size-5" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm leading-6 text-zinc-500">{metric.detail}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-zinc-100">
+          <CardTitle className="font-heading text-lg font-semibold">Recent learning activity</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 pt-1 md:grid-cols-3">
+          {recentlyWatched.slice(0, 3).map((item) => (
+            <div key={item.title} className="rounded-lg border border-zinc-100 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="font-medium text-zinc-950">{item.title}</p>
+                <CalendarCheck className="size-4 shrink-0 text-zinc-400" />
+              </div>
+              <Progress
+                value={item.progress}
+                className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
+              />
+              <p className="mt-2 text-xs text-zinc-500">{item.progress}% watched</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+export function OversightLayerIntro({
+  title,
+  description,
+  modules,
+}: {
+  title: string;
+  description: string;
+  modules: string[];
+}) {
+  return (
+    <motion.section variants={shellItem} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <Badge className="mb-3 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
+        Oversight intelligence layer
+      </Badge>
+      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+        <div>
+          <h2 className="font-heading text-2xl font-semibold tracking-tight text-zinc-950">{title}</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-500">{description}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {modules.map((module) => (
+            <Badge key={module} className="rounded-md bg-zinc-100 text-zinc-700 hover:bg-zinc-100">
+              <Target className="size-3.5" />
+              {module}
+            </Badge>
+          ))}
+        </div>
+      </div>
+    </motion.section>
+  );
+}
