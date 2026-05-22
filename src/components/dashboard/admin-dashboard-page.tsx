@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Award,
   BookOpenCheck,
@@ -10,6 +11,7 @@ import {
   CircleCheck,
   ClipboardCheck,
   Cpu,
+  GraduationCap,
   LineChart,
   Plus,
   Users,
@@ -129,6 +131,7 @@ function Sparkline({ values }: { values: number[] }) {
 }
 
 function DashboardHero() {
+  const router = useRouter();
   const [profile, setProfile] = useState<AuthProfile | null>(null);
 
   useEffect(() => {
@@ -173,6 +176,14 @@ function DashboardHero() {
             <Plus className="size-4" />
             Provision tenant
           </Button>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/admin/courses/new")}
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            <GraduationCap className="size-4" />
+            New course
+          </button>
           <Button variant="outline" className="h-10 rounded-lg border-zinc-200 bg-white px-4">
             Platform reports
             <ChevronRight className="size-4" />

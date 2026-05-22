@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Bookmark,
+  Award,
   BookOpen,
   CheckCircle2,
-  ChevronDown,
   Clock3,
+  GraduationCap,
+  Loader2,
   PlayCircle,
-  Star,
+  Plus,
   Users,
 } from "lucide-react";
 
@@ -20,145 +22,60 @@ import {
   shellItem,
 } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { courses as staticCourses, recentlyWatched, recommendedCourses } from "@/lib/course-data";
-import type { Course } from "@/lib/course-data";
-import { fetchCoursesWithProgress } from "@/lib/lms";
+import { fetchCourseCatalog } from "@/lib/lms";
+import type { CatalogCourses } from "@/lib/lms";
 import type { CourseWithProgress } from "@/lib/lms-types";
 import { formatDuration } from "@/lib/lms-types";
 
-const libraryStats = [
-  { label: "Total courses", value: "64", detail: "12 growth tracks" },
-  { label: "Active learners", value: "8,420", detail: "+18% this month" },
-  { label: "Completion stats", value: "84%", detail: "network average" },
+const CREATOR_ROLES = [
+  "Platform Super Admin",
+  "Super Admin",
+  "Admin",
+  "Group Pastor",
+  "Sub-Group Pastor",
+  "Subgroup Pastor",
+  "Sub-group Pastor",
+  "Campus Pastor",
 ];
 
-const tabs = ["All Courses", "In Progress", "Completed", "Saved"];
+type Tab = "all" | "in-progress" | "completed";
 
-const filters = [
-  { label: "Leadership Level", value: "All levels" },
-  { label: "Category", value: "Ministry systems" },
-  { label: "Duration", value: "Any length" },
-  { label: "Status", value: "All statuses" },
+const TABS: { key: Tab; label: string }[] = [
+  { key: "all", label: "All Courses" },
+  { key: "in-progress", label: "In Progress" },
+  { key: "completed", label: "Completed" },
 ];
 
-function liveToCourse(c: CourseWithProgress): Course {
-  const status =
-    c.certificate
-      ? "completed"
-      : c.enrolled
-      ? "in-progress"
-      : "not-enrolled";
-
-  return {
-    id: c.slug,
-    title: c.title,
-    category: c.category,
-    instructor: c.instructor_name,
-    lessons: c.total_lessons || c.lesson_count || 0,
-    duration: formatDuration(c.duration_minutes),
-    enrolled: c.enrolled ? String(c.total_lessons) : "0",
-    progress: c.progress_percent,
-    status,
-    thumbnail: c.thumbnail_url ?? "",
-    level: c.level,
-    description: c.description ?? "",
-  };
-}
-
-function LibraryHero() {
-  return (
-    <motion.section
-      variants={shellItem}
-      className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
-    >
-      <div className="grid gap-8 p-6 md:p-8 xl:grid-cols-[1.2fr_0.8fr]">
-        <div>
-          <Badge className="mb-5 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
-            Course library
-          </Badge>
-          <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Leadership Growth Tracks
-          </h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-500">
-            Equip leaders across Harvesters with world-class ministry intelligence.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-          {libraryStats.map((stat) => (
-            <div key={stat.label} className="rounded-lg border border-zinc-100 bg-zinc-50/70 p-4">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">
-                {stat.label}
-              </p>
-              <p className="font-heading mt-2 text-2xl font-semibold tracking-tight text-zinc-950">
-                {stat.value}
-              </p>
-              <p className="mt-1 text-sm text-zinc-500">{stat.detail}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </motion.section>
-  );
-}
-
-function CourseControls() {
-  return (
-    <motion.section variants={shellItem} className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {tabs.map((tab, index) => (
-          <button
-            key={tab}
-            className={cn(
-              "h-9 shrink-0 rounded-lg border px-4 text-sm font-medium transition-all",
-              index === 0
-                ? "border-black bg-black text-white"
-                : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-950"
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {filters.map((filter) => (
-          <button
-            key={filter.label}
-            className="flex h-12 items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 text-left shadow-sm transition-colors hover:border-zinc-300"
-          >
-            <span>
-              <span className="block text-xs text-zinc-400">{filter.label}</span>
-              <span className="block text-sm font-medium text-zinc-800">{filter.value}</span>
-            </span>
-            <ChevronDown className="size-4 text-zinc-400" />
-          </button>
-        ))}
-      </div>
-    </motion.section>
-  );
-}
-
-function CourseCard({ course }: { course: Course }) {
-  const completed = course.status === "completed";
-  const inProgress = course.status === "in-progress";
+function CourseCard({ course }: { course: CourseWithProgress }) {
+  const completed = Boolean(course.certificate);
+  const inProgress = course.enrolled && !completed;
   const cta = completed ? "View Certificate" : inProgress ? "Continue" : "Enrol now";
+  const ctaHref = completed
+    ? `/courses/${course.slug}/certificate`
+    : inProgress
+    ? `/courses/${course.slug}/learn`
+    : `/courses/${course.slug}`;
 
   return (
     <motion.article variants={shellItem} whileHover={{ y: -4 }} className="h-full">
-      <Card className="h-full rounded-xl border-zinc-200 bg-white p-0 shadow-sm transition-shadow hover:shadow-xl hover:shadow-zinc-200/70">
+      <div className="flex h-full flex-col rounded-xl border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-xl hover:shadow-zinc-200/70">
         <Link
-          href={`/courses/${course.id}`}
+          href={`/courses/${course.slug}`}
           className="group relative block aspect-[16/10] overflow-hidden rounded-t-xl bg-zinc-900"
         >
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-            style={{ backgroundImage: `url(${course.thumbnail})` }}
-          />
+          {course.thumbnail_url ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+              style={{ backgroundImage: `url(${course.thumbnail_url})` }}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <GraduationCap className="size-12 text-zinc-600" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
           <Badge className="absolute left-4 top-4 rounded-md border-white/15 bg-white/90 text-zinc-900 hover:bg-white">
             {course.category}
@@ -168,11 +85,11 @@ function CourseCard({ course }: { course: Course }) {
               <CheckCircle2 className="size-3.5" />
               Completed
             </div>
-          ) : (
-            <span className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-lg border border-white/15 bg-black/35 text-white backdrop-blur transition-colors group-hover:bg-black/55">
-              <Bookmark className="size-4" />
-            </span>
-          )}
+          ) : course.is_required ? (
+            <div className="absolute right-4 top-4 rounded-md bg-rose-600 px-2 py-1 text-xs font-semibold text-white">
+              Required
+            </div>
+          ) : null}
           <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-4 text-white">
             <div>
               <p className="text-xs text-white/70">{course.level}</p>
@@ -186,166 +103,276 @@ function CourseCard({ course }: { course: Course }) {
 
         <CardContent className="flex flex-1 flex-col gap-4 p-4">
           <div>
-            <p className="text-sm font-medium text-zinc-950">{course.instructor}</p>
+            <p className="text-sm font-medium text-zinc-950">{course.instructor_name}</p>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-zinc-500">
               <span className="flex items-center gap-1">
                 <BookOpen className="size-3.5" />
-                {course.lessons > 0 ? `${course.lessons} lessons` : "—"}
+                {course.total_lessons > 0 ? `${course.total_lessons} lessons` : "—"}
               </span>
               <span className="flex items-center gap-1">
                 <Clock3 className="size-3.5" />
-                {course.duration}
+                {formatDuration(course.duration_minutes)}
               </span>
               <span className="flex items-center gap-1">
                 <Users className="size-3.5" />
-                {course.enrolled}
+                {course.enrolled ? "Enrolled" : "Open"}
               </span>
             </div>
           </div>
 
           <div className="mt-auto space-y-3">
-            {course.status !== "not-enrolled" ? (
+            {course.enrolled ? (
               <div>
                 <div className="mb-2 flex items-center justify-between text-xs">
                   <span className="text-zinc-500">Progress</span>
-                  <span className="font-semibold text-zinc-900">{course.progress}%</span>
+                  <span className="font-semibold text-zinc-900">{course.progress_percent}%</span>
                 </div>
                 <Progress
-                  value={course.progress}
+                  value={course.progress_percent}
                   className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
                 />
               </div>
             ) : (
               <div className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
-                Recommended for your leadership pathway
+                {(course.leadership_targets ?? []).length > 0
+                  ? `For: ${(course.leadership_targets ?? []).slice(0, 2).join(", ")}${(course.leadership_targets ?? []).length > 2 ? ` +${(course.leadership_targets ?? []).length - 2} more` : ""}`
+                  : "Available to all leaders"}
               </div>
             )}
 
-            <Button
-              asChild
+            <Link
+              href={ctaHref}
               className={cn(
-                "h-10 w-full rounded-lg",
+                "flex h-10 w-full items-center justify-center rounded-lg text-sm font-medium transition-colors",
                 completed
                   ? "border border-zinc-200 bg-white text-zinc-950 hover:bg-zinc-50"
                   : "bg-black text-white hover:bg-zinc-800"
               )}
             >
-              <Link href={`/courses/${course.id}`}>{cta}</Link>
-            </Button>
+              {cta}
+            </Link>
           </div>
         </CardContent>
-      </Card>
+      </div>
     </motion.article>
   );
 }
 
-function CourseGrid({ courses }: { courses: Course[] }) {
+function RequiredSection({ courses }: { courses: CourseWithProgress[] }) {
+  if (!courses.length) return null;
   return (
-    <motion.section variants={shellContainer} className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-      {courses.map((course) => (
-        <CourseCard key={course.id} course={course} />
-      ))}
+    <motion.section variants={shellItem} className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <div className="size-2 rounded-full bg-rose-600" />
+          <h2 className="font-heading text-lg font-semibold text-zinc-950">
+            Required for your role
+          </h2>
+        </div>
+        <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+          {courses.length} course{courses.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {courses.map((c) => (
+          <CourseCard key={c.id} course={c} />
+        ))}
+      </div>
     </motion.section>
   );
 }
 
-function RecommendedSection() {
+function PathwaySection({ courses, userRole }: { courses: CourseWithProgress[]; userRole: string }) {
+  if (!courses.length) return null;
   return (
-    <motion.section variants={shellItem}>
-      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
-        <CardHeader className="border-b border-zinc-100">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
-                Recommended courses
-              </CardTitle>
-              <p className="mt-1 text-sm text-zinc-500">
-                Curated for Harvesters leadership development pathways
-              </p>
-            </div>
-            <Star className="size-5 text-zinc-400" />
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-3 pt-1 md:grid-cols-3">
-          {recommendedCourses.map((course) => (
-            <div
-              key={course.title}
-              className="group overflow-hidden rounded-lg border border-zinc-100 bg-white"
-            >
-              <div className="relative h-32 overflow-hidden bg-zinc-900">
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                  style={{ backgroundImage: `url(${course.thumbnail})` }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/65 to-transparent" />
-                <Badge className="absolute left-3 top-3 rounded-md bg-white/90 text-zinc-900 hover:bg-white">
-                  {course.category}
-                </Badge>
-              </div>
-              <div className="p-4">
-                <p className="font-heading font-medium leading-snug text-zinc-950">{course.title}</p>
-                <p className="mt-2 text-sm text-zinc-500">{course.duration}</p>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </motion.section>
-  );
-}
-
-function RecentlyWatched() {
-  return (
-    <motion.section variants={shellItem}>
-      <Card className="rounded-xl border-zinc-200 bg-[#0b0b0b] text-white shadow-sm">
-        <CardHeader>
-          <CardTitle className="font-heading text-lg font-semibold">Recently watched</CardTitle>
-          <p className="text-sm text-zinc-400">Resume learning where your leaders paused</p>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {recentlyWatched.map((lesson) => (
-            <div key={lesson.title} className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-              <div className="mb-5 flex items-center justify-between">
-                <div className="flex size-9 items-center justify-center rounded-lg bg-white/10">
-                  <PlayCircle className="size-4" />
-                </div>
-                <span className="text-xs text-zinc-400">{lesson.progress}%</span>
-              </div>
-              <p className="min-h-12 text-sm font-medium leading-6">{lesson.title}</p>
-              <Progress
-                value={lesson.progress}
-                className="mt-4 h-1.5 bg-white/10 [&_[data-slot=progress-indicator]]:bg-white"
-              />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+    <motion.section variants={shellItem} className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <div className="size-2 rounded-full bg-violet-600" />
+          <h2 className="font-heading text-lg font-semibold text-zinc-950">
+            Your Leadership Pathway
+          </h2>
+        </div>
+        {userRole ? (
+          <span className="rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+            {userRole}
+          </span>
+        ) : null}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {courses.map((c) => (
+          <CourseCard key={c.id} course={c} />
+        ))}
+      </div>
     </motion.section>
   );
 }
 
 export default function CoursesPage() {
-  const [displayCourses, setDisplayCourses] = useState<Course[]>(staticCourses);
+  const router = useRouter();
+  const [catalog, setCatalog] = useState<CatalogCourses | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>("all");
 
   useEffect(() => {
-    fetchCoursesWithProgress()
-      .then((live) => {
-        if (live.length > 0) {
-          setDisplayCourses(live.map(liveToCourse));
-        }
+    fetchCourseCatalog()
+      .then((data) => {
+        setCatalog(data);
+        setLoading(false);
       })
-      .catch(() => {
-        // keep static fallback on error
-      });
+      .catch(() => setLoading(false));
   }, []);
+
+  const isCreator = CREATOR_ROLES.includes(catalog?.userRole ?? "");
+  const allCourses = catalog?.all ?? [];
+  const required = catalog?.required ?? [];
+  const pathway = catalog?.pathway ?? [];
+
+  const filtered = allCourses.filter((c) => {
+    if (activeTab === "in-progress") return c.enrolled && !c.certificate;
+    if (activeTab === "completed") return Boolean(c.certificate);
+    return true;
+  });
+
+  const enrolledCount = allCourses.filter((c) => c.enrolled).length;
+  const completedCount = allCourses.filter((c) => c.certificate).length;
+
+  const stats = [
+    { label: "Available courses", value: String(allCourses.length), detail: "Filtered for your role" },
+    { label: "Enrolled", value: String(enrolledCount), detail: "Active learning tracks" },
+    { label: "Completed", value: String(completedCount), detail: "Certificates earned" },
+  ];
 
   return (
     <DashboardShell searchPlaceholder="Search courses, tracks, instructors..." showDate={false}>
-      <LibraryHero />
-      <CourseControls />
-      <CourseGrid courses={displayCourses} />
-      <RecommendedSection />
-      <RecentlyWatched />
+      {/* Hero */}
+      <motion.section
+        variants={shellItem}
+        className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
+      >
+        <div className="grid gap-8 p-6 md:p-8 xl:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <Badge className="mb-5 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
+              Course library
+            </Badge>
+            <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
+              Leadership Growth Tracks
+            </h1>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-zinc-500">
+              Equip leaders across Harvesters with world-class ministry intelligence.
+            </p>
+            {isCreator && (
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard/admin/courses/new")}
+                className="mt-5 inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+              >
+                <Plus className="size-4" />
+                New course
+              </button>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            {loading
+              ? Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="animate-pulse rounded-lg border border-zinc-100 bg-zinc-50/70 p-4">
+                    <div className="h-3 w-24 rounded bg-zinc-200" />
+                    <div className="mt-3 h-7 w-12 rounded bg-zinc-200" />
+                    <div className="mt-2 h-3 w-32 rounded bg-zinc-200" />
+                  </div>
+                ))
+              : stats.map((stat) => (
+                  <div key={stat.label} className="rounded-lg border border-zinc-100 bg-zinc-50/70 p-4">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">
+                      {stat.label}
+                    </p>
+                    <p className="font-heading mt-2 text-2xl font-semibold tracking-tight text-zinc-950">
+                      {stat.value}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-500">{stat.detail}</p>
+                  </div>
+                ))}
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Tabs */}
+      <motion.section variants={shellItem} className="flex gap-2 overflow-x-auto pb-1">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              "h-9 shrink-0 rounded-lg border px-4 text-sm font-medium transition-all",
+              activeTab === tab.key
+                ? "border-black bg-black text-white"
+                : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-950"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </motion.section>
+
+      {/* Content */}
+      {loading ? (
+        <motion.div variants={shellItem} className="flex items-center justify-center py-20">
+          <Loader2 className="size-8 animate-spin text-zinc-300" />
+        </motion.div>
+      ) : filtered.length === 0 ? (
+        <motion.div
+          variants={shellItem}
+          className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 py-20"
+        >
+          <GraduationCap className="size-10 text-zinc-300" />
+          <p className="mt-3 text-sm font-medium text-zinc-500">
+            {activeTab === "in-progress"
+              ? "No courses in progress"
+              : activeTab === "completed"
+              ? "No completed courses yet"
+              : "No courses available"}
+          </p>
+          {activeTab === "all" && isCreator && (
+            <button
+              type="button"
+              onClick={() => router.push("/dashboard/admin/courses/new")}
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+            >
+              <Plus className="size-4" />
+              Create your first course
+            </button>
+          )}
+        </motion.div>
+      ) : activeTab === "all" ? (
+        <motion.div variants={shellContainer} className="space-y-8">
+          <RequiredSection courses={required} />
+          <PathwaySection courses={pathway} userRole={catalog?.userRole ?? ""} />
+          {(required.length > 0 || pathway.length > 0) && (
+            <motion.div variants={shellItem} className="space-y-3">
+              <h2 className="font-heading text-lg font-semibold text-zinc-950">All Courses</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {filtered.map((c) => (
+                  <CourseCard key={c.id} course={c} />
+                ))}
+              </div>
+            </motion.div>
+          )}
+          {required.length === 0 && pathway.length === 0 && (
+            <motion.div variants={shellContainer} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((c) => (
+                <CourseCard key={c.id} course={c} />
+              ))}
+            </motion.div>
+          )}
+        </motion.div>
+      ) : (
+        <motion.div variants={shellContainer} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((c) => (
+            <CourseCard key={c.id} course={c} />
+          ))}
+        </motion.div>
+      )}
     </DashboardShell>
   );
 }

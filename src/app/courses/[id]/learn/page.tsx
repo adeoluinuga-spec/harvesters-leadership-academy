@@ -173,20 +173,22 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
       </AnimatePresence>
 
       <motion.div variants={shellItem} className="flex items-center justify-between gap-4">
-        <Button asChild variant="outline" className="rounded-lg border-zinc-200 bg-white">
-          <Link href={`/courses/${id}`}>
-            <ArrowLeft className="size-4" />
-            Course overview
-          </Link>
-        </Button>
+        <Link
+          href={`/courses/${id}`}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+        >
+          <ArrowLeft className="size-4" />
+          Course overview
+        </Link>
         <div className="flex items-center gap-2">
           {hasCertificate ? (
-            <Button asChild className="rounded-lg bg-black text-white hover:bg-zinc-800">
-              <Link href={`/courses/${id}/certificate`}>
-                <Award className="size-4" />
-                View certificate
-              </Link>
-            </Button>
+            <Link
+              href={`/courses/${id}/certificate`}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+            >
+              <Award className="size-4" />
+              View certificate
+            </Link>
           ) : canTakeAssessment ? (
             <Button onClick={() => setShowAssessment(true)} className="rounded-lg bg-black text-white hover:bg-zinc-800">
               <ClipboardCheck className="size-4" />
@@ -542,17 +544,14 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
                   : []),
               ].map((tool) =>
                 tool.href ? (
-                  <Button
+                  <Link
                     key={tool.label}
-                    asChild
-                    variant="outline"
-                    className="h-11 justify-start rounded-lg border-zinc-200 bg-white"
+                    href={tool.href}
+                    className="flex h-11 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
                   >
-                    <Link href={tool.href}>
-                      <tool.icon className="size-4" />
-                      {tool.label}
-                    </Link>
-                  </Button>
+                    <tool.icon className="size-4" />
+                    {tool.label}
+                  </Link>
                 ) : (
                   <Button
                     key={tool.label}

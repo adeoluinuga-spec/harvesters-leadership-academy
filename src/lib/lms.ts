@@ -11,14 +11,70 @@ import type {
 } from "@/lib/lms-types";
 
 // ============================================================
-// Course catalog
+// Leadership hierarchy for course visibility filtering
 // ============================================================
 
-export async function fetchCoursesWithProgress(): Promise<CourseWithProgress[]> {
+const LEADERSHIP_LEVEL: Record<string, number> = {
+  "Cell Leader": 0,
+  "Assistant HOD": 0,
+  "Cell Leader / Assistant HOD": 0,
+  "Zonal Leader": 1,
+  "HOD": 1,
+  "Zonal Leader / HOD": 1,
+  "Community Leader": 2,
+  "Area Leader": 3,
+  "Directional Leader": 4,
+  "Campus Pastor": 5,
+  "Campus Admin": 5,
+  "Sub-Group Pastor": 6,
+  "Subgroup Pastor": 6,
+  "Sub-group Pastor": 6,
+  "Group Pastor": 7,
+  "Super Admin": 8,
+  "Admin": 8,
+  "Platform Super Admin": 8,
+};
+
+export function getLeadershipLevel(role: string): number {
+  return LEADERSHIP_LEVEL[role] ?? 0;
+}
+
+export function canUserSeeCourse(userLevel: number, targets: string[]): boolean {
+  if (!targets || targets.length === 0) return true;
+  const minTargetLevel = Math.min(...targets.map((t) => getLeadershipLevel(t)));
+  return userLevel >= minTargetLevel;
+}
+
+export async function getCurrentUserRole(): Promise<{ role: string; level: number }> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) return { role: "", level: 0 };
+
+  const { data } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const role = data?.role ?? "";
+  return { role, level: getLeadershipLevel(role) };
+}
+
+export type CatalogCourses = {
+  required: CourseWithProgress[];
+  pathway: CourseWithProgress[];
+  all: CourseWithProgress[];
+  userRole: string;
+};
+
+// ============================================================
+// Course catalog
+// ============================================================
+
+async function fetchAllCoursesWithProgress(userId: string | null): Promise<CourseWithProgress[]> {
+  const supabase = createClient();
 
   const { data: courses, error } = await supabase
     .from("courses")
@@ -31,9 +87,10 @@ export async function fetchCoursesWithProgress(): Promise<CourseWithProgress[]> 
 
   const lessonCounts = await fetchLessonCounts(courses.map((c) => c.id));
 
-  if (!user) {
+  if (!userId) {
     return courses.map((course) => ({
       ...course,
+      leadership_targets: Array.isArray(course.leadership_targets) ? course.leadership_targets : [],
       lesson_count: lessonCounts.get(course.id) ?? 0,
       enrolled: false,
       progress_percent: 0,
@@ -45,23 +102,20 @@ export async function fetchCoursesWithProgress(): Promise<CourseWithProgress[]> 
   }
 
   const [enrollments, progressRows, certificates, attempts] = await Promise.all([
-    supabase.from("enrollments").select("course_id").eq("user_id", user.id),
-    supabase.from("lesson_progress").select("course_id, completed").eq("user_id", user.id).eq("completed", true),
-    supabase.from("certificates").select("*").eq("user_id", user.id),
-    supabase.from("assessment_attempts").select("*").eq("user_id", user.id).order("attempted_at", { ascending: false }),
+    supabase.from("enrollments").select("course_id").eq("user_id", userId),
+    supabase.from("lesson_progress").select("course_id, completed").eq("user_id", userId).eq("completed", true),
+    supabase.from("certificates").select("*").eq("user_id", userId),
+    supabase.from("assessment_attempts").select("*").eq("user_id", userId).order("attempted_at", { ascending: false }),
   ]);
 
   const enrolledSet = new Set((enrollments.data ?? []).map((e) => e.course_id));
-
   const completedByCourse = new Map<string, number>();
   for (const row of progressRows.data ?? []) {
     completedByCourse.set(row.course_id, (completedByCourse.get(row.course_id) ?? 0) + 1);
   }
-
   const certsByCourse = new Map<string, LMSCertificate>(
     (certificates.data ?? []).map((c) => [c.course_id, c as LMSCertificate])
   );
-
   const bestAttemptByCourse = new Map<string, LMSAttempt>();
   for (const attempt of attempts.data ?? []) {
     const existing = bestAttemptByCourse.get(attempt.course_id);
@@ -73,18 +127,66 @@ export async function fetchCoursesWithProgress(): Promise<CourseWithProgress[]> 
   return courses.map((course) => {
     const total = lessonCounts.get(course.id) ?? 0;
     const completed = completedByCourse.get(course.id) ?? 0;
-    const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
     return {
       ...course,
+      leadership_targets: Array.isArray(course.leadership_targets) ? course.leadership_targets : [],
       lesson_count: total,
       enrolled: enrolledSet.has(course.id),
-      progress_percent: progressPercent,
+      progress_percent: total > 0 ? Math.round((completed / total) * 100) : 0,
       completed_lessons: completed,
       total_lessons: total,
       certificate: certsByCourse.get(course.id) ?? null,
       best_attempt: bestAttemptByCourse.get(course.id) ?? null,
     };
   });
+}
+
+export async function fetchCoursesWithProgress(): Promise<CourseWithProgress[]> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return fetchAllCoursesWithProgress(user?.id ?? null);
+}
+
+export async function fetchCourseCatalog(): Promise<CatalogCourses> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [all, userInfo] = await Promise.all([
+    fetchAllCoursesWithProgress(user?.id ?? null),
+    user
+      ? supabase.from("users").select("role").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const userRole = (userInfo as { data: { role?: string } | null })?.data?.role ?? "";
+  const userLevel = getLeadershipLevel(userRole);
+
+  const visible = all.filter((c) =>
+    canUserSeeCourse(userLevel, c.leadership_targets ?? [])
+  );
+
+  const required = visible.filter((c) => c.is_required);
+  const pathway = visible.filter(
+    (c) =>
+      !c.is_required &&
+      (c.leadership_targets ?? []).length > 0 &&
+      (c.leadership_targets ?? []).some(
+        (t) => t === userRole || getLeadershipLevel(t) === userLevel
+      )
+  );
+  const rest = visible.filter(
+    (c) =>
+      !c.is_required &&
+      !(c.leadership_targets ?? []).some(
+        (t) => t === userRole || getLeadershipLevel(t) === userLevel
+      )
+  );
+
+  return { required, pathway, all: visible, userRole };
 }
 
 // ============================================================
