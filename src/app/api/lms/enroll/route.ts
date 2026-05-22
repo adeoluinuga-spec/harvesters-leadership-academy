@@ -24,13 +24,13 @@ export async function POST(request: Request) {
 
   const { data: course } = await supabase
     .from("courses")
-    .select("id, title, is_published")
+    .select("id, title, status, is_published")
     .eq("id", body.course_id)
-    .eq("is_published", true)
+    .or("status.eq.published,is_published.eq.true")
     .maybeSingle();
 
   if (!course) {
-    return Response.json({ error: "Course not found." }, { status: 404 });
+    return Response.json({ error: "Course not found or not published." }, { status: 404 });
   }
 
   const { data, error } = await supabase

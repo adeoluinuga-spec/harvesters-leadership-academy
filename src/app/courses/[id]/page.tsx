@@ -30,6 +30,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [enrolling, startEnroll] = useTransition();
   const [enrolled, setEnrolled] = useState(false);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSimpleCourseDetail(id)
@@ -45,6 +46,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
 
   function handleEnroll() {
     if (!course?.id) return;
+    setEnrollError(null);
     startEnroll(async () => {
       try {
         const res = await fetch("/api/lms/enroll", {
@@ -52,8 +54,15 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ course_id: course.id }),
         });
-        if (res.ok) setEnrolled(true);
-      } catch {}
+        if (res.ok) {
+          setEnrolled(true);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          setEnrollError((data as { error?: string }).error ?? "Enrollment failed. Please try again.");
+        }
+      } catch {
+        setEnrollError("Network error. Please check your connection and try again.");
+      }
     });
   }
 
@@ -167,6 +176,9 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                   </button>
                 )}
               </div>
+              {enrollError && (
+                <p className="mt-3 text-sm text-rose-400">{enrollError}</p>
+              )}
             </div>
           </div>
         </div>

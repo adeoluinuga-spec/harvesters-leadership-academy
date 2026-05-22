@@ -18,12 +18,13 @@ import {
 
 import { shellItem } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { courses, recommendedCourses, recentlyWatched } from "@/lib/course-data";
+import { recommendedCourses, recentlyWatched } from "@/lib/course-data";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 import { MockRole } from "@/lib/mock-auth";
+import { fetchCoursesWithProgress } from "@/lib/lms";
+import type { CourseWithProgress } from "@/lib/lms-types";
 import { motion } from "framer-motion";
 
 type LearningMetric = {
@@ -81,29 +82,36 @@ const roleContext: Record<MockRole, string> = {
 
 export function PersonalLearningLayer({ role }: { role: MockRole }) {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const activeCourse = courses.find((course) => course.status === "in-progress") ?? courses[0];
+  const [enrolledCourses, setEnrolledCourses] = useState<CourseWithProgress[]>([]);
 
   useEffect(() => {
     let active = true;
 
-    async function syncProfile() {
-      const result = await getCurrentUserProfile();
-      if (active && result.profile) {
-        setProfile(result.profile);
-      }
+    async function load() {
+      const [profileResult, courses] = await Promise.all([
+        getCurrentUserProfile(),
+        fetchCoursesWithProgress(),
+      ]);
+      if (!active) return;
+      if (profileResult.profile) setProfile(profileResult.profile);
+      setEnrolledCourses(courses.filter((c) => c.enrolled));
     }
 
-    syncProfile();
+    load();
 
     return () => {
       active = false;
     };
   }, []);
 
+  const activeCourse = enrolledCourses[0] ?? null;
+
   const effectiveRole = profile?.role ?? role;
   const currentRole = profile?.currentLeadershipRole ?? effectiveRole;
   const aspiration = profile?.leadershipAspiration ?? "your next leadership step";
-  const aiInsight = `As a ${effectiveRole} preparing for ${aspiration}, prioritize ${activeCourse.title} alongside ${roleContext[effectiveRole]}.`;
+  const aiInsight = activeCourse
+    ? `As a ${effectiveRole} preparing for ${aspiration}, prioritize ${activeCourse.title} alongside ${roleContext[effectiveRole as MockRole] ?? roleContext["Leader"]}.`
+    : `As a ${effectiveRole} preparing for ${aspiration}, explore the course library to begin your leadership growth journey.`;
 
   return (
     <motion.section variants={shellItem} className="space-y-4">
@@ -129,7 +137,7 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
           {[
             ["Current leadership role", currentRole],
             ["Leadership aspiration", aspiration],
-            ["Learning context", profile?.campus ?? "Campus"],
+            ["Learning context", profile?.campus || "Campus not assigned"],
           ].map(([label, value]) => (
             <div key={label} className="rounded-lg border border-zinc-100 bg-zinc-50 p-4">
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
@@ -152,22 +160,39 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
           <CardContent className="grid gap-4 pt-1 lg:grid-cols-[1fr_0.78fr]">
             <div className="rounded-lg border border-zinc-100 p-4">
               <BookOpenCheck className="mb-4 size-5 text-zinc-500" />
-              <p className="font-heading text-lg font-semibold text-zinc-950">{activeCourse.title}</p>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">{activeCourse.description}</p>
-              <div className="mt-4 flex items-center justify-between text-xs">
-                <span className="text-zinc-500">{activeCourse.category}</span>
-                <span className="font-semibold text-zinc-950">{activeCourse.progress}% complete</span>
-              </div>
-              <Progress
-                value={activeCourse.progress}
-                className="mt-2 h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
-              />
-              <Button asChild className="mt-4 h-10 rounded-lg bg-black text-white hover:bg-zinc-800">
-                <Link href={`/courses/${activeCourse.id}/learn`}>
-                  Continue
-                  <ChevronRight className="size-4" />
-                </Link>
-              </Button>
+              {activeCourse ? (
+                <>
+                  <p className="font-heading text-lg font-semibold text-zinc-950">{activeCourse.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500">{activeCourse.description}</p>
+                  <div className="mt-4 flex items-center justify-between text-xs">
+                    <span className="text-zinc-500">{activeCourse.category}</span>
+                    <span className="font-semibold text-zinc-950">{activeCourse.progress_percent}% complete</span>
+                  </div>
+                  <Progress
+                    value={activeCourse.progress_percent}
+                    className="mt-2 h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
+                  />
+                  <Link
+                    href={`/courses/${activeCourse.slug}`}
+                    className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-black px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+                  >
+                    Continue
+                    <ChevronRight className="size-4" />
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="font-heading text-lg font-semibold text-zinc-950">No courses started yet</p>
+                  <p className="mt-2 text-sm leading-6 text-zinc-500">Browse the course library to begin your leadership growth journey.</p>
+                  <Link
+                    href="/courses"
+                    className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-black px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+                  >
+                    Browse courses
+                    <ChevronRight className="size-4" />
+                  </Link>
+                </>
+              )}
             </div>
 
             <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-4">

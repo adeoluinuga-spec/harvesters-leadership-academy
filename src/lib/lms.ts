@@ -40,12 +40,25 @@ export function getLeadershipLevel(role: string): number {
   return LEADERSHIP_LEVEL[role] ?? 0;
 }
 
+// All spelling variants of "Sub-Group Pastor" that may be stored in the DB
+// or entered in leadership_targets.
+const SUBGROUP_PASTOR_VARIANTS = new Set([
+  "Sub-Group Pastor",
+  "Subgroup Pastor",
+  "Sub-group Pastor",
+]);
+
+function normalizeRoleVariant(role: string): string {
+  return SUBGROUP_PASTOR_VARIANTS.has(role) ? "Sub-Group Pastor" : role;
+}
+
 export function canUserSeeCourse(userRole: string, targets: string[]): boolean {
   if (!targets || targets.length === 0) return true;
-  if (targets.includes(userRole)) return true;
   // Admin-level roles can always see all published courses
   if (["Platform Super Admin", "Super Admin", "Admin"].includes(userRole)) return true;
-  return false;
+  // Normalize both sides to handle all role spelling variants
+  const normalized = normalizeRoleVariant(userRole);
+  return targets.some((t) => normalizeRoleVariant(t) === normalized);
 }
 
 export async function getCurrentUserRole(): Promise<{ role: string; level: number }> {
@@ -173,8 +186,11 @@ export async function fetchCourseCatalog(): Promise<CatalogCourses> {
   );
 
   const required = visible.filter((c) => c.is_required);
+  const normalizedUserRole = normalizeRoleVariant(userRole);
   const pathway = visible.filter(
-    (c) => !c.is_required && (c.leadership_targets ?? []).includes(userRole)
+    (c) => !c.is_required && (c.leadership_targets ?? []).some(
+      (t) => normalizeRoleVariant(t) === normalizedUserRole
+    )
   );
 
   return { required, pathway, all: visible, userRole };

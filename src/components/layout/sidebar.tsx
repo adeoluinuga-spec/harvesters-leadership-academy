@@ -20,6 +20,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/client";
+import { dashboardForRole, normalizeStoredRole } from "@/lib/mock-auth";
 
 const ADMIN_COURSE_ROLES = [
   "Platform Super Admin",
@@ -64,6 +65,7 @@ function ManageCoursesLink({ pathname }: { pathname: string }) {
 export function Sidebar() {
   const pathname = usePathname();
   const [canManageCourses, setCanManageCourses] = useState(false);
+  const [dashboardHref, setDashboardHref] = useState("/dashboard/leader");
 
   useEffect(() => {
     async function checkRole() {
@@ -72,7 +74,10 @@ export function Sidebar() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
-        setCanManageCourses(ADMIN_COURSE_ROLES.includes(data?.role ?? ""));
+        const role = data?.role ?? "";
+        setCanManageCourses(ADMIN_COURSE_ROLES.includes(role));
+        const route = dashboardForRole(normalizeStoredRole(role));
+        if (route) setDashboardHref(route);
       } catch {
         // silently ignore — non-critical
       }
@@ -96,14 +101,15 @@ export function Sidebar() {
 
       <nav className="flex flex-1 flex-col gap-1 px-3 py-6 lg:px-4">
         {sidebarItems.map((navItem) => {
+          const href = navItem.label === "My Dashboard" ? dashboardHref : navItem.href;
           const active =
-            navItem.href !== "#" &&
-            (pathname === navItem.href || pathname.startsWith(`${navItem.href}/`));
+            href !== "#" &&
+            (pathname === href || pathname.startsWith(`${href}/`));
 
           return (
             <Link
               key={navItem.label}
-              href={navItem.href}
+              href={href}
               className={cn(
                 "group flex h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition-all hover:bg-white/8 hover:text-white lg:justify-start",
                 active && "bg-white text-black shadow-sm hover:bg-white hover:text-black"
