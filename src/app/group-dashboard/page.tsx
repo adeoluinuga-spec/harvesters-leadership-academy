@@ -162,7 +162,7 @@ function statusClasses(status: string) {
   return "bg-rose-50 text-rose-700 border-rose-100";
 }
 
-function Hero({ name }: { name: string }) {
+function Hero({ groupName }: { groupName: string }) {
   return (
     <motion.section variants={shellItem} className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
       <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
@@ -171,10 +171,10 @@ function Hero({ name }: { name: string }) {
             Group pastor intelligence
           </Badge>
           <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Welcome back, {name}
+            {groupName} Leadership Intelligence
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
-            Your personal leadership growth continues alongside strategic ministry intelligence across Group Alpha.
+            Your personal leadership growth continues alongside strategic ministry intelligence across {groupName}.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -194,7 +194,7 @@ function Hero({ name }: { name: string }) {
   );
 }
 
-function KpiGrid() {
+function KpiGrid({ groupName }: { groupName: string }) {
   return (
     <motion.section variants={shellContainer} className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
       {kpis.map((kpi) => (
@@ -215,7 +215,9 @@ function KpiGrid() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between gap-4">
-                <p className="text-sm text-zinc-500">{kpi.detail}</p>
+                <p className="text-sm text-zinc-500">
+                  {kpi.detail === "Across Group Alpha" ? `Across ${groupName}` : kpi.detail}
+                </p>
                 <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold text-zinc-700">
                   {kpi.delta}
                 </span>
@@ -329,7 +331,7 @@ function SubgroupPerformance() {
   );
 }
 
-function CampusHealthAndInsights() {
+function CampusHealthAndInsights({ groupName }: { groupName: string }) {
   return (
     <motion.section variants={shellItem} className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
@@ -363,7 +365,7 @@ function CampusHealthAndInsights() {
       <Card className="rounded-xl border-zinc-200 bg-[#0b0b0b] text-white shadow-sm">
         <CardHeader>
           <CardTitle className="font-heading text-lg font-semibold">Ministry insights</CardTitle>
-          <p className="text-sm text-zinc-400">Strategic signals for Group Alpha oversight</p>
+          <p className="text-sm text-zinc-400">Strategic signals for {groupName} oversight</p>
         </CardHeader>
         <CardContent className="space-y-3">
           {insights.map((insight) => (
@@ -446,6 +448,7 @@ function LeadersAndActivity() {
 
 export default function GroupDashboardPage() {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const groupName = profile?.group ?? "Group Alpha";
 
   useEffect(() => {
     let active = true;
@@ -467,11 +470,11 @@ export default function GroupDashboardPage() {
   return (
     <ProtectedRoute allowedRoles={["Group Pastor", "Directional Leader", "District Pastor / Pastoral Leader", "Super Admin", "Admin"]}>
       <DashboardShell searchPlaceholder="Search subgroups, campuses, leaders..." showDate>
-        <Hero name={profile?.fullName?.split(" ").filter(Boolean)[0] ?? "Leader"} />
+        <Hero groupName={groupName} />
         <PersonalLearningLayer role={profile?.role ?? "Group Pastor"} />
         <OversightLayerIntro
           title="Group oversight intelligence"
-          description="Role-aware intelligence for strategic ministry health, subgroup analytics, leadership pipeline visibility, and campus growth signals."
+          description={`Role-aware intelligence for ${groupName} ministry health, subgroup analytics, leadership pipeline visibility, and campus growth signals.`}
           modules={[
             "Strategic ministry intelligence",
             "Subgroup analytics",
@@ -479,9 +482,9 @@ export default function GroupDashboardPage() {
             "Campus growth intelligence",
           ]}
         />
-        <KpiGrid />
+        <KpiGrid groupName={groupName} />
         <SubgroupPerformance />
-        <CampusHealthAndInsights />
+        <CampusHealthAndInsights groupName={groupName} />
         <LeadersAndActivity />
       </DashboardShell>
     </ProtectedRoute>

@@ -25,7 +25,7 @@ export function TopNavbar({
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const displayName = profile?.fullName || "Academy Leader";
-  const displayRole = profile?.role || "Leader";
+  const displayRole = formatMinistryIdentity(profile);
   const currentDate = useMemo(
     () =>
       new Intl.DateTimeFormat("en-US", {
@@ -124,4 +124,37 @@ export function TopNavbar({
       </div>
     </header>
   );
+}
+
+function formatMinistryIdentity(profile: AuthProfile | null) {
+  if (!profile) return "Leader";
+
+  if (profile.role === "Campus Pastor" && profile.campus) {
+    return `${profile.role}, ${formatHarvestersCampus(profile.campus)}`;
+  }
+
+  if (
+    (profile.role === "Sub-Group Pastor" || profile.role === "Subgroup Pastor" || profile.role === "Sub-group Pastor") &&
+    profile.subgroup
+  ) {
+    return `${profile.role}, ${profile.subgroup}`;
+  }
+
+  if (profile.role === "Group Pastor" && profile.group) {
+    return `${profile.role}, ${profile.group}`;
+  }
+
+  if (profile.role === "Super Admin" || profile.role === "Admin") {
+    return profile.role;
+  }
+
+  if (profile.campus) {
+    return `${profile.role}, ${formatHarvestersCampus(profile.campus)}`;
+  }
+
+  return profile.role;
+}
+
+function formatHarvestersCampus(campus: string) {
+  return campus.startsWith("Harvesters ") ? campus : `Harvesters ${campus.replace(/\s+Campus$/i, "")}`;
 }

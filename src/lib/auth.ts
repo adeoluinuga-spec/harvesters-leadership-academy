@@ -20,6 +20,9 @@ export type AuthProfile = MockLeadershipProfile & {
   avatarUrl: string;
   role: MockRole;
   onboardingCompleted: boolean;
+  campusId: string | null;
+  subgroupId: string | null;
+  groupId: string | null;
 };
 
 type ProfileRow = {
@@ -65,6 +68,8 @@ type LookupRow = {
   title?: string | null;
   group_id?: string | number | null;
   subgroup_id?: string | number | null;
+  campus_pastor?: string | null;
+  pastor?: string | null;
 };
 
 export type MinistryCampusOption = {
@@ -230,6 +235,48 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
     ? normalizeRole(roleName)
     : normalizeRole((metadata.role as string | undefined) ?? fallbackRole);
 
+  const campusId = data?.campus_id ?? null;
+  let subgroupId = data?.subgroup_id ?? null;
+  let groupId = data?.group_id ?? null;
+  let campusName = data?.campus ?? relatedName(data?.campuses);
+  let subgroupName = data?.subgroup ?? relatedName(data?.subgroups);
+  let groupName = data?.group_name ?? data?.group ?? relatedName(data?.groups);
+  let campusPastor = data?.campus_pastor ?? null;
+
+  if (campusId && (!campusName || !subgroupId || !groupId || !campusPastor)) {
+    const { data: campusRow } = await supabase
+      .from("campuses")
+      .select("name, subgroup_id, group_id, campus_pastor, pastor")
+      .eq("id", campusId)
+      .maybeSingle<LookupRow>();
+
+    campusName = campusName ?? campusRow?.name ?? null;
+    subgroupId = subgroupId ?? stringifyId(campusRow?.subgroup_id);
+    groupId = groupId ?? stringifyId(campusRow?.group_id);
+    campusPastor = campusPastor ?? campusRow?.campus_pastor ?? campusRow?.pastor ?? null;
+  }
+
+  if (subgroupId && (!subgroupName || !groupId)) {
+    const { data: subgroupRow } = await supabase
+      .from("subgroups")
+      .select("name, group_id")
+      .eq("id", subgroupId)
+      .maybeSingle<LookupRow>();
+
+    subgroupName = subgroupName ?? subgroupRow?.name ?? null;
+    groupId = groupId ?? stringifyId(subgroupRow?.group_id);
+  }
+
+  if (groupId && !groupName) {
+    const { data: groupRow } = await supabase
+      .from("groups")
+      .select("name")
+      .eq("id", groupId)
+      .maybeSingle<LookupRow>();
+
+    groupName = groupRow?.name ?? null;
+  }
+
   return {
     id: user.id,
     email: data?.email ?? user.email ?? "",
@@ -238,10 +285,13 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
     avatarUrl: data?.avatar_url ?? "",
     role,
     onboardingCompleted: data?.onboarding_completed ?? false,
-    campus: data?.campus ?? relatedName(data?.campuses) ?? defaultLeadershipProfile.campus,
-    subgroup: data?.subgroup ?? relatedName(data?.subgroups) ?? defaultLeadershipProfile.subgroup,
-    group: data?.group_name ?? data?.group ?? relatedName(data?.groups) ?? defaultLeadershipProfile.group,
-    campusPastor: data?.campus_pastor ?? defaultLeadershipProfile.campusPastor,
+    campusId,
+    subgroupId,
+    groupId,
+    campus: campusName ?? defaultLeadershipProfile.campus,
+    subgroup: subgroupName ?? defaultLeadershipProfile.subgroup,
+    group: groupName ?? defaultLeadershipProfile.group,
+    campusPastor: campusPastor ?? defaultLeadershipProfile.campusPastor,
     currentLeadershipRole:
       data?.current_leadership_role ?? defaultLeadershipProfile.currentLeadershipRole,
     leadershipAspiration:

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { AlertCircle, CalendarCheck, CheckCircle2, GraduationCap, HeartHandshake, Users } from "lucide-react";
 
 import { PersonalLearningLayer, OversightLayerIntro } from "@/components/dashboard/learning-oversight-layers";
@@ -11,17 +12,40 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { campuses, leaders } from "@/lib/hierarchy-data";
-
-const campus = campuses[1];
-const campusLeaders = leaders.filter((leader) => leader.campus === campus.name);
-const stats = [
-  { label: "Total leaders", value: campus.leaders, icon: Users },
-  { label: "Active leaders", value: campus.active, icon: CheckCircle2 },
-  { label: "Participation", value: `${campus.engagement}%`, icon: GraduationCap },
-  { label: "Inactive alerts", value: campus.inactive, icon: AlertCircle },
-];
+import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 
 export default function CampusDashboardPage() {
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfile() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setProfile(result.profile);
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const campus =
+    campuses.find((campusItem) => campusItem.name === profile?.campus) ??
+    campuses.find((campusItem) => campusItem.name === "Ilupeju Campus") ??
+    campuses[0];
+  const campusLeaders = leaders.filter((leader) => leader.campus === campus.name);
+  const stats = [
+    { label: "Total leaders", value: campus.leaders, icon: Users },
+    { label: "Active leaders", value: campus.active, icon: CheckCircle2 },
+    { label: "Participation", value: `${campus.engagement}%`, icon: GraduationCap },
+    { label: "Inactive alerts", value: campus.inactive, icon: AlertCircle },
+  ];
+
   return (
     <ProtectedRoute allowedRoles={["Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Campus Admin", "Super Admin", "Admin"]}>
     <DashboardShell searchPlaceholder="Search campus leaders, teams, assessments...">
@@ -34,7 +58,7 @@ export default function CampusDashboardPage() {
             {campus.name} Learning and Campus Oversight
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
-            Your personal leadership growth stays connected to campus participation, leader care, and ministry-team health.
+            Your personal leadership growth stays connected to {campus.name} participation, leader care, and ministry-team health within {profile?.subgroup ?? campus.subgroup}.
           </p>
         </div>
         <AfricanMinistryVisual label="Campus ministry leadership in motion" />
@@ -44,7 +68,7 @@ export default function CampusDashboardPage() {
 
       <OversightLayerIntro
         title="Campus oversight intelligence"
-        description="Role-aware intelligence for campus participation, inactive leaders, engagement analytics, mentorship follow-up, and ministry-team performance."
+        description={`Role-aware intelligence for ${campus.name} participation, inactive leaders, engagement analytics, mentorship follow-up, and ministry-team performance.`}
         modules={[
           "Campus participation",
           "Inactive leaders",
@@ -117,14 +141,14 @@ export default function CampusDashboardPage() {
 
       <motion.section variants={shellItem} className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
         <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
-          <CardHeader><CardTitle className="font-heading text-lg font-semibold">Leader engagement tracking</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="font-heading text-lg font-semibold">{campus.name} leader engagement</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             {campusLeaders.map((leader) => <LeaderCard key={leader.id} leader={leader} />)}
           </CardContent>
         </Card>
         <IntelligencePanel
           title="Mentorship and follow-up"
-          subtitle="Accountability indicators for campus leadership"
+          subtitle={`Accountability indicators for ${campus.name} leadership`}
           insights={[
             "31 leaders require reactivation calls this week.",
             "Pastoral Care team needs a focused mentorship circle.",
