@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Lock, Loader2 } from "lucide-react";
+import { ArrowLeft, Lock, Loader2, Video } from "lucide-react";
 
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -187,6 +187,7 @@ export default function NewCoursePage() {
   const [description, setDescription] = useState("");
   const [overview, setOverview] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [instructorName, setInstructorName] = useState("");
   const [instructorRole, setInstructorRole] = useState("");
   const [category, setCategory] = useState<string>(COURSE_CATEGORIES[0]);
@@ -220,6 +221,7 @@ export default function NewCoursePage() {
       description,
       overview,
       thumbnail_url: thumbnailUrl,
+      video_url: videoUrl,
       instructor_name: instructorName,
       instructor_role: instructorRole,
       category,
@@ -303,6 +305,21 @@ export default function NewCoursePage() {
           description="A compelling image helps leaders recognise this course at a glance"
         >
           <ThumbnailUpload value={thumbnailUrl} onChange={setThumbnailUrl} />
+        </SectionCard>
+
+        {/* Vimeo video */}
+        <SectionCard title="Course video" description="Paste any Vimeo link — watch URL or embed URL both work">
+          <Field label="Vimeo URL" hint="e.g. https://vimeo.com/123456789">
+            <div className="relative">
+              <Video className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400" />
+              <Input
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="https://vimeo.com/123456789"
+                className="pl-8"
+              />
+            </div>
+          </Field>
         </SectionCard>
 
         {/* Basic info */}

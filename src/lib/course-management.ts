@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/client";
 import type { AdminCourse, LMSCourse, LMSModule, LMSLesson, CourseStatus, CourseDifficulty } from "@/lib/lms-types";
+import { normalizeVimeoUrl } from "@/lib/vimeo";
 
 export type CourseFormData = {
   title: string;
   description: string;
   overview: string;
   thumbnail_url: string;
+  video_url: string;
   instructor_name: string;
   instructor_role: string;
   category: string;
@@ -119,6 +121,7 @@ export async function createCourse(data: CourseFormData): Promise<{ course: LMSC
       description: data.description.trim() || null,
       overview: data.overview.trim() || null,
       thumbnail_url: data.thumbnail_url.trim() || null,
+      video_url: data.video_url?.trim() ? normalizeVimeoUrl(data.video_url.trim()) : null,
       category: data.category,
       level: data.level,
       instructor_name: data.instructor_name.trim(),
@@ -146,6 +149,7 @@ export async function updateCourse(id: string, data: Partial<CourseFormData>): P
   if (data.description !== undefined) payload.description = data.description.trim() || null;
   if (data.overview !== undefined) payload.overview = data.overview.trim() || null;
   if (data.thumbnail_url !== undefined) payload.thumbnail_url = data.thumbnail_url.trim() || null;
+  if (data.video_url !== undefined) payload.video_url = data.video_url?.trim() ? normalizeVimeoUrl(data.video_url.trim()) : null;
   if (data.category !== undefined) payload.category = data.category;
   if (data.level !== undefined) payload.level = data.level;
   if (data.instructor_name !== undefined) payload.instructor_name = data.instructor_name.trim();

@@ -5,6 +5,7 @@ import type {
   LMSAssessment,
   LMSAttempt,
   LMSCertificate,
+  LMSCourse,
   LMSLesson,
   LMSModule,
   LMSNote,
@@ -187,6 +188,43 @@ export async function fetchCourseCatalog(): Promise<CatalogCourses> {
   );
 
   return { required, pathway, all: visible, userRole };
+}
+
+// ============================================================
+// Simple course detail (MVP — no lessons/modules/assessments)
+// ============================================================
+
+export type SimpleCourseDetail = LMSCourse & { enrolled: boolean };
+
+export async function fetchSimpleCourseDetail(slug: string): Promise<SimpleCourseDetail | null> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: course, error } = await supabase
+    .from("courses")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error || !course) return null;
+
+  let enrolled = false;
+  if (user) {
+    const { data: enr } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("course_id", course.id)
+      .maybeSingle();
+    enrolled = Boolean(enr);
+  }
+
+  return {
+    ...(course as LMSCourse),
+    video_url: (course as Record<string, unknown>).video_url as string | null ?? null,
+    leadership_targets: Array.isArray(course.leadership_targets) ? course.leadership_targets : [],
+    enrolled,
+  };
 }
 
 // ============================================================

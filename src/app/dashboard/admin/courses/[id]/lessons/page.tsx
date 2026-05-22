@@ -42,6 +42,7 @@ import {
   type ModuleFormData,
 } from "@/lib/course-management";
 import type { AdminCourse, LMSLesson } from "@/lib/lms-types";
+import { extractVimeoId, normalizeVimeoUrl, vimeoEmbedUrl } from "@/lib/vimeo";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -192,6 +193,7 @@ function LessonEditor({
 
     const payload: LessonFormData = {
       ...form,
+      video_url: form.video_url.trim() ? normalizeVimeoUrl(form.video_url.trim()) : "",
       duration_seconds: inputToSeconds(durationInput),
       resources: form.resources.filter((r) => r.title.trim() && r.url.trim()),
     };
@@ -210,6 +212,8 @@ function LessonEditor({
       onSave(lesson, true);
     }
   }
+
+  const vimeoId = form.video_url.trim() ? extractVimeoId(form.video_url) : null;
 
   const resourceTypeIcon = (type: string) => {
     if (type === "pdf") return <FileText className="size-3.5 text-zinc-400" />;
@@ -267,17 +271,40 @@ function LessonEditor({
           </Field>
 
           {/* Video URL */}
-          <Field label="Video URL" hint="Paste a Vimeo or YouTube embed URL">
+          <Field label="Vimeo URL" hint="Paste any Vimeo link — watch URL or embed URL, both work">
             <div className="relative">
               <Video className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400" />
               <Input
                 value={form.video_url}
                 onChange={(e) => set("video_url", e.target.value)}
-                placeholder="https://player.vimeo.com/video/..."
+                placeholder="https://vimeo.com/123456789"
                 className="pl-8"
               />
             </div>
           </Field>
+
+          {/* Vimeo live preview */}
+          {vimeoId && (
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-950">
+              <div className="relative aspect-video">
+                <iframe
+                  key={vimeoId}
+                  src={vimeoEmbedUrl(vimeoId)}
+                  className="h-full w-full"
+                  allow="fullscreen; picture-in-picture"
+                  allowFullScreen
+                  title="Vimeo preview"
+                />
+              </div>
+              <div className="flex items-center gap-2 border-t border-white/10 px-3 py-2">
+                <div className="size-1.5 rounded-full bg-emerald-400" />
+                <p className="text-xs text-zinc-400">
+                  Vimeo video · ID {vimeoId}
+                </p>
+                <p className="ml-auto text-xs text-zinc-500">Will be saved as embed URL</p>
+              </div>
+            </div>
+          )}
 
           {/* Duration */}
           <Field label="Duration" hint='Enter as MM:SS (e.g. "18:30") or minutes (e.g. "18.5")'>
@@ -288,13 +315,13 @@ function LessonEditor({
             />
           </Field>
 
-          {/* Description */}
-          <Field label="Description">
+          {/* Lesson notes */}
+          <Field label="Lesson notes" hint="Teaching notes shown to learners alongside the video">
             <Textarea
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
-              rows={3}
-              placeholder="Brief overview of what this lesson covers..."
+              rows={4}
+              placeholder="Key points, scripture references, reflection prompts, or teaching notes for this lesson..."
             />
           </Field>
 
@@ -394,7 +421,7 @@ function LessonEditor({
           </div>
 
           {/* Transcript */}
-          <Field label="Transcript" hint="Optional — paste full lesson transcript for AI insights and search">
+          <Field label="Video transcript" hint="Verbatim transcript — used for AI insights, search, and accessibility">
             <Textarea
               value={form.transcript}
               onChange={(e) => set("transcript", e.target.value)}

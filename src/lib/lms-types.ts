@@ -47,6 +47,7 @@ export type LMSCourse = {
   description: string | null;
   overview: string | null;
   thumbnail_url: string | null;
+  video_url: string | null;
   category: string;
   level: string;
   instructor_name: string;

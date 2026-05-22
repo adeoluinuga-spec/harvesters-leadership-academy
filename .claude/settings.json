@@ -6,7 +6,9 @@
       "Bash(node -e \"const {Slot} = require\\('radix-ui'\\); const r = Slot.Root; const sym = Object.getOwnPropertySymbols\\(r\\); console.log\\('symbols:', sym.map\\(s => s.toString\\(\\)\\)\\); console.log\\('is forwardRef?:', sym.some\\(s => s.toString\\(\\).includes\\('forward'\\)\\)\\)\")",
       "Bash(node -e \"const slot = require\\('@radix-ui/react-slot'\\); console.log\\('keys:', Object.keys\\(slot\\)\\); console.log\\('Root type:', typeof slot.Root\\); console.log\\('default type:', typeof slot.default\\)\")",
       "Bash(Get-ChildItem -Recurse \"c:\\\\Users\\\\hp\\\\Desktop\\\\harvesters-academy\\\\src\\\\app\\\\dashboard\\\\admin\\\\courses\")",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\hp\\.claude\\projects\\c--Users-hp-Desktop-harvesters-academy\\memory"
