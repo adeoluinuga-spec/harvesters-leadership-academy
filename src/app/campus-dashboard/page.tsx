@@ -127,7 +127,7 @@ export default function CampusDashboardPage() {
 
           {!hasCampusId && !hierarchy.loading && (
             <div className="mt-5 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              No campus assignment found. Complete your ministry profile to see campus oversight data.
+              Complete your profile to select your campus. Your oversight data will appear here once your campus is claimed.
             </div>
           )}
         </div>

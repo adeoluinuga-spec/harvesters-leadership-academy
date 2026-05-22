@@ -482,6 +482,16 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
     throw new Error("Your session has expired. Please sign in again before completing onboarding.");
   }
 
+  // Campus Pastor must claim a campus that is not already taken
+  if (input.role === "Campus Pastor" && input.campus.source === "supabase" && input.campus.id) {
+    const claimedIds = await fetchClaimedCampusIds(authData.user.id);
+    if (claimedIds.has(input.campus.id)) {
+      throw new Error(
+        "This campus is already claimed by another Campus Pastor. Please select a different campus or contact your Platform Super Admin."
+      );
+    }
+  }
+
   await ensureUserProfile(authData.user, {
     designation: input.designation,
   });
@@ -540,6 +550,46 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
 
 export function dashboardForAuthRole(role: MockRole) {
   return dashboardForRole(role);
+}
+
+/**
+ * Returns the set of campus_ids already claimed by a Campus Pastor with
+ * onboarding_completed = true, optionally excluding one user (the current
+ * user so they can re-claim/change their own campus).
+ */
+/**
+ * Returns the set of campus_ids already claimed by a Campus Pastor with
+ * onboarding_completed = true. Pass the current user's id as excludeUserId
+ * so their own campus is not counted as taken.
+ */
+export async function fetchClaimedCampusIds(excludeUserId?: string): Promise<Set<string>> {
+  const supabase = createClient();
+
+  type ClaimRow = { campus_id: string | null };
+
+  let query = supabase
+    .from("users")
+    .select("campus_id")
+    .eq("role", "Campus Pastor")
+    .eq("onboarding_completed", true)
+    .not("campus_id", "is", null);
+
+  if (excludeUserId) {
+    query = query.neq("id", excludeUserId);
+  }
+
+  const { data, error } = await query.returns<ClaimRow[]>();
+
+  if (error) {
+    console.error("[auth] fetchClaimedCampusIds failed", error.message);
+    return new Set();
+  }
+
+  return new Set(
+    (data ?? [])
+      .map((row) => row.campus_id)
+      .filter((id): id is string => Boolean(id))
+  );
 }
 
 function relatedName(value?: RelatedName | RelatedName[] | null) {

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Camera, CheckCircle2, ChevronRight, LoaderCircle, MapPin, Phone, Upload, User } from "lucide-react";
+import { Building2, Camera, CheckCircle2, ChevronRight, LoaderCircle, MapPin, Phone, Upload, User } from "lucide-react";
 
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import {
 } from "@/lib/mock-auth";
 import {
   dashboardForAuthRole,
+  fetchClaimedCampusIds,
   fetchLookupOptions,
   fetchMinistryCampuses,
   getCurrentUserProfile,
@@ -46,6 +47,21 @@ const pathway = [
   "Group Pastor",
 ];
 
+function campusOptionLabel(campus: MinistryCampusOption): string {
+  const parts = [campus.name];
+  if (campus.subgroupName && campus.subgroupName !== "Unassigned subgroup") {
+    parts.push(campus.subgroupName);
+  }
+  if (campus.groupName && campus.groupName !== groupAlphaFallback) {
+    parts.push(campus.groupName);
+  } else if (campus.groupName) {
+    parts.push(campus.groupName);
+  }
+  return parts.join(" — ");
+}
+
+const groupAlphaFallback = "Group Alpha";
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -66,14 +82,31 @@ export default function OnboardingPage() {
   const [gender, setGender] = useState("");
   const [yearsInMinistry, setYearsInMinistry] = useState("");
   const [campusOptions, setCampusOptions] = useState<MinistryCampusOption[]>([]);
+  const [claimedCampusIds, setClaimedCampusIds] = useState<Set<string>>(new Set());
   const [roleOptions, setRoleOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedCampusId, setSelectedCampusId] = useState("");
   const [currentLeadershipRole, setCurrentLeadershipRole] =
     useState<CurrentLeadershipRole>("Cell Leader / Assistant HOD");
   const [leadershipAspiration, setLeadershipAspiration] =
     useState<LeadershipAspiration>("Zonal Leader / HOD");
+
+  const isCampusPastor = selectedRole === "Campus Pastor";
+
+  // Campuses available for selection — Campus Pastors only see unclaimed ones
+  // (their own current campus is never in the claimed set because we excluded it)
+  const availableCampuses = useMemo(() => {
+    if (!isCampusPastor) return campusOptions;
+    return campusOptions.filter((c) => !claimedCampusIds.has(c.id));
+  }, [isCampusPastor, campusOptions, claimedCampusIds]);
+
   const selectedCampusRecord =
-    campusOptions.find((campus) => campus.id === selectedCampusId) ?? campusOptions[0];
+    campusOptions.find((campus) => campus.id === selectedCampusId) ?? null;
+
+  // Whether the currently selected campus is already claimed by another Pastor
+  const selectedCampusClaimed = isCampusPastor && selectedCampusId
+    ? claimedCampusIds.has(selectedCampusId)
+    : false;
+
   const selectedRoleOption = roleOptions.find(
     (role) => normalizeRole(role.name) === selectedRole
   );
@@ -98,18 +131,40 @@ export default function OnboardingPage() {
         return;
       }
 
+      const profile = profileResult.profile;
+      const detectedRole: MockRole = profile?.role ?? "Cell Leader / Assistant HOD";
+
       setCampusOptions(campuses);
       setRoleOptions(roleRows);
-      setDesignation(profileResult.profile?.designation ?? "None");
-      setFullName(profileResult.profile?.fullName ?? "");
-      setEmail(profileResult.profile?.email ?? "");
-      setAvatarUrl(profileResult.profile?.avatarUrl ?? "");
-      setAvatarPreview(profileResult.profile?.avatarUrl ?? "");
-      setSelectedRole(profileResult.profile?.role ?? "Cell Leader / Assistant HOD");
-      setAssignedRole(profileResult.profile?.role ?? null);
-      setSelectedCampusId(
-        campuses.find((campus) => campus.name === "Ilupeju Campus")?.id ?? campuses[0]?.id ?? ""
-      );
+      setDesignation(profile?.designation ?? "None");
+      setFullName(profile?.fullName ?? "");
+      setEmail(profile?.email ?? "");
+      setAvatarUrl(profile?.avatarUrl ?? "");
+      setAvatarPreview(profile?.avatarUrl ?? "");
+      setSelectedRole(detectedRole);
+      setAssignedRole(detectedRole);
+
+      // Campus Pastors: fetch claimed campus IDs (excluding self) and smart-default their campus
+      if (detectedRole === "Campus Pastor") {
+        const claimed = await fetchClaimedCampusIds(profile?.id);
+        if (active) {
+          setClaimedCampusIds(claimed);
+        }
+        // Pre-select their existing campus if already assigned; otherwise leave blank
+        const preSeededCampusId = profile?.campusId ?? null;
+        if (preSeededCampusId && campuses.some((c) => c.id === preSeededCampusId)) {
+          setSelectedCampusId(preSeededCampusId);
+        } else {
+          // Force them to choose — do not default to first campus
+          setSelectedCampusId("");
+        }
+      } else {
+        // For all other roles, default to Ilupeju Campus or first campus
+        setSelectedCampusId(
+          campuses.find((c) => c.name === "Ilupeju Campus")?.id ?? campuses[0]?.id ?? ""
+        );
+      }
+
       setLoadingLookups(false);
     }
 
@@ -119,6 +174,16 @@ export default function OnboardingPage() {
       active = false;
     };
   }, [router]);
+
+  // When the role changes to/from Campus Pastor, reset campus selection and re-filter
+  useEffect(() => {
+    if (isCampusPastor) {
+      // Don't auto-reset if they already have a valid, unclaimed selection
+      if (selectedCampusId && !claimedCampusIds.has(selectedCampusId)) return;
+      setSelectedCampusId("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCampusPastor]);
 
   function handleAvatarChange(file?: File) {
     setError("");
@@ -141,9 +206,7 @@ export default function OnboardingPage() {
   }
 
   async function uploadAvatarIfNeeded() {
-    if (!avatarFile) {
-      return avatarUrl || null;
-    }
+    if (!avatarFile) return avatarUrl || null;
 
     const supabase = createClient();
     const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -156,17 +219,10 @@ export default function OnboardingPage() {
     const filePath = `${authData.user.id}/${Date.now()}.${fileExtension}`;
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(filePath, avatarFile, {
-        cacheControl: "3600",
-        contentType: avatarFile.type,
-        upsert: true,
-      });
+      .upload(filePath, avatarFile, { cacheControl: "3600", contentType: avatarFile.type, upsert: true });
 
     if (uploadError) {
-      console.error("[onboarding] Avatar upload failed", {
-        message: uploadError.message,
-      });
-
+      console.error("[onboarding] Avatar upload failed", { message: uploadError.message });
       throw new Error("We could not upload your profile picture. Please try another image or continue later.");
     }
 
@@ -179,27 +235,26 @@ export default function OnboardingPage() {
       setError("Please upload a profile picture before completing onboarding.");
       return;
     }
-
     if (!fullName.trim()) {
       setError("Please enter your full name before completing onboarding.");
       return;
     }
-
     if (!email.trim()) {
       setError("Please enter your email address before completing onboarding.");
       return;
     }
-
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       setError("Please enter a valid email address before completing onboarding.");
       return;
     }
-
-    if (!selectedCampusRecord) {
-      setError("Invalid hierarchy mapping. Please select a campus before continuing.");
+    if (isCampusPastor && !selectedCampusId) {
+      setError("Please select your campus before completing onboarding.");
       return;
     }
-
+    if (!selectedCampusRecord) {
+      setError("Please select a valid campus before completing onboarding.");
+      return;
+    }
     if (!gender) {
       setError("Please select Male or Female before continuing.");
       return;
@@ -251,22 +306,18 @@ export default function OnboardingPage() {
         setError("Please upload a profile picture before continuing to ministry information.");
         return false;
       }
-
       if (!fullName.trim()) {
         setError("Please enter your full name before continuing.");
         return false;
       }
-
       if (!email.trim()) {
         setError("Please enter your email address before continuing.");
         return false;
       }
-
       if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
         setError("Please enter a valid email address before continuing.");
         return false;
       }
-
       if (!gender) {
         setError("Please select Male or Female before continuing.");
         return false;
@@ -274,7 +325,17 @@ export default function OnboardingPage() {
     }
 
     if (currentStep === 1) {
-      if (!selectedCampusRecord) {
+      // Campus Pastor must claim an unclaimed campus
+      if (isCampusPastor) {
+        if (!selectedCampusId) {
+          setError("Please select the campus you oversee before continuing.");
+          return false;
+        }
+        if (selectedCampusClaimed) {
+          setError("This campus already has a Campus Pastor assigned. Please select a different campus.");
+          return false;
+        }
+      } else if (!selectedCampusRecord) {
         setError("Please select a valid campus before continuing.");
         return false;
       }
@@ -327,6 +388,7 @@ export default function OnboardingPage() {
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.2 }}
           >
+            {/* ── Step 0: Basic Information ─────────────────────── */}
             {step === 0 ? (
               <div className="grid gap-4">
                 <label className="flex cursor-pointer items-center gap-4 rounded-lg border border-zinc-100 p-4 transition-colors hover:border-zinc-200">
@@ -438,34 +500,114 @@ export default function OnboardingPage() {
               </div>
             ) : null}
 
+            {/* ── Step 1: Ministry Information ──────────────────── */}
             {step === 1 ? (
               <div className="grid gap-4">
-                <label>
-                  <span className="mb-2 block text-sm font-medium text-zinc-700">Campus selection</span>
-                  <select
-                    value={selectedCampusId}
-                    disabled={saving || loadingLookups}
-                    onChange={(event) => setSelectedCampusId(event.target.value)}
-                    className="h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-950 outline-none transition-all focus:border-zinc-300 focus:ring-3 focus:ring-zinc-300/40"
-                  >
-                    {campusOptions.map((campus) => (
-                      <option key={campus.id} value={campus.id}>
-                        {campus.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {[
-                  ["Sub-Group", selectedCampusRecord?.subgroupName],
-                  ["Group", selectedCampusRecord?.groupName],
-                  ["Campus Pastor", selectedCampusRecord?.campusPastor],
-                  ["Sub-Group Pastor", selectedCampusRecord?.subgroupPastor],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-zinc-100 bg-zinc-50 p-3">
-                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">{label}</p>
-                    <p className="font-heading mt-1 font-semibold text-zinc-950">{value ?? "Not mapped"}</p>
+
+                {/* Campus Pastor: claim-campus flow */}
+                {isCampusPastor ? (
+                  <div className="grid gap-4">
+                    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black text-white">
+                          <Building2 className="size-4" />
+                        </div>
+                        <div>
+                          <p className="font-heading font-semibold text-zinc-950">Claim your campus</p>
+                          <p className="text-sm text-zinc-500">
+                            Select the campus you oversee. Each campus can only be claimed by one Campus Pastor.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {availableCampuses.length === 0 && !loadingLookups ? (
+                      <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        All campuses are currently claimed. Contact your Platform Super Admin to resolve campus assignments.
+                      </div>
+                    ) : (
+                      <label>
+                        <span className="mb-2 block text-sm font-medium text-zinc-700">
+                          Select your campus
+                        </span>
+                        <select
+                          value={selectedCampusId}
+                          disabled={saving || loadingLookups}
+                          onChange={(event) => {
+                            setSelectedCampusId(event.target.value);
+                            setError("");
+                          }}
+                          className="h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-950 outline-none transition-all focus:border-zinc-300 focus:ring-3 focus:ring-zinc-300/40"
+                        >
+                          <option value="">Choose your campus…</option>
+                          {availableCampuses.map((campus) => (
+                            <option key={campus.id} value={campus.id}>
+                              {campusOptionLabel(campus)}
+                            </option>
+                          ))}
+                        </select>
+                        {selectedCampusClaimed && (
+                          <p className="mt-2 text-sm text-rose-600">
+                            This campus already has a Campus Pastor assigned.
+                          </p>
+                        )}
+                      </label>
+                    )}
+
+                    {/* Show hierarchy details for chosen campus */}
+                    {selectedCampusRecord && (
+                      <div className="grid gap-2 rounded-xl border border-zinc-100 bg-white p-4">
+                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
+                          Campus hierarchy
+                        </p>
+                        {[
+                          ["Campus", selectedCampusRecord.name],
+                          ["Sub-Group", selectedCampusRecord.subgroupName],
+                          ["Group", selectedCampusRecord.groupName],
+                          ["Listed Campus Pastor", selectedCampusRecord.campusPastor],
+                          ["Sub-Group Pastor", selectedCampusRecord.subgroupPastor],
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 text-sm">
+                            <span className="text-zinc-500">{label}</span>
+                            <span className="font-medium text-zinc-950">{value ?? "Not mapped"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
+                ) : (
+                  /* All other roles: standard campus selection */
+                  <div className="grid gap-4">
+                    <label>
+                      <span className="mb-2 block text-sm font-medium text-zinc-700">Campus selection</span>
+                      <select
+                        value={selectedCampusId}
+                        disabled={saving || loadingLookups}
+                        onChange={(event) => setSelectedCampusId(event.target.value)}
+                        className="h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-950 outline-none transition-all focus:border-zinc-300 focus:ring-3 focus:ring-zinc-300/40"
+                      >
+                        {campusOptions.map((campus) => (
+                          <option key={campus.id} value={campus.id}>
+                            {campus.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {[
+                      ["Sub-Group", selectedCampusRecord?.subgroupName],
+                      ["Group", selectedCampusRecord?.groupName],
+                      ["Campus Pastor", selectedCampusRecord?.campusPastor],
+                      ["Sub-Group Pastor", selectedCampusRecord?.subgroupPastor],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg border border-zinc-100 bg-zinc-50 p-3">
+                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">{label}</p>
+                        <p className="font-heading mt-1 font-semibold text-zinc-950">{value ?? "Not mapped"}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Role selector */}
                 <div>
                   <p className="mb-2 text-sm font-medium text-zinc-700">Role</p>
                   <div className="grid gap-2">
@@ -474,33 +616,35 @@ export default function OnboardingPage() {
                       const canSelfSelect = selfOnboardingRoles.includes(roleName) || assignedRole === roleName;
 
                       return (
-                      <button
-                        key={role.name}
-                        disabled={!canSelfSelect || saving}
-                        onClick={() => setSelectedRole(roleName)}
-                        className={`flex items-center justify-between rounded-lg border p-3 text-left transition-colors ${
-                          selectedRole === role.name
-                            ? "border-black bg-black text-white"
-                            : !canSelfSelect
-                              ? "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400"
-                              : "border-zinc-100 bg-white text-zinc-950 hover:bg-zinc-50"
-                        }`}
-                      >
-                        <span className={`font-medium ${selectedRole === role.name ? "text-white" : !canSelfSelect ? "text-zinc-400" : "text-zinc-950"}`}>
-                          {role.name}
-                        </span>
-                        {!canSelfSelect ? (
-                          <Badge className={`rounded-md ${selectedRole === role.name ? "bg-white text-black hover:bg-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-100"}`}>
-                            Platform Super Admin
-                          </Badge>
-                        ) : null}
-                      </button>
-                    )})}
+                        <button
+                          key={role.name}
+                          disabled={!canSelfSelect || saving}
+                          onClick={() => setSelectedRole(roleName)}
+                          className={`flex items-center justify-between rounded-lg border p-3 text-left transition-colors ${
+                            selectedRole === role.name
+                              ? "border-black bg-black text-white"
+                              : !canSelfSelect
+                                ? "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400"
+                                : "border-zinc-100 bg-white text-zinc-950 hover:bg-zinc-50"
+                          }`}
+                        >
+                          <span className={`font-medium ${selectedRole === role.name ? "text-white" : !canSelfSelect ? "text-zinc-400" : "text-zinc-950"}`}>
+                            {role.name}
+                          </span>
+                          {!canSelfSelect ? (
+                            <Badge className={`rounded-md ${selectedRole === role.name ? "bg-white text-black hover:bg-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-100"}`}>
+                              Platform Super Admin
+                            </Badge>
+                          ) : null}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             ) : null}
 
+            {/* ── Step 2: Leadership Profile ─────────────────────── */}
             {step === 2 ? (
               <div className="grid gap-4">
                 <label>
@@ -508,15 +652,11 @@ export default function OnboardingPage() {
                   <select
                     value={currentLeadershipRole}
                     disabled={saving}
-                    onChange={(event) =>
-                      setCurrentLeadershipRole(event.target.value as CurrentLeadershipRole)
-                    }
+                    onChange={(event) => setCurrentLeadershipRole(event.target.value as CurrentLeadershipRole)}
                     className="h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-950 outline-none transition-all focus:border-zinc-300 focus:ring-3 focus:ring-zinc-300/40"
                   >
                     {currentLeadershipRoles.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
+                      <option key={role} value={role}>{role}</option>
                     ))}
                   </select>
                 </label>
@@ -527,15 +667,11 @@ export default function OnboardingPage() {
                   <select
                     value={leadershipAspiration}
                     disabled={saving}
-                    onChange={(event) =>
-                      setLeadershipAspiration(event.target.value as LeadershipAspiration)
-                    }
+                    onChange={(event) => setLeadershipAspiration(event.target.value as LeadershipAspiration)}
                     className="h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-950 outline-none transition-all focus:border-zinc-300 focus:ring-3 focus:ring-zinc-300/40"
                   >
                     {leadershipAspirations.map((aspiration) => (
-                      <option key={aspiration} value={aspiration}>
-                        {aspiration}
-                      </option>
+                      <option key={aspiration} value={aspiration}>{aspiration}</option>
                     ))}
                   </select>
                 </label>
@@ -575,31 +711,44 @@ export default function OnboardingPage() {
               </div>
             ) : null}
 
+            {/* ── Step 3: Confirmation ───────────────────────────── */}
             {step === 3 ? (
               <div className="space-y-5">
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5">
                   <CheckCircle2 className="mb-4 size-7 text-emerald-700" />
                   <h3 className="font-heading text-xl font-semibold text-zinc-950">
-                    Onboarding profile ready
+                    {isCampusPastor
+                      ? `Campus claim ready — ${selectedCampusRecord?.name ?? "Campus"}`
+                      : "Onboarding profile ready"}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-zinc-600">
-                    Your ministry profile is prepared for role-based academy access, learning recommendations, and leadership intelligence.
+                    {isCampusPastor
+                      ? `Your academy profile is prepared. You will be assigned as Campus Pastor for ${selectedCampusRecord?.name ?? "your selected campus"} with full campus oversight access.`
+                      : "Your ministry profile is prepared for role-based academy access, learning recommendations, and leadership intelligence."}
                   </p>
                 </div>
                 <div className="grid gap-3 rounded-xl border border-zinc-100 bg-white p-4">
-                  <p className="font-heading font-semibold text-zinc-950">Hierarchy summary</p>
+                  <p className="font-heading font-semibold text-zinc-950">
+                    {isCampusPastor ? "Campus claim summary" : "Hierarchy summary"}
+                  </p>
                   {[
                     ["Designation", designation],
                     ["Full Name", fullName],
-                    ["Campus", selectedCampusRecord?.name],
+                    ["Role", selectedRole],
+                    isCampusPastor
+                      ? ["Campus (claimed)", selectedCampusRecord?.name]
+                      : ["Campus", selectedCampusRecord?.name],
                     ["Sub-Group", selectedCampusRecord?.subgroupName],
                     ["Group", selectedCampusRecord?.groupName],
-                    ["Campus Pastor", selectedCampusRecord?.campusPastor],
-                    ["Sub-Group Pastor", selectedCampusRecord?.subgroupPastor],
-                    ["Group Pastor", selectedCampusRecord?.groupPastor],
-                    ["Role", selectedRole],
-                    ["Current Leadership Role", currentLeadershipRole],
-                    ["Preparing For", leadershipAspiration],
+                    ...(!isCampusPastor
+                      ? [
+                          ["Campus Pastor", selectedCampusRecord?.campusPastor],
+                          ["Sub-Group Pastor", selectedCampusRecord?.subgroupPastor],
+                          ["Group Pastor", selectedCampusRecord?.groupPastor],
+                          ["Current Leadership Role", currentLeadershipRole],
+                          ["Preparing For", leadershipAspiration],
+                        ]
+                      : []),
                   ].map(([label, value]) => (
                     <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-sm">
                       <span className="text-zinc-500">{label}</span>
@@ -645,7 +794,7 @@ export default function OnboardingPage() {
                 </>
               ) : (
                 <>
-                  Continue to dashboard
+                  {isCampusPastor ? "Claim campus and open dashboard" : "Continue to dashboard"}
                   <ChevronRight className="size-4" />
                 </>
               )}
