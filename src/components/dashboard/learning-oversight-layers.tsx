@@ -62,12 +62,12 @@ const learningMetrics: LearningMetric[] = [
 
 const roleContext: Record<MockRole, string> = {
   "Cell Leader / Assistant HOD": "the cell members you influence and the ministry habits you are forming",
-  "Zonal Leader / HOD": "zonal or departmental leadership, team development, and readiness signals",
+  "Zonal Leader / HOD": "zonal leadership, team development, and readiness signals",
   "Community Leader": "community leadership health, leader maturity, and participation patterns",
   "Area Leader": "area leadership health, community comparison, and follow-up intelligence",
   "District Pastor / Pastoral Leader": "pastoral oversight, district health, and leader care signals",
   "Directional Leader": "directional oversight, pastoral reporting, and leadership pipeline intelligence",
-  "Campus Pastor": "campus participation, inactive leaders, mentorship, and department performance",
+  "Campus Pastor": "campus participation, inactive leaders, mentorship, and leadership-team performance",
   "Sub-Group Pastor": "sub-group health, campus comparisons, leadership performance, and participation trends",
   "Group Pastor": "group-wide ministry intelligence, sub-group analytics, pipeline visibility, and campus growth",
   "Campus Admin": "campus operations, enrollment management, and campus-level learning analytics",
@@ -99,9 +99,10 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
     };
   }, []);
 
-  const currentRole = profile?.currentLeadershipRole ?? role;
+  const effectiveRole = profile?.role ?? role;
+  const currentRole = profile?.currentLeadershipRole ?? effectiveRole;
   const aspiration = profile?.leadershipAspiration ?? "your next leadership step";
-  const aiInsight = `As a ${role} preparing for ${aspiration}, prioritize ${activeCourse.title} alongside ${roleContext[role]}.`;
+  const aiInsight = `As a ${effectiveRole} preparing for ${aspiration}, prioritize ${activeCourse.title} alongside ${roleContext[effectiveRole]}.`;
 
   return (
     <motion.section variants={shellItem} className="space-y-4">

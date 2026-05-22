@@ -24,7 +24,7 @@ const stats = [
 export default function CampusDashboardPage() {
   return (
     <ProtectedRoute allowedRoles={["Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Campus Admin", "Super Admin", "Admin"]}>
-    <DashboardShell searchPlaceholder="Search campus leaders, departments, assessments...">
+    <DashboardShell searchPlaceholder="Search campus leaders, teams, assessments...">
       <motion.section variants={shellItem} className="grid gap-5 xl:grid-cols-[1fr_380px]">
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
           <Badge className="mb-5 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
@@ -34,7 +34,7 @@ export default function CampusDashboardPage() {
             {campus.name} Learning and Campus Oversight
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
-            Your personal leadership growth stays connected to campus participation, leader care, and department health.
+            Your personal leadership growth stays connected to campus participation, leader care, and ministry-team health.
           </p>
         </div>
         <AfricanMinistryVisual label="Campus ministry leadership in motion" />
@@ -44,13 +44,13 @@ export default function CampusDashboardPage() {
 
       <OversightLayerIntro
         title="Campus oversight intelligence"
-        description="Role-aware intelligence for campus participation, inactive leaders, engagement analytics, mentorship follow-up, and department performance."
+        description="Role-aware intelligence for campus participation, inactive leaders, engagement analytics, mentorship follow-up, and ministry-team performance."
         modules={[
           "Campus participation",
           "Inactive leaders",
           "Engagement analytics",
           "Mentorship/follow-up",
-          "Department performance",
+          "Ministry-team performance",
         ]}
       />
 
@@ -75,8 +75,8 @@ export default function CampusDashboardPage() {
       <motion.section variants={shellItem} className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
           <CardHeader className="border-b border-zinc-100">
-            <CardTitle className="font-heading text-lg font-semibold">Department performance</CardTitle>
-            <p className="text-sm text-zinc-500">Participation levels across ministry departments</p>
+            <CardTitle className="font-heading text-lg font-semibold">Ministry-team performance</CardTitle>
+            <p className="text-sm text-zinc-500">Participation levels across ministry teams</p>
           </CardHeader>
           <CardContent className="space-y-4 pt-1">
             {campus.departments.map((department) => (
@@ -127,9 +127,9 @@ export default function CampusDashboardPage() {
           subtitle="Accountability indicators for campus leadership"
           insights={[
             "31 leaders require reactivation calls this week.",
-            "Pastoral Care department needs a focused mentorship circle.",
+            "Pastoral Care team needs a focused mentorship circle.",
             "Two leaders are ready for coordinator-level review.",
-            "Course participation improves when department leads host weekly debriefs.",
+            "Course participation improves when team leads host weekly debriefs.",
           ]}
           dark
         />

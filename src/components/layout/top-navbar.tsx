@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, LogOut, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -26,6 +26,16 @@ export function TopNavbar({
   const [signingOut, setSigningOut] = useState(false);
   const displayName = profile?.fullName || "Academy Leader";
   const displayRole = profile?.role || "Leader";
+  const currentDate = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(new Date()),
+    []
+  );
   const initials = displayName
     .split(" ")
     .filter(Boolean)
@@ -75,7 +85,7 @@ export function TopNavbar({
         <div className="flex items-center justify-between gap-3 sm:justify-end">
           {showDate ? (
             <p className="hidden text-sm font-medium text-zinc-500 md:block">
-              Thursday, May 21, 2026
+              {currentDate}
             </p>
           ) : null}
           <Button

@@ -127,7 +127,7 @@ const notifications: AcademyNotification[] = [
   {
     id: "campus-drop",
     title: "Campus completion dropped this week",
-    body: "Engagement moved down by 6%. AI suggests reinforcing learning rhythms through department leads.",
+    body: "Engagement moved down by 6%. AI suggests reinforcing learning rhythms through team leads.",
     type: "System",
     priority: "Insight",
     time: "Monday",
@@ -147,7 +147,7 @@ const notifications: AcademyNotification[] = [
   {
     id: "group-campus-attention",
     title: "Ilupeju Campus needs attention",
-    body: "Learning starts are healthy, but assessment submission has slowed across two departments.",
+    body: "Learning starts are healthy, but assessment submission has slowed across two ministry teams.",
     type: "Follow-up",
     priority: "Care",
     time: "Today, 9:40 AM",

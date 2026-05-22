@@ -60,7 +60,7 @@ export const aiGenerationArtifacts: AiGenerationArtifact[] = [
   {
     label: "Reflection questions",
     value: "12 prompts",
-    detail: "Questions adapt to department culture, stewardship posture, and leadership aspiration.",
+    detail: "Questions adapt to ministry-team culture, stewardship posture, and leadership aspiration.",
     icon: MessageSquareText,
   },
   {
@@ -141,15 +141,15 @@ export const summaryCards = [
   },
   {
     title: "Action points",
-    body: "Audit one department rhythm, identify two leaders needing follow-up, and rewrite one assignment with clearer ownership.",
+    body: "Audit one ministry-team rhythm, identify two leaders needing follow-up, and rewrite one assignment with clearer ownership.",
     icon: ClipboardCheck,
   },
 ];
 
 export const reflectionPrompts = [
   {
-    prompt: "How would this leadership principle affect your department culture over the next 30 days?",
-    tag: "Department culture",
+    prompt: "How would this leadership principle affect your ministry-team culture over the next 30 days?",
+    tag: "Ministry-team culture",
   },
   {
     prompt: "What stewardship lesson stood out most to you, and where does it challenge your current leadership posture?",
@@ -169,7 +169,7 @@ export const pathwayRecommendations = [
   {
     type: "Course",
     title: "Culture, Teams and Stewardship",
-    reason: "Strengthens the operating rhythms needed for healthier department culture.",
+    reason: "Strengthens the operating rhythms needed for healthier ministry-team culture.",
   },
   {
     type: "Leadership track",
@@ -216,5 +216,5 @@ export const courseIntelligenceSignals = [
   { label: "Emotional tone", value: "Reflective, corrective, pastoral", icon: HeartHandshake },
   { label: "Stewardship emphasis", value: "High", icon: Target },
   { label: "Communication themes", value: "Clarity, repetition, team language", icon: MessageSquareText },
-  { label: "Ministry applications", value: "Department rhythms, follow-up, delegation maps", icon: LineChart },
+  { label: "Ministry applications", value: "Team rhythms, follow-up, delegation maps", icon: LineChart },
 ];

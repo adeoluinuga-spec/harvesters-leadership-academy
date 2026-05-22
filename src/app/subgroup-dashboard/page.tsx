@@ -82,7 +82,7 @@ export default function SubgroupDashboardPage() {
         <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
           <CardHeader className="border-b border-zinc-100">
             <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Expandable campus views</CardTitle>
-            <p className="text-sm text-zinc-500">Department health, participation levels, and inactive leader counts</p>
+            <p className="text-sm text-zinc-500">Ministry-team health, participation levels, and inactive leader counts</p>
           </CardHeader>
           <CardContent className="space-y-3 pt-1">
             {subgroupCampuses.map((campus) => {

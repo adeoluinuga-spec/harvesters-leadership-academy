@@ -447,7 +447,7 @@ export function AiCourseIntelligenceSections() {
       <SectionHeading
         eyebrow="Reflection prompt system"
         title="Reflection that attaches learning to formation"
-        description="Prompts move leaders from content consumption into department culture, stewardship, mentorship, and execution."
+        description="Prompts move leaders from content consumption into ministry-team culture, stewardship, mentorship, and execution."
       />
       <ReflectionPromptSystem />
 

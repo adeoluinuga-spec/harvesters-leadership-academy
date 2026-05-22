@@ -44,7 +44,7 @@ export function PermissionExamples() {
   const examples: Array<{ status: string; copy: string; icon: LucideIcon }> = [
     {
       status: "Allowed",
-      copy: "Campus Pastor sees personal learning plus campus participation, inactive leaders, mentorship, and department performance.",
+      copy: "Campus Pastor sees personal learning plus campus participation, inactive leaders, mentorship, and ministry-team performance.",
       icon: CheckCircle2,
     },
     {
