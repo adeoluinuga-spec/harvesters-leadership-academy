@@ -1,1 +1,1 @@
-export { default } from "../../group-dashboard/page";
+export { default } from "../../directional-dashboard/page";

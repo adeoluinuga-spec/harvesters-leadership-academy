@@ -446,7 +446,7 @@ export default function GroupDashboardPage() {
   const groupName = hierarchy.groupName || "…";
 
   return (
-    <ProtectedRoute allowedRoles={["Group Pastor", "Directional Leader", "District Pastor / Pastoral Leader", "Super Admin", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Group Pastor", "Super Admin", "Admin"]}>
       <DashboardShell searchPlaceholder="Search subgroups, campuses, leaders..." showDate>
         <Hero groupName={groupName} />
         <PersonalLearningLayer role={(hierarchy.role || "Group Pastor") as import("@/lib/mock-auth").MockRole} />
