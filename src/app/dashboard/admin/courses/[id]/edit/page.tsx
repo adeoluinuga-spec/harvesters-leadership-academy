@@ -12,20 +12,9 @@ import { cn } from "@/lib/utils";
 import { fetchAdminCourseById, updateCourse, deleteCourse } from "@/lib/course-management";
 import { ThumbnailUpload } from "@/components/lms/thumbnail-upload";
 import { LeadershipCadreSelect } from "@/components/lms/leadership-cadre-select";
-import { COURSE_CATEGORIES, COURSE_DIFFICULTY_LEVELS, type CourseDifficulty, type CourseStatus } from "@/lib/lms-types";
+import { COURSE_CATEGORIES, type CourseStatus } from "@/lib/lms-types";
 
 type EditPageProps = { params: Promise<{ id: string }> };
-
-const LEVELS = [
-  "All leaders",
-  "Senior leaders",
-  "Directors",
-  "Campus teams",
-  "Team leads",
-  "Coordinators",
-  "Academy admins",
-  "Cell leaders",
-];
 
 function Field({
   label,
@@ -130,11 +119,8 @@ export default function EditCoursePage({ params }: EditPageProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [instructorName, setInstructorName] = useState("");
-  const [instructorRole, setInstructorRole] = useState("");
   const [category, setCategory] = useState<string>(COURSE_CATEGORIES[0]);
-  const [level, setLevel] = useState(LEVELS[0]);
   const [leadershipTargets, setLeadershipTargets] = useState<string[]>([]);
-  const [difficultyLevel, setDifficultyLevel] = useState<CourseDifficulty>("Foundational");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [isRequired, setIsRequired] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
@@ -153,11 +139,8 @@ export default function EditCoursePage({ params }: EditPageProps) {
       setThumbnailUrl(course.thumbnail_url ?? "");
       setVideoUrl(course.video_url ?? "");
       setInstructorName(course.instructor_name);
-      setInstructorRole(course.instructor_role ?? course.instructor_title ?? "");
       setCategory(course.category);
-      setLevel(course.level);
       setLeadershipTargets(course.leadership_targets ?? []);
-      setDifficultyLevel(course.difficulty_level ?? "Foundational");
       setDurationMinutes(course.duration_minutes ? String(course.duration_minutes) : "");
       setIsRequired(course.is_required ?? false);
       setIsFeatured(course.is_featured ?? false);
@@ -182,11 +165,8 @@ export default function EditCoursePage({ params }: EditPageProps) {
       thumbnail_url: thumbnailUrl,
       video_url: videoUrl,
       instructor_name: instructorName,
-      instructor_role: instructorRole,
       category,
-      level,
       leadership_targets: leadershipTargets,
-      difficulty_level: difficultyLevel,
       duration_minutes: durationMinutes ? parseInt(durationMinutes, 10) : 0,
       is_required: isRequired,
       is_featured: isFeatured,
@@ -303,10 +283,6 @@ export default function EditCoursePage({ params }: EditPageProps) {
               <Input value={instructorName} onChange={(e) => setInstructorName(e.target.value)} />
             </Field>
 
-            <Field label="Instructor role / title">
-              <Input value={instructorRole} onChange={(e) => setInstructorRole(e.target.value)} />
-            </Field>
-
             <Field label="Estimated duration (minutes)">
               <Input
                 type="number"
@@ -321,29 +297,6 @@ export default function EditCoursePage({ params }: EditPageProps) {
                 {COURSE_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field label="Leadership level">
-              <Select value={level} onChange={(e) => setLevel(e.target.value)}>
-                {LEVELS.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field label="Difficulty level" required>
-              <Select
-                value={difficultyLevel}
-                onChange={(e) => setDifficultyLevel(e.target.value as CourseDifficulty)}
-              >
-                {COURSE_DIFFICULTY_LEVELS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
                   </option>
                 ))}
               </Select>

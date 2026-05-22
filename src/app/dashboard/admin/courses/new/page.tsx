@@ -13,7 +13,7 @@ import { createClient } from "@/lib/client";
 import { createCourse } from "@/lib/course-management";
 import { ThumbnailUpload } from "@/components/lms/thumbnail-upload";
 import { LeadershipCadreSelect } from "@/components/lms/leadership-cadre-select";
-import { COURSE_CATEGORIES, COURSE_DIFFICULTY_LEVELS, type CourseDifficulty, type CourseStatus } from "@/lib/lms-types";
+import { COURSE_CATEGORIES, type CourseStatus } from "@/lib/lms-types";
 
 // All roles that can create courses — inclusive list covering renamed roles
 const CREATOR_ROLES = [
@@ -25,17 +25,6 @@ const CREATOR_ROLES = [
   "Subgroup Pastor",
   "Sub-group Pastor",
   "Campus Pastor",
-];
-
-const LEVELS = [
-  "All leaders",
-  "Senior leaders",
-  "Directors",
-  "Campus teams",
-  "Team leads",
-  "Coordinators",
-  "Academy admins",
-  "Cell leaders",
 ];
 
 function Field({
@@ -189,11 +178,8 @@ export default function NewCoursePage() {
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [instructorName, setInstructorName] = useState("");
-  const [instructorRole, setInstructorRole] = useState("");
   const [category, setCategory] = useState<string>(COURSE_CATEGORIES[0]);
-  const [level, setLevel] = useState(LEVELS[0]);
   const [leadershipTargets, setLeadershipTargets] = useState<string[]>([]);
-  const [difficultyLevel, setDifficultyLevel] = useState<CourseDifficulty>("Foundational");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [isRequired, setIsRequired] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
@@ -223,11 +209,8 @@ export default function NewCoursePage() {
       thumbnail_url: thumbnailUrl,
       video_url: videoUrl,
       instructor_name: instructorName,
-      instructor_role: instructorRole,
       category,
-      level,
       leadership_targets: leadershipTargets,
-      difficulty_level: difficultyLevel,
       duration_minutes: durationMinutes ? parseInt(durationMinutes, 10) : 0,
       is_required: isRequired,
       is_featured: isFeatured,
@@ -341,14 +324,6 @@ export default function NewCoursePage() {
               />
             </Field>
 
-            <Field label="Instructor role / title">
-              <Input
-                value={instructorRole}
-                onChange={(e) => setInstructorRole(e.target.value)}
-                placeholder="Senior Pastor, Harvesters International"
-              />
-            </Field>
-
             <Field
               label="Estimated duration (minutes)"
               hint="Leave blank to auto-calculate from lessons later"
@@ -367,29 +342,6 @@ export default function NewCoursePage() {
                 {COURSE_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field label="Leadership level">
-              <Select value={level} onChange={(e) => setLevel(e.target.value)}>
-                {LEVELS.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field label="Difficulty level" required>
-              <Select
-                value={difficultyLevel}
-                onChange={(e) => setDifficultyLevel(e.target.value as CourseDifficulty)}
-              >
-                {COURSE_DIFFICULTY_LEVELS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
                   </option>
                 ))}
               </Select>

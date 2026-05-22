@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/client";
-import type { AdminCourse, LMSCourse, LMSModule, LMSLesson, CourseStatus, CourseDifficulty } from "@/lib/lms-types";
+import type { AdminCourse, LMSCourse, LMSModule, LMSLesson, CourseStatus } from "@/lib/lms-types";
 import { normalizeVimeoUrl } from "@/lib/vimeo";
 
 export type CourseFormData = {
@@ -9,11 +9,8 @@ export type CourseFormData = {
   thumbnail_url: string;
   video_url: string;
   instructor_name: string;
-  instructor_role: string;
   category: string;
-  level: string;
   leadership_targets: string[];
-  difficulty_level: CourseDifficulty;
   duration_minutes: number;
   is_required: boolean;
   is_featured: boolean;
@@ -123,13 +120,9 @@ export async function createCourse(data: CourseFormData): Promise<{ course: LMSC
       thumbnail_url: data.thumbnail_url.trim() || null,
       video_url: data.video_url?.trim() ? normalizeVimeoUrl(data.video_url.trim()) : null,
       category: data.category,
-      level: data.level,
       instructor_name: data.instructor_name.trim(),
-      instructor_title: data.instructor_role.trim() || null,
-      instructor_role: data.instructor_role.trim() || null,
       duration_minutes: data.duration_minutes || 0,
       leadership_targets: data.leadership_targets,
-      difficulty_level: data.difficulty_level,
       is_required: data.is_required,
       is_featured: data.is_featured,
       status: data.status,
@@ -151,15 +144,9 @@ export async function updateCourse(id: string, data: Partial<CourseFormData>): P
   if (data.thumbnail_url !== undefined) payload.thumbnail_url = data.thumbnail_url.trim() || null;
   if (data.video_url !== undefined) payload.video_url = data.video_url?.trim() ? normalizeVimeoUrl(data.video_url.trim()) : null;
   if (data.category !== undefined) payload.category = data.category;
-  if (data.level !== undefined) payload.level = data.level;
   if (data.instructor_name !== undefined) payload.instructor_name = data.instructor_name.trim();
-  if (data.instructor_role !== undefined) {
-    payload.instructor_title = data.instructor_role.trim() || null;
-    payload.instructor_role = data.instructor_role.trim() || null;
-  }
   if (data.duration_minutes !== undefined) payload.duration_minutes = data.duration_minutes;
   if (data.leadership_targets !== undefined) payload.leadership_targets = data.leadership_targets;
-  if (data.difficulty_level !== undefined) payload.difficulty_level = data.difficulty_level;
   if (data.is_required !== undefined) payload.is_required = data.is_required;
   if (data.is_featured !== undefined) payload.is_featured = data.is_featured;
   if (data.status !== undefined) payload.status = data.status;
