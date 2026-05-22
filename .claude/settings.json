@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const {Slot} = require\\('radix-ui'\\); console.log\\('Slot type:', typeof Slot\\); console.log\\('Slot.Root type:', typeof Slot.Root\\); console.log\\('Slot keys:', Object.keys\\(Slot||{}\\)\\)\")",
+      "Bash(node -e 'const {Slot} = require\\('\\\\''radix-ui'\\\\''\\); const r = Slot.Root; console.log\\('\\\\''typeof Slot.Root:'\\\\'', typeof r\\); console.log\\('\\\\''__TRACKED_VAR__typeof:'\\\\'', r && r['\\\\''__TRACKED_VAR__typeof'\\\\''] && r['\\\\''__TRACKED_VAR__typeof'\\\\''].toString\\(\\)\\); console.log\\('\\\\''render?:'\\\\'', typeof \\(r&&r.render\\)\\)')",
+      "Bash(node -e \"const {Slot} = require\\('radix-ui'\\); const r = Slot.Root; const sym = Object.getOwnPropertySymbols\\(r\\); console.log\\('symbols:', sym.map\\(s => s.toString\\(\\)\\)\\); console.log\\('is forwardRef?:', sym.some\\(s => s.toString\\(\\).includes\\('forward'\\)\\)\\)\")",
+      "Bash(node -e \"const slot = require\\('@radix-ui/react-slot'\\); console.log\\('keys:', Object.keys\\(slot\\)\\); console.log\\('Root type:', typeof slot.Root\\); console.log\\('default type:', typeof slot.default\\)\")"
+    ]
+  }
+}

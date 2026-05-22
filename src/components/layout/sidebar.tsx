@@ -21,7 +21,16 @@ import {
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/client";
 
-const ADMIN_COURSE_ROLES = ["Platform Super Admin", "Group Pastor", "Sub-Group Pastor", "Subgroup Pastor", "Campus Pastor"];
+const ADMIN_COURSE_ROLES = [
+  "Platform Super Admin",
+  "Super Admin",
+  "Admin",
+  "Group Pastor",
+  "Sub-Group Pastor",
+  "Subgroup Pastor",
+  "Sub-group Pastor",
+  "Campus Pastor",
+];
 
 const sidebarItems = [
   { label: "My Dashboard", href: "/dashboard/leader", icon: LayoutDashboard },
@@ -34,6 +43,23 @@ const sidebarItems = [
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
   { label: "Settings", href: "#", icon: Settings },
 ];
+
+function ManageCoursesLink({ pathname }: { pathname: string }) {
+  const href = "/dashboard/admin/courses";
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group flex h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition-all hover:bg-white/8 hover:text-white lg:justify-start",
+        active && "bg-white text-black shadow-sm hover:bg-white hover:text-black"
+      )}
+    >
+      <BookOpenCheck className="size-4 shrink-0" />
+      <span className="hidden lg:inline">Manage Courses</span>
+    </Link>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -89,22 +115,9 @@ export function Sidebar() {
           );
         })}
 
-        {canManageCourses && (() => {
-          const href = "/dashboard/admin/courses";
-          const active = pathname === href || pathname.startsWith(`${href}/`);
-          return (
-            <Link
-              href={href}
-              className={cn(
-                "group flex h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition-all hover:bg-white/8 hover:text-white lg:justify-start",
-                active && "bg-white text-black shadow-sm hover:bg-white hover:text-black"
-              )}
-            >
-              <BookOpenCheck className="size-4 shrink-0" />
-              <span className="hidden lg:inline">Manage Courses</span>
-            </Link>
-          );
-        })()}
+        {canManageCourses && (
+          <ManageCoursesLink pathname={pathname} />
+        )}
       </nav>
 
       <div className="border-t border-white/10 p-3 lg:p-4">

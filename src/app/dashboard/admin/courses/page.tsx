@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -87,7 +88,8 @@ function CourseCard({ course, onStatusChange, onDelete }: {
   async function togglePublish() {
     setBusy(true);
     setMenuOpen(false);
-    const next: CourseStatus = course.status === "published" ? "draft" : "published";
+    const currentStatus: CourseStatus = course.status ?? (course.is_published ? "published" : "draft");
+    const next: CourseStatus = currentStatus === "published" ? "draft" : "published";
     await changeCourseStatus(course.id, next);
     onStatusChange(course.id, next);
     setBusy(false);
@@ -121,7 +123,7 @@ function CourseCard({ course, onStatusChange, onDelete }: {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
         <div className="absolute left-3 top-3 flex gap-1.5">
-          <StatusBadge status={course.status} />
+          <StatusBadge status={course.status ?? (course.is_published ? "published" : "draft")} />
           {course.is_required && (
             <span className="inline-flex h-5 items-center rounded-full bg-rose-600 px-2 text-[10px] font-semibold uppercase tracking-wide text-white">
               Required
@@ -139,7 +141,7 @@ function CourseCard({ course, onStatusChange, onDelete }: {
       <div className="p-4">
         <div className="mb-1 flex items-start justify-between gap-2">
           <p className="text-xs font-medium text-zinc-400">{course.category}</p>
-          <DifficultyBadge level={course.difficulty_level} />
+          <DifficultyBadge level={course.difficulty_level ?? "Foundational"} />
         </div>
         <h3 className="font-heading mb-1 line-clamp-2 text-sm font-semibold text-zinc-950">{course.title}</h3>
         <p className="mb-3 text-xs text-zinc-500">{course.instructor_name}</p>
@@ -160,25 +162,26 @@ function CourseCard({ course, onStatusChange, onDelete }: {
         </div>
 
         {/* Leadership targets */}
-        {course.leadership_targets.length > 0 && (
+        {(course.leadership_targets ?? []).length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1">
-            {course.leadership_targets.slice(0, 3).map((t) => (
+            {(course.leadership_targets ?? []).slice(0, 3).map((t) => (
               <span key={t} className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500">{t}</span>
             ))}
-            {course.leadership_targets.length > 3 && (
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500">+{course.leadership_targets.length - 3} more</span>
+            {(course.leadership_targets ?? []).length > 3 && (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] text-zinc-500">+{(course.leadership_targets ?? []).length - 3} more</span>
             )}
           </div>
         )}
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button asChild size="sm" variant="outline" className="flex-1 rounded-lg border-zinc-200 bg-white text-xs">
-            <Link href={`/dashboard/admin/courses/${course.id}/edit`}>
-              <Pencil className="size-3.5" />
-              Edit
-            </Link>
-          </Button>
+          <Link
+            href={`/dashboard/admin/courses/${course.id}/edit`}
+            className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            <Pencil className="size-3.5" />
+            Edit
+          </Link>
 
           <div className="relative">
             <Button
@@ -205,7 +208,7 @@ function CourseCard({ course, onStatusChange, onDelete }: {
                     onClick={togglePublish}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-zinc-700 hover:bg-zinc-50"
                   >
-                    {course.status === "published" ? (
+                    {(course.status ?? (course.is_published ? "published" : "draft")) === "published" ? (
                       <><EyeOff className="size-3.5" /> Unpublish</>
                     ) : (
                       <><Eye className="size-3.5" /> Publish</>
@@ -232,6 +235,7 @@ function CourseCard({ course, onStatusChange, onDelete }: {
 }
 
 export default function AdminCoursesPage() {
+  const router = useRouter();
   const [courses, setCourses] = useState<AdminCourse[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>("all");
@@ -273,12 +277,14 @@ export default function AdminCoursesPage() {
           <h1 className="font-heading text-2xl font-semibold text-zinc-950">Course Management</h1>
           <p className="mt-0.5 text-sm text-zinc-500">Create, manage, and publish courses for your leadership community</p>
         </div>
-        <Button asChild className="rounded-lg bg-black text-white hover:bg-zinc-800">
-          <Link href="/dashboard/admin/courses/new">
-            <Plus className="size-4" />
-            New course
-          </Link>
-        </Button>
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/admin/courses/new")}
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+        >
+          <Plus className="size-4" />
+          New course
+        </button>
       </motion.div>
 
       {/* Stats grid */}
@@ -320,12 +326,14 @@ export default function AdminCoursesPage() {
               {filter === "all" ? "No courses yet" : `No ${filter} courses`}
             </p>
             {filter === "all" && (
-              <Button asChild className="mt-4 rounded-lg bg-black text-white hover:bg-zinc-800">
-                <Link href="/dashboard/admin/courses/new">
-                  <Plus className="size-4" />
-                  Create your first course
-                </Link>
-              </Button>
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard/admin/courses/new")}
+                className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+              >
+                <Plus className="size-4" />
+                Create your first course
+              </button>
             )}
           </div>
         ) : (

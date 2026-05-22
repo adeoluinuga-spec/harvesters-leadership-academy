@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Lock, Loader2 } from "lucide-react";
 
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/client";
@@ -16,15 +15,45 @@ import { ThumbnailUpload } from "@/components/lms/thumbnail-upload";
 import { LeadershipCadreSelect } from "@/components/lms/leadership-cadre-select";
 import { COURSE_CATEGORIES, COURSE_DIFFICULTY_LEVELS, type CourseDifficulty, type CourseStatus } from "@/lib/lms-types";
 
-const ALLOWED_ROLES = ["Platform Super Admin", "Group Pastor", "Sub-Group Pastor", "Subgroup Pastor", "Campus Pastor"];
+// All roles that can create courses — inclusive list covering renamed roles
+const CREATOR_ROLES = [
+  "Platform Super Admin",
+  "Super Admin",
+  "Admin",
+  "Group Pastor",
+  "Sub-Group Pastor",
+  "Subgroup Pastor",
+  "Sub-group Pastor",
+  "Campus Pastor",
+];
 
-const LEVELS = ["All leaders", "Senior leaders", "Directors", "Campus teams", "Team leads", "Coordinators", "Academy admins", "Cell leaders"];
+const LEVELS = [
+  "All leaders",
+  "Senior leaders",
+  "Directors",
+  "Campus teams",
+  "Team leads",
+  "Coordinators",
+  "Academy admins",
+  "Cell leaders",
+];
 
-function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <label className="block text-sm font-medium text-zinc-700">
-        {label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}
+        {label}
+        {required ? <span className="ml-0.5 text-red-500">*</span> : null}
       </label>
       {children}
       {hint ? <p className="text-xs text-zinc-400">{hint}</p> : null}
@@ -36,7 +65,10 @@ function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputEleme
   return (
     <input
       {...props}
-      className={cn("w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300", className)}
+      className={cn(
+        "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300",
+        className
+      )}
     />
   );
 }
@@ -45,23 +77,41 @@ function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLText
   return (
     <textarea
       {...props}
-      className={cn("w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300 resize-none", className)}
+      className={cn(
+        "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300 resize-none",
+        className
+      )}
     />
   );
 }
 
-function Select({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
+function Select({
+  className,
+  children,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
   return (
     <select
       {...props}
-      className={cn("w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-300", className)}
+      className={cn(
+        "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-300",
+        className
+      )}
     >
       {children}
     </select>
   );
 }
 
-function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
     <motion.div variants={shellItem}>
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
@@ -77,7 +127,58 @@ function SectionCard({ title, description, children }: { title: string; descript
 
 export default function NewCoursePage() {
   const router = useRouter();
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
+
+  // Auth check — runs in background, does NOT block form rendering
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
+  const [userRole, setUserRole] = useState<string>("");
+  const authCheckRan = useRef(false);
+
+  useEffect(() => {
+    if (authCheckRan.current) return;
+    authCheckRan.current = true;
+
+    async function checkAuth() {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          setAuthorized(false);
+          setAuthChecked(true);
+          return;
+        }
+
+        const { data, error: dbError } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (dbError) {
+          // DB error — can't determine role, deny for safety
+          setAuthorized(false);
+          setAuthChecked(true);
+          return;
+        }
+
+        const role = data?.role ?? "";
+        setUserRole(role);
+        setAuthorized(CREATOR_ROLES.includes(role));
+        setAuthChecked(true);
+      } catch {
+        // Network or unexpected error — deny for safety
+        setAuthorized(false);
+        setAuthChecked(true);
+      }
+    }
+
+    checkAuth();
+  }, []);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,23 +198,20 @@ export default function NewCoursePage() {
   const [isFeatured, setIsFeatured] = useState(false);
   const [status, setStatus] = useState<CourseStatus>("draft");
 
-  useEffect(() => {
-    async function checkAuth() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setAuthorized(false); return; }
-      const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
-      setAuthorized(ALLOWED_ROLES.includes(data?.role ?? ""));
-    }
-    checkAuth();
-  }, []);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // Auth check complete and unauthorized
+    if (authChecked && !authorized) {
+      setError(`Your role (${userRole || "unknown"}) does not have permission to create courses. Contact a Platform Super Admin.`);
+      return;
+    }
+
     if (!title.trim() || !instructorName.trim()) {
       setError("Course title and instructor name are required.");
       return;
     }
+
     setSaving(true);
     setError(null);
 
@@ -135,46 +233,63 @@ export default function NewCoursePage() {
     });
 
     setSaving(false);
+
     if (saveError) {
       setError(saveError);
       return;
     }
+
     router.push("/dashboard/admin/courses");
   }
 
-  if (authorized === null) {
+  // Show access-denied state after auth check completes and user is not authorized
+  if (authChecked && !authorized) {
     return (
       <DashboardShell showDate={false}>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="size-8 animate-spin text-zinc-300" />
-        </div>
-      </DashboardShell>
-    );
-  }
-
-  if (!authorized) {
-    return (
-      <DashboardShell showDate={false}>
-        <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-200 bg-white py-20">
-          <p className="font-heading text-lg font-semibold text-zinc-950">Access restricted</p>
-          <p className="mt-1 text-sm text-zinc-500">Only Platform Super Admins and Group Pastors can create courses.</p>
-          <Button asChild className="mt-5 rounded-lg bg-black text-white hover:bg-zinc-800">
-            <Link href="/dashboard/admin/courses">Back to courses</Link>
-          </Button>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center rounded-xl border border-zinc-200 bg-white py-20"
+        >
+          <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-zinc-100">
+            <Lock className="size-6 text-zinc-500" />
+          </div>
+          <h2 className="font-heading text-lg font-semibold text-zinc-950">Access restricted</h2>
+          <p className="mt-2 max-w-sm text-center text-sm text-zinc-500">
+            Course creation is available to Platform Super Admins, Group Pastors, and Campus Pastors.
+            {userRole ? (
+              <>
+                {" "}Your current role is{" "}
+                <span className="font-medium text-zinc-700">{userRole}</span>.
+              </>
+            ) : null}
+          </p>
+          <p className="mt-1 text-xs text-zinc-400">
+            Contact your Platform Super Admin to request access.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/admin/courses")}
+            className="mt-6 inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          >
+            Back to courses
+          </button>
+        </motion.div>
       </DashboardShell>
     );
   }
 
   return (
     <DashboardShell searchPlaceholder="Create course..." showDate={false}>
+      {/* Header row */}
       <motion.div variants={shellItem} className="flex items-center gap-4">
-        <Button asChild variant="outline" className="rounded-lg border-zinc-200 bg-white">
-          <Link href="/dashboard/admin/courses">
-            <ArrowLeft className="size-4" />
-            Back to courses
-          </Link>
-        </Button>
+        <Link
+          href="/dashboard/admin/courses"
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+        >
+          <ArrowLeft className="size-4" />
+          Back to courses
+        </Link>
         <div>
           <h1 className="font-heading text-xl font-semibold text-zinc-950">New course</h1>
           <p className="text-xs text-zinc-500">Fill in the details and save as draft or publish immediately</p>
@@ -183,7 +298,10 @@ export default function NewCoursePage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Thumbnail */}
-        <SectionCard title="Course thumbnail" description="A compelling image helps leaders recognise this course at a glance">
+        <SectionCard
+          title="Course thumbnail"
+          description="A compelling image helps leaders recognise this course at a glance"
+        >
           <ThumbnailUpload value={thumbnailUrl} onChange={setThumbnailUrl} />
         </SectionCard>
 
@@ -214,7 +332,10 @@ export default function NewCoursePage() {
               />
             </Field>
 
-            <Field label="Estimated duration (minutes)" hint="Leave blank to auto-calculate from lessons later">
+            <Field
+              label="Estimated duration (minutes)"
+              hint="Leave blank to auto-calculate from lessons later"
+            >
               <Input
                 type="number"
                 value={durationMinutes}
@@ -226,29 +347,54 @@ export default function NewCoursePage() {
 
             <Field label="Category" required>
               <Select value={category} onChange={(e) => setCategory(e.target.value)}>
-                {COURSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {COURSE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </Select>
             </Field>
 
             <Field label="Leadership level">
               <Select value={level} onChange={(e) => setLevel(e.target.value)}>
-                {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                {LEVELS.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
               </Select>
             </Field>
 
             <Field label="Difficulty level" required>
-              <Select value={difficultyLevel} onChange={(e) => setDifficultyLevel(e.target.value as CourseDifficulty)}>
-                {COURSE_DIFFICULTY_LEVELS.map((d) => <option key={d} value={d}>{d}</option>)}
+              <Select
+                value={difficultyLevel}
+                onChange={(e) => setDifficultyLevel(e.target.value as CourseDifficulty)}
+              >
+                {COURSE_DIFFICULTY_LEVELS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
               </Select>
             </Field>
 
             <div className="flex flex-col justify-end gap-3 pb-1">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isRequired} onChange={(e) => setIsRequired(e.target.checked)} className="size-4 rounded border-zinc-300" />
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isRequired}
+                  onChange={(e) => setIsRequired(e.target.checked)}
+                  className="size-4 rounded border-zinc-300"
+                />
                 <span className="text-sm font-medium text-zinc-700">Mandatory course</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} className="size-4 rounded border-zinc-300" />
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isFeatured}
+                  onChange={(e) => setIsFeatured(e.target.checked)}
+                  className="size-4 rounded border-zinc-300"
+                />
                 <span className="text-sm font-medium text-zinc-700">Feature on homepage</span>
               </label>
             </div>
@@ -265,7 +411,10 @@ export default function NewCoursePage() {
             </div>
 
             <div className="md:col-span-2">
-              <Field label="Full course overview" hint="Detailed description shown on the course detail page">
+              <Field
+                label="Full course overview"
+                hint="Detailed description shown on the course detail page"
+              >
                 <Textarea
                   value={overview}
                   onChange={(e) => setOverview(e.target.value)}
@@ -299,7 +448,12 @@ export default function NewCoursePage() {
               )}
             >
               <p className="text-sm font-semibold">Save as draft</p>
-              <p className={cn("mt-0.5 text-xs", status === "draft" ? "text-zinc-400" : "text-zinc-500")}>
+              <p
+                className={cn(
+                  "mt-0.5 text-xs",
+                  status === "draft" ? "text-zinc-400" : "text-zinc-500"
+                )}
+              >
                 Only you and admins can see this course
               </p>
             </button>
@@ -314,7 +468,12 @@ export default function NewCoursePage() {
               )}
             >
               <p className="text-sm font-semibold">Publish immediately</p>
-              <p className={cn("mt-0.5 text-xs", status === "published" ? "text-emerald-100" : "text-zinc-500")}>
+              <p
+                className={cn(
+                  "mt-0.5 text-xs",
+                  status === "published" ? "text-emerald-100" : "text-zinc-500"
+                )}
+              >
                 Visible to all targeted leadership cadres
               </p>
             </button>
@@ -322,17 +481,30 @@ export default function NewCoursePage() {
         </SectionCard>
 
         {error ? (
-          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
         ) : null}
 
         <motion.div variants={shellItem} className="flex gap-3 pb-6">
-          <Button type="submit" disabled={saving} className="rounded-lg bg-black text-white hover:bg-zinc-800">
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+          >
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-            {saving ? "Creating course..." : status === "published" ? "Publish course" : "Save as draft"}
-          </Button>
-          <Button type="button" asChild variant="outline" className="rounded-lg border-zinc-200 bg-white">
-            <Link href="/dashboard/admin/courses">Cancel</Link>
-          </Button>
+            {saving
+              ? "Creating course..."
+              : status === "published"
+                ? "Publish course"
+                : "Save as draft"}
+          </button>
+          <Link
+            href="/dashboard/admin/courses"
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            Cancel
+          </Link>
         </motion.div>
       </form>
     </DashboardShell>

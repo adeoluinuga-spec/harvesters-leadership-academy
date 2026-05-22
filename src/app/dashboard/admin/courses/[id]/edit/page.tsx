@@ -7,7 +7,6 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { fetchAdminCourseById, updateCourse, deleteCourse } from "@/lib/course-management";
@@ -17,13 +16,33 @@ import { COURSE_CATEGORIES, COURSE_DIFFICULTY_LEVELS, type CourseDifficulty, typ
 
 type EditPageProps = { params: Promise<{ id: string }> };
 
-const LEVELS = ["All leaders", "Senior leaders", "Directors", "Campus teams", "Team leads", "Coordinators", "Academy admins", "Cell leaders"];
+const LEVELS = [
+  "All leaders",
+  "Senior leaders",
+  "Directors",
+  "Campus teams",
+  "Team leads",
+  "Coordinators",
+  "Academy admins",
+  "Cell leaders",
+];
 
-function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <label className="block text-sm font-medium text-zinc-700">
-        {label}{required ? <span className="ml-0.5 text-red-500">*</span> : null}
+        {label}
+        {required ? <span className="ml-0.5 text-red-500">*</span> : null}
       </label>
       {children}
       {hint ? <p className="text-xs text-zinc-400">{hint}</p> : null}
@@ -35,7 +54,10 @@ function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputEleme
   return (
     <input
       {...props}
-      className={cn("w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300", className)}
+      className={cn(
+        "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300",
+        className
+      )}
     />
   );
 }
@@ -44,23 +66,41 @@ function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLText
   return (
     <textarea
       {...props}
-      className={cn("w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300 resize-none", className)}
+      className={cn(
+        "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300 resize-none",
+        className
+      )}
     />
   );
 }
 
-function Select({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
+function Select({
+  className,
+  children,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
   return (
     <select
       {...props}
-      className={cn("w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-300", className)}
+      className={cn(
+        "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-300",
+        className
+      )}
     >
       {children}
     </select>
   );
 }
 
-function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
     <motion.div variants={shellItem}>
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
@@ -101,7 +141,11 @@ export default function EditCoursePage({ params }: EditPageProps) {
 
   useEffect(() => {
     fetchAdminCourseById(id).then((course) => {
-      if (!course) { setNotFound(true); setLoading(false); return; }
+      if (!course) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
       setTitle(course.title);
       setDescription(course.description ?? "");
       setOverview(course.overview ?? "");
@@ -147,7 +191,10 @@ export default function EditCoursePage({ params }: EditPageProps) {
     });
 
     setSaving(false);
-    if (saveError) { setError(saveError); return; }
+    if (saveError) {
+      setError(saveError);
+      return;
+    }
     router.push("/dashboard/admin/courses");
   }
 
@@ -173,9 +220,13 @@ export default function EditCoursePage({ params }: EditPageProps) {
       <DashboardShell showDate={false}>
         <div className="flex flex-col items-center justify-center rounded-xl border border-zinc-200 bg-white py-20">
           <p className="font-heading text-lg font-semibold text-zinc-950">Course not found</p>
-          <Button asChild className="mt-5 rounded-lg bg-black text-white hover:bg-zinc-800">
-            <Link href="/dashboard/admin/courses">Back to courses</Link>
-          </Button>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/admin/courses")}
+            className="mt-5 inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          >
+            Back to courses
+          </button>
         </div>
       </DashboardShell>
     );
@@ -185,27 +236,27 @@ export default function EditCoursePage({ params }: EditPageProps) {
     <DashboardShell searchPlaceholder="Edit course..." showDate={false}>
       <motion.div variants={shellItem} className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button asChild variant="outline" className="rounded-lg border-zinc-200 bg-white">
-            <Link href="/dashboard/admin/courses">
-              <ArrowLeft className="size-4" />
-              Back to courses
-            </Link>
-          </Button>
+          <Link
+            href="/dashboard/admin/courses"
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            <ArrowLeft className="size-4" />
+            Back to courses
+          </Link>
           <div>
             <h1 className="font-heading text-xl font-semibold text-zinc-950">Edit course</h1>
-            <p className="text-xs text-zinc-500">Changes are saved immediately when you click save</p>
+            <p className="text-xs text-zinc-500">Changes are saved when you click save</p>
           </div>
         </div>
-        <Button
+        <button
           type="button"
-          variant="outline"
           disabled={deleting}
           onClick={handleDelete}
-          className="rounded-lg border-red-200 bg-white text-red-600 hover:bg-red-50 hover:text-red-700"
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
         >
           {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
           Delete course
-        </Button>
+        </button>
       </motion.div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -230,34 +281,64 @@ export default function EditCoursePage({ params }: EditPageProps) {
             </Field>
 
             <Field label="Estimated duration (minutes)">
-              <Input type="number" value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} min="0" />
+              <Input
+                type="number"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value)}
+                min="0"
+              />
             </Field>
 
             <Field label="Category" required>
               <Select value={category} onChange={(e) => setCategory(e.target.value)}>
-                {COURSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {COURSE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </Select>
             </Field>
 
             <Field label="Leadership level">
               <Select value={level} onChange={(e) => setLevel(e.target.value)}>
-                {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                {LEVELS.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
               </Select>
             </Field>
 
             <Field label="Difficulty level" required>
-              <Select value={difficultyLevel} onChange={(e) => setDifficultyLevel(e.target.value as CourseDifficulty)}>
-                {COURSE_DIFFICULTY_LEVELS.map((d) => <option key={d} value={d}>{d}</option>)}
+              <Select
+                value={difficultyLevel}
+                onChange={(e) => setDifficultyLevel(e.target.value as CourseDifficulty)}
+              >
+                {COURSE_DIFFICULTY_LEVELS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
               </Select>
             </Field>
 
             <div className="flex flex-col justify-end gap-3 pb-1">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isRequired} onChange={(e) => setIsRequired(e.target.checked)} className="size-4 rounded border-zinc-300" />
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isRequired}
+                  onChange={(e) => setIsRequired(e.target.checked)}
+                  className="size-4 rounded border-zinc-300"
+                />
                 <span className="text-sm font-medium text-zinc-700">Mandatory course</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} className="size-4 rounded border-zinc-300" />
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isFeatured}
+                  onChange={(e) => setIsFeatured(e.target.checked)}
+                  className="size-4 rounded border-zinc-300"
+                />
                 <span className="text-sm font-medium text-zinc-700">Feature on homepage</span>
               </label>
             </div>
@@ -298,7 +379,9 @@ export default function EditCoursePage({ params }: EditPageProps) {
               )}
             >
               <p className="text-sm font-semibold">Draft</p>
-              <p className={cn("mt-0.5 text-xs", status === "draft" ? "text-zinc-400" : "text-zinc-500")}>Only admins can see this course</p>
+              <p className={cn("mt-0.5 text-xs", status === "draft" ? "text-zinc-400" : "text-zinc-500")}>
+                Only admins can see this course
+              </p>
             </button>
             <button
               type="button"
@@ -311,7 +394,11 @@ export default function EditCoursePage({ params }: EditPageProps) {
               )}
             >
               <p className="text-sm font-semibold">Published</p>
-              <p className={cn("mt-0.5 text-xs", status === "published" ? "text-emerald-100" : "text-zinc-500")}>Visible to targeted leadership cadres</p>
+              <p
+                className={cn("mt-0.5 text-xs", status === "published" ? "text-emerald-100" : "text-zinc-500")}
+              >
+                Visible to targeted leadership cadres
+              </p>
             </button>
             <button
               type="button"
@@ -324,23 +411,36 @@ export default function EditCoursePage({ params }: EditPageProps) {
               )}
             >
               <p className="text-sm font-semibold">Archived</p>
-              <p className={cn("mt-0.5 text-xs", status === "archived" ? "text-amber-700" : "text-zinc-500")}>Hidden from new enrollments</p>
+              <p
+                className={cn("mt-0.5 text-xs", status === "archived" ? "text-amber-700" : "text-zinc-500")}
+              >
+                Hidden from new enrollments
+              </p>
             </button>
           </div>
         </SectionCard>
 
         {error ? (
-          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
         ) : null}
 
         <motion.div variants={shellItem} className="flex gap-3 pb-6">
-          <Button type="submit" disabled={saving} className="rounded-lg bg-black text-white hover:bg-zinc-800">
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+          >
             {saving ? <Loader2 className="size-4 animate-spin" /> : null}
             {saving ? "Saving..." : "Save changes"}
-          </Button>
-          <Button type="button" asChild variant="outline" className="rounded-lg border-zinc-200 bg-white">
-            <Link href="/dashboard/admin/courses">Cancel</Link>
-          </Button>
+          </button>
+          <Link
+            href="/dashboard/admin/courses"
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            Cancel
+          </Link>
         </motion.div>
       </form>
     </DashboardShell>
