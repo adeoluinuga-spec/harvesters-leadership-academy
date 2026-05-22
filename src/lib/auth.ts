@@ -208,9 +208,11 @@ export async function ensureUserProfile(
 
 export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leader") {
   const supabase = createClient();
+
+  // Step 1: fetch user row — no campus/subgroup/group FK joins, just scalar columns + role/org
   let { data } = await supabase
     .from("users")
-    .select("*, roles(name), organizations(name, slug), campuses(name), subgroups(name), groups(name)")
+    .select("*, roles(name), organizations(name, slug)")
     .eq("id", user.id)
     .maybeSingle<ProfileRow>();
 
@@ -262,47 +264,43 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
     tenantSlug = tenantSlug ?? organizationRow?.slug ?? null;
   }
 
+  // Step 2: read IDs directly from scalar columns on the user row
   const campusId = data?.campus_id ?? null;
-  let subgroupId = data?.subgroup_id ?? null;
-  let groupId = data?.group_id ?? null;
-  let campusName = relatedName(data?.campuses) ?? data?.campus ?? null;
-  let subgroupName = relatedName(data?.subgroups) ?? data?.subgroup ?? null;
-  let groupName = relatedName(data?.groups) ?? data?.group_name ?? data?.group ?? null;
-  let campusPastor = data?.campus_pastor ?? null;
+  const subgroupId = data?.subgroup_id ?? null;
+  const groupId = data?.group_id ?? null;
 
-  if (campusId && (!campusName || !subgroupId || !groupId || !campusPastor)) {
-    const { data: campusRow } = await supabase
-      .from("campuses")
-      .select("name, subgroup_id, group_id, campus_pastor, pastor")
-      .eq("id", campusId)
-      .maybeSingle<LookupRow>();
+  // Steps 3–6: parallel explicit queries for each name — no FK join reliance, no text column fallback
+  const [campusRow, subgroupRow, groupRow] = await Promise.all([
+    campusId
+      ? supabase
+          .from("campuses")
+          .select("name, campus_pastor, pastor")
+          .eq("id", campusId)
+          .maybeSingle<LookupRow>()
+          .then((r) => r.data)
+      : Promise.resolve(null),
+    subgroupId
+      ? supabase
+          .from("subgroups")
+          .select("name")
+          .eq("id", subgroupId)
+          .maybeSingle<LookupRow>()
+          .then((r) => r.data)
+      : Promise.resolve(null),
+    groupId
+      ? supabase
+          .from("groups")
+          .select("name")
+          .eq("id", groupId)
+          .maybeSingle<LookupRow>()
+          .then((r) => r.data)
+      : Promise.resolve(null),
+  ]);
 
-    campusName = campusName ?? campusRow?.name ?? null;
-    subgroupId = subgroupId ?? stringifyId(campusRow?.subgroup_id);
-    groupId = groupId ?? stringifyId(campusRow?.group_id);
-    campusPastor = campusPastor ?? campusRow?.campus_pastor ?? campusRow?.pastor ?? null;
-  }
-
-  if (subgroupId && (!subgroupName || !groupId)) {
-    const { data: subgroupRow } = await supabase
-      .from("subgroups")
-      .select("name, group_id")
-      .eq("id", subgroupId)
-      .maybeSingle<LookupRow>();
-
-    subgroupName = subgroupName ?? subgroupRow?.name ?? null;
-    groupId = groupId ?? stringifyId(subgroupRow?.group_id);
-  }
-
-  if (groupId && !groupName) {
-    const { data: groupRow } = await supabase
-      .from("groups")
-      .select("name")
-      .eq("id", groupId)
-      .maybeSingle<LookupRow>();
-
-    groupName = groupRow?.name ?? null;
-  }
+  const campusName = campusRow?.name ?? null;
+  const subgroupName = subgroupRow?.name ?? null;
+  const groupName = groupRow?.name ?? null;
+  const campusPastor = campusRow?.campus_pastor ?? campusRow?.pastor ?? null;
 
   return {
     id: user.id,
@@ -322,8 +320,7 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
     subgroup: subgroupName ?? "",
     group: groupName ?? "",
     campusPastor: campusPastor ?? "",
-    currentLeadershipRole:
-      data?.current_leadership_role ?? "None",
+    currentLeadershipRole: data?.current_leadership_role ?? "None",
     leadershipAspiration:
       data?.aspirational_leadership_role ??
       data?.leadership_aspiration ??
