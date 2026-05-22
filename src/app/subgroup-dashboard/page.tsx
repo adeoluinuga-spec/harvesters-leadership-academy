@@ -1,55 +1,173 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, Award, Building2, ChevronDown, GraduationCap, Users } from "lucide-react";
 
 import { PersonalLearningLayer, OversightLayerIntro } from "@/components/dashboard/learning-oversight-layers";
 import { DashboardShell, shellContainer, shellItem } from "@/components/layout/dashboard-shell";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { CampusCard, IntelligencePanel, statusClasses } from "@/components/hierarchy/hierarchy-cards";
+import { IntelligencePanel } from "@/components/hierarchy/hierarchy-cards";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { campuses, leaders, subgroupInsights, activityItems } from "@/lib/hierarchy-data";
+import { subgroupInsights, activityItems } from "@/lib/hierarchy-data";
+import { createClient } from "@/lib/client";
 import { cn } from "@/lib/utils";
 import { useHierarchy } from "@/hooks/use-hierarchy";
 
+type RealCampus = {
+  id: string;
+  name: string | null;
+  pastor: string | null;
+  campus_pastor: string | null;
+};
+
+type SubgroupUser = {
+  id: string;
+  full_name: string | null;
+  role: string | null;
+  current_leadership_role: string | null;
+  onboarding_completed: boolean | null;
+  campus_id: string | null;
+};
+
+function campusPastorName(campus: RealCampus): string {
+  return campus.campus_pastor ?? campus.pastor ?? "Campus Pastor";
+}
+
+function healthLabel(pct: number): string {
+  if (pct >= 80) return "Thriving";
+  if (pct >= 65) return "Stable";
+  return "Needs Attention";
+}
+
+function healthClasses(pct: number): string {
+  if (pct >= 80) return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  if (pct >= 65) return "border-zinc-200 bg-zinc-100 text-zinc-700";
+  return "border-amber-100 bg-amber-50 text-amber-700";
+}
+
 export default function SubgroupDashboardPage() {
   const hierarchy = useHierarchy();
-  const { subgroupName, groupName } = hierarchy;
+  const { subgroupName, subgroupId, groupName } = hierarchy;
 
-  const [expanded, setExpanded] = useState("");
-  const subgroupCampuses = useMemo(
-    () => campuses.filter((campus) => campus.subgroup === subgroupName),
-    [subgroupName]
-  );
+  const [realCampuses, setRealCampuses] = useState<RealCampus[]>([]);
+  const [subgroupUsers, setSubgroupUsers] = useState<SubgroupUser[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string>("");
+
+  useEffect(() => {
+    if (hierarchy.loading) return;
+
+    if (!subgroupId) {
+      setDataLoading(false);
+      return;
+    }
+
+    let active = true;
+    const supabase = createClient();
+
+    Promise.all([
+      supabase
+        .from("campuses")
+        .select("id, name, pastor, campus_pastor")
+        .eq("subgroup_id", subgroupId),
+      supabase
+        .from("users")
+        .select("id, full_name, role, current_leadership_role, onboarding_completed, campus_id")
+        .eq("subgroup_id", subgroupId),
+    ]).then(([campusResult, userResult]) => {
+      if (!active) return;
+
+      if (campusResult.error) {
+        console.error("[subgroup-dashboard] failed to load campuses", {
+          subgroupId,
+          error: campusResult.error.message,
+        });
+      }
+      if (userResult.error) {
+        console.error("[subgroup-dashboard] failed to load subgroup users", {
+          subgroupId,
+          error: userResult.error.message,
+        });
+      }
+
+      const campuses = (campusResult.data ?? []) as RealCampus[];
+      setRealCampuses(campuses);
+      setSubgroupUsers((userResult.data ?? []) as SubgroupUser[]);
+
+      // Auto-expand first campus if available
+      if (campuses.length > 0) {
+        setExpanded((prev) => prev || campuses[0].id);
+      }
+
+      setDataLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [subgroupId, hierarchy.loading]);
+
+  // Per-campus user counts for real data
+  const usersByCampus = useMemo(() => {
+    const map = new Map<string, SubgroupUser[]>();
+    for (const user of subgroupUsers) {
+      if (!user.campus_id) continue;
+      const list = map.get(user.campus_id) ?? [];
+      list.push(user);
+      map.set(user.campus_id, list);
+    }
+    return map;
+  }, [subgroupUsers]);
+
+  const totalLeaders = subgroupUsers.length;
+  const activeLeaders = subgroupUsers.filter((u) => u.onboarding_completed === true).length;
+  const participationPct = totalLeaders > 0 ? Math.round((activeLeaders / totalLeaders) * 100) : 0;
   const followUps = useMemo(
-    () => leaders.filter((leader) => leader.subgroup === subgroupName && leader.issue),
-    [subgroupName]
+    () => subgroupUsers.filter((u) => !u.onboarding_completed),
+    [subgroupUsers]
   );
-  const totalLeaders = subgroupCampuses.reduce((sum, campus) => sum + campus.leaders, 0);
-  const averageParticipation = subgroupCampuses.length
-    ? Math.round(
-        subgroupCampuses.reduce((sum, campus) => sum + campus.engagement, 0) /
-          subgroupCampuses.length
-      )
-    : 0;
-  const certificateEstimate = Math.max(0, Math.round(totalLeaders * 0.3));
+
   const kpis = [
-    { label: "Campuses", value: String(subgroupCampuses.length || "–"), detail: `${subgroupName} network`, icon: Building2 },
-    { label: "Total Leaders", value: totalLeaders > 0 ? totalLeaders.toLocaleString() : "–", detail: "Across ministry teams", icon: Users },
-    { label: "Course Participation", value: averageParticipation > 0 ? `${averageParticipation}%` : "–", detail: "Active academy learners", icon: GraduationCap },
-    { label: "Certificates", value: certificateEstimate > 0 ? certificateEstimate.toLocaleString() : "–", detail: "Issued this quarter", icon: Award },
-    { label: "Follow-ups", value: String(followUps.length), detail: "Open leader actions", icon: AlertCircle },
+    {
+      label: "Campuses",
+      value: dataLoading ? "…" : String(realCampuses.length || "–"),
+      detail: `${subgroupName} network`,
+      icon: Building2,
+    },
+    {
+      label: "Total Leaders",
+      value: dataLoading ? "…" : (totalLeaders > 0 ? totalLeaders.toLocaleString() : "–"),
+      detail: "Across ministry teams",
+      icon: Users,
+    },
+    {
+      label: "Course Participation",
+      value: dataLoading ? "…" : (totalLeaders ? `${participationPct}%` : "–"),
+      detail: "Active academy learners",
+      icon: GraduationCap,
+    },
+    {
+      label: "Certificates",
+      value: "—",
+      detail: "Issued this quarter",
+      icon: Award,
+    },
+    {
+      label: "Follow-ups",
+      value: dataLoading ? "…" : String(followUps.length),
+      detail: "Open leader actions",
+      icon: AlertCircle,
+    },
   ];
-  const expandedCampusId = subgroupCampuses.some((campus) => campus.id === expanded)
-    ? expanded
-    : subgroupCampuses[0]?.id ?? "";
 
   return (
-    <ProtectedRoute allowedRoles={["Sub-Group Pastor", "Group Pastor", "Super Admin", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Sub-Group Pastor", "Super Admin", "Admin"]}>
     <DashboardShell searchPlaceholder="Search campuses, leaders, follow-ups...">
+
+      {/* ── Hero ──────────────────────────────────────────────── */}
       <motion.section variants={shellItem} className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
         <Badge className="mb-5 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
           Subgroup dashboard
@@ -60,10 +178,17 @@ export default function SubgroupDashboardPage() {
         <p className="mt-3 max-w-2xl text-base text-zinc-500">
           Your personal learning continues while {subgroupName} health, campus comparison, and leader performance signals stay visible within {groupName}.
         </p>
+        {!hierarchy.loading && !subgroupId && (
+          <div className="mt-5 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            No subgroup assignment found. Complete your ministry profile to see subgroup oversight data.
+          </div>
+        )}
       </motion.section>
 
-      <PersonalLearningLayer role="Sub-Group Pastor" />
+      {/* ── Personal Learning ─────────────────────────────────── */}
+      <PersonalLearningLayer role={(hierarchy.role || "Sub-Group Pastor") as import("@/lib/mock-auth").MockRole} />
 
+      {/* ── Oversight Intro ───────────────────────────────────── */}
       <OversightLayerIntro
         title="Subgroup oversight intelligence"
         description={`Role-aware intelligence for ${subgroupName} health, campus comparisons, leadership performance, and campus participation trends.`}
@@ -75,6 +200,7 @@ export default function SubgroupDashboardPage() {
         ]}
       />
 
+      {/* ── KPIs ──────────────────────────────────────────────── */}
       <motion.section variants={shellContainer} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {kpis.map((kpi) => (
           <motion.div key={kpi.label} variants={shellItem} whileHover={{ y: -3 }}>
@@ -94,80 +220,202 @@ export default function SubgroupDashboardPage() {
         ))}
       </motion.section>
 
-      <motion.section variants={shellItem} className="grid gap-4 lg:grid-cols-2">
-        {subgroupCampuses.map((campus) => <CampusCard key={campus.id} campus={campus} />)}
-      </motion.section>
+      {/* ── Campus Cards (real data) ───────────────────────────── */}
+      {realCampuses.length > 0 && (
+        <motion.section variants={shellItem} className="grid gap-4 lg:grid-cols-2">
+          {realCampuses.map((campus) => {
+            const campusUserList = usersByCampus.get(campus.id) ?? [];
+            const campusTotal = campusUserList.length;
+            const campusActive = campusUserList.filter((u) => u.onboarding_completed).length;
+            const campusInactive = campusTotal - campusActive;
+            const pct = campusTotal > 0 ? Math.round((campusActive / campusTotal) * 100) : 0;
+            const health = healthLabel(pct);
+            return (
+              <Card key={campus.id} className="rounded-xl border-zinc-200 bg-white shadow-sm">
+                <CardHeader className="flex-row items-start justify-between space-y-0">
+                  <div>
+                    <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
+                      {campus.name ?? "Unnamed Campus"}
+                    </CardTitle>
+                    <p className="mt-1 text-sm text-zinc-500">{campusPastorName(campus)}</p>
+                  </div>
+                  <Badge className={cn("rounded-md border hover:bg-inherit", healthClasses(pct))}>
+                    {health}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs text-zinc-500">Leaders</p>
+                      <p className="font-heading mt-1 font-semibold text-zinc-950">{campusTotal || "—"}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs text-zinc-500">Active</p>
+                      <p className="font-heading mt-1 font-semibold text-zinc-950">{campusActive || "—"}</p>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs text-zinc-500">Inactive</p>
+                      <p className="font-heading mt-1 font-semibold text-zinc-950">{campusInactive || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="mb-2 flex justify-between text-xs">
+                      <span className="text-zinc-500">Participation</span>
+                      <span className="font-semibold text-zinc-950">{campusTotal ? `${pct}%` : "—"}</span>
+                    </div>
+                    <Progress value={pct} className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black" />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </motion.section>
+      )}
 
-      <motion.section variants={shellItem}>
-        <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
-          <CardHeader className="border-b border-zinc-100">
-            <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Expandable campus views</CardTitle>
-            <p className="text-sm text-zinc-500">Ministry-team health, participation levels, and inactive leader counts</p>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-1">
-            {subgroupCampuses.map((campus) => {
-              const isOpen = expandedCampusId === campus.id;
-              return (
-                <div key={campus.id} className="rounded-lg border border-zinc-100">
-                  <button onClick={() => setExpanded(isOpen ? "" : campus.id)} className="flex w-full items-center justify-between p-4 text-left">
-                    <div>
-                      <p className="font-heading font-semibold text-zinc-950">{campus.name}</p>
-                      <p className="text-sm text-zinc-500">{campus.pastor}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge className={cn("rounded-md border hover:bg-inherit", statusClasses(campus.status))}>{campus.status}</Badge>
-                      <ChevronDown className={cn("size-5 text-zinc-400 transition-transform", isOpen && "rotate-180")} />
-                    </div>
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {isOpen ? (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                        <div className="grid gap-3 border-t border-zinc-100 p-4 md:grid-cols-3">
-                          {campus.departments.map((department) => (
-                            <div key={department.name} className="rounded-lg border border-zinc-100 p-4">
-                              <p className="font-medium text-zinc-950">{department.name}</p>
-                              <p className="mt-1 text-sm text-zinc-500">{department.leaders} leaders</p>
-                              <Progress value={department.performance} className="mt-4 h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black" />
-                              <p className="mt-2 text-xs text-zinc-500">{department.performance}% participation health</p>
+      {/* ── Expandable Campus Views (real data) ───────────────── */}
+      {realCampuses.length > 0 && (
+        <motion.section variants={shellItem}>
+          <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+            <CardHeader className="border-b border-zinc-100">
+              <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Expandable campus views</CardTitle>
+              <p className="text-sm text-zinc-500">Ministry-team health, participation levels, and inactive leader counts</p>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-1">
+              {realCampuses.map((campus) => {
+                const campusUserList = usersByCampus.get(campus.id) ?? [];
+                const campusTotal = campusUserList.length;
+                const campusActive = campusUserList.filter((u) => u.onboarding_completed).length;
+                const pct = campusTotal > 0 ? Math.round((campusActive / campusTotal) * 100) : 0;
+                const health = healthLabel(pct);
+                const isOpen = expanded === campus.id;
+
+                return (
+                  <div key={campus.id} className="rounded-lg border border-zinc-100">
+                    <button
+                      onClick={() => setExpanded(isOpen ? "" : campus.id)}
+                      className="flex w-full items-center justify-between p-4 text-left"
+                    >
+                      <div>
+                        <p className="font-heading font-semibold text-zinc-950">{campus.name ?? "Unnamed Campus"}</p>
+                        <p className="text-sm text-zinc-500">{campusPastorName(campus)}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge className={cn("rounded-md border hover:bg-inherit", healthClasses(pct))}>
+                          {health}
+                        </Badge>
+                        <ChevronDown className={cn("size-5 text-zinc-400 transition-transform", isOpen && "rotate-180")} />
+                      </div>
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {isOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="grid gap-3 border-t border-zinc-100 p-4 md:grid-cols-3">
+                            <div className="rounded-lg border border-zinc-100 p-4">
+                              <p className="font-medium text-zinc-950">Total leaders</p>
+                              <p className="mt-1 text-sm text-zinc-500">{campusTotal || "No data"}</p>
+                              <Progress value={pct} className="mt-4 h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black" />
+                              <p className="mt-2 text-xs text-zinc-500">{campusTotal ? `${pct}% participation` : "Awaiting data"}</p>
                             </div>
-                          ))}
-                        </div>
-                      </motion.div>
-                    ) : null}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </motion.section>
+                            <div className="rounded-lg border border-zinc-100 p-4">
+                              <p className="font-medium text-zinc-950">Active leaders</p>
+                              <p className="font-heading mt-3 text-2xl font-semibold text-zinc-950">
+                                {campusActive || "—"}
+                              </p>
+                              <p className="mt-1 text-sm text-zinc-500">Completed onboarding</p>
+                            </div>
+                            <div className="rounded-lg border border-zinc-100 p-4">
+                              <p className="font-medium text-zinc-950">Needs follow-up</p>
+                              <p className="font-heading mt-3 text-2xl font-semibold text-zinc-950">
+                                {campusTotal - campusActive || "—"}
+                              </p>
+                              <p className="mt-1 text-sm text-zinc-500">Not yet active in academy</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </motion.section>
+      )}
 
+      {/* ── Empty state (no subgroup data) ────────────────────── */}
+      {!dataLoading && realCampuses.length === 0 && subgroupId && (
+        <motion.section variants={shellItem}>
+          <div className="rounded-xl border border-dashed border-zinc-200 bg-white py-14 text-center">
+            <Building2 className="mx-auto size-8 text-zinc-300" />
+            <p className="mt-3 text-sm font-medium text-zinc-500">No campuses found for this subgroup</p>
+            <p className="mt-1 text-xs text-zinc-400">
+              Ensure campuses have the correct subgroup_id assigned in the database
+            </p>
+          </div>
+        </motion.section>
+      )}
+
+      {/* ── Follow-up Intelligence (real Supabase users) ──────── */}
       <motion.section variants={shellItem} className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
         <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
           <CardHeader className="border-b border-zinc-100">
             <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Leader follow-up intelligence</CardTitle>
+            <p className="text-sm text-zinc-500">
+              {dataLoading
+                ? "Loading leaders…"
+                : followUps.length > 0
+                ? `${followUps.length} leader${followUps.length !== 1 ? "s" : ""} require${followUps.length === 1 ? "s" : ""} follow-up`
+                : "All registered leaders are active"}
+            </p>
           </CardHeader>
           <CardContent className="grid gap-3 pt-1 md:grid-cols-2">
-            {followUps.map((leader) => (
-              <div key={leader.id} className="rounded-lg border border-zinc-100 p-4">
-                <p className="font-medium text-zinc-950">{leader.name}</p>
-                <p className="text-sm text-zinc-500">{leader.campus} · {leader.role}</p>
-                <div className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-500">{leader.issue}</div>
+            {followUps.slice(0, 6).map((user) => (
+              <div key={user.id} className="rounded-lg border border-zinc-100 p-4">
+                <p className="font-medium text-zinc-950">{user.full_name || "Unnamed Leader"}</p>
+                <p className="text-sm text-zinc-500">
+                  {user.current_leadership_role || user.role || "Leader"}
+                </p>
+                <div className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+                  Academy profile not yet completed
+                </div>
+              </div>
+            ))}
+            {!dataLoading && followUps.length === 0 && (
+              <div className="col-span-2 rounded-lg border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-400">
+                No follow-up actions required at this time
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <IntelligencePanel
+          title="Subgroup insights"
+          subtitle="Learning and oversight signals for pastoral action"
+          insights={subgroupInsights}
+          dark
+        />
+      </motion.section>
+
+      {/* ── Activity Feed ─────────────────────────────────────── */}
+      <motion.section variants={shellItem}>
+        <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg font-semibold">Recent activity feed</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {activityItems.map((item) => (
+              <div key={item} className="rounded-lg border border-zinc-100 p-4 text-sm leading-6 text-zinc-600">
+                {item}
               </div>
             ))}
           </CardContent>
         </Card>
-        <IntelligencePanel title="Subgroup insights" subtitle="Learning and oversight signals for pastoral action" insights={subgroupInsights} dark />
       </motion.section>
 
-      <motion.section variants={shellItem}>
-        <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
-          <CardHeader><CardTitle className="font-heading text-lg font-semibold">Recent activity feed</CardTitle></CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {activityItems.map((item) => <div key={item} className="rounded-lg border border-zinc-100 p-4 text-sm leading-6 text-zinc-600">{item}</div>)}
-          </CardContent>
-        </Card>
-      </motion.section>
     </DashboardShell>
     </ProtectedRoute>
   );
