@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Award,
@@ -14,7 +13,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
+import { useHierarchy } from "@/hooks/use-hierarchy";
 
 type LeaderMetric = {
   label: string;
@@ -23,31 +22,14 @@ type LeaderMetric = {
 };
 
 export default function LeaderDashboardPage() {
-  const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const hierarchy = useHierarchy();
   const metrics: LeaderMetric[] = [
     { label: "Course progress", value: "62%", icon: BookOpenCheck },
     { label: "Certificates", value: "3", icon: Award },
     { label: "Engagement", value: "88%", icon: LineChart },
   ];
 
-  useEffect(() => {
-    let active = true;
-
-    async function syncProfile() {
-      const result = await getCurrentUserProfile();
-      if (active && result.profile) {
-        setProfile(result.profile);
-      }
-    }
-
-    syncProfile();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const firstName = profile?.fullName?.split(" ").filter(Boolean)[0] ?? "Leader";
+  const firstName = hierarchy.firstName || "Leader";
 
   return (
     <ProtectedRoute allowedRoles={["Cell Leader / Assistant HOD", "Zonal Leader / HOD", "Community Leader", "Area Leader", "Directional Leader", "District Pastor / Pastoral Leader", "Leader", "Super Admin", "Admin"]}>
@@ -63,13 +45,13 @@ export default function LeaderDashboardPage() {
             Welcome back, {firstName}
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
-            Continue growing as a learner while strengthening the responsibility habits needed for {profile?.leadershipAspiration ?? "your next leadership step"}.
+            Continue growing as a learner while strengthening the responsibility habits needed for {hierarchy.leadershipAspiration || "your next leadership step"}.
           </p>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {[
-              ["Current role", profile?.currentLeadershipRole ?? "Cell Leader / Assistant HOD"],
-              ["Preparing for", profile?.leadershipAspiration ?? "Zonal Leader / HOD"],
-              ["Ministry context", profile?.campus ?? "Campus"],
+              ["Current role", hierarchy.currentLeadershipRole || "–"],
+              ["Preparing for", hierarchy.leadershipAspiration || "–"],
+              ["Ministry context", hierarchy.campusName],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-zinc-100 bg-zinc-50 p-3">
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
@@ -81,7 +63,7 @@ export default function LeaderDashboardPage() {
           </div>
         </motion.section>
 
-        <PersonalLearningLayer role={profile?.role ?? "Cell Leader / Assistant HOD"} />
+        <PersonalLearningLayer role={(hierarchy.role || "Cell Leader / Assistant HOD") as import("@/lib/mock-auth").MockRole} />
 
         <OversightLayerIntro
           title="Personal ministry responsibility intelligence"

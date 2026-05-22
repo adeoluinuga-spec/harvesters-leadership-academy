@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
@@ -25,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
+import { useHierarchy } from "@/hooks/use-hierarchy";
 
 const heroStats = [
   { label: "Total campuses", value: "13" },
@@ -113,46 +112,42 @@ const campusHealth = [
 const leadersNeedingAttention = [
   {
     name: "Tomi Adebayo",
-    campus: "Ilupeju Campus",
-    subgroup: "Magodo Subgroup",
+    location: "Campus · Subgroup A",
     issue: "Inactive for 21 days",
     action: "Assign pastoral follow-up",
   },
   {
     name: "Nkechi Eze",
-    campus: "Oluyole Campus",
-    subgroup: "Jericho Subgroup",
+    location: "Campus · Subgroup B",
     issue: "Low lesson completion",
     action: "Recommend coaching pathway",
   },
   {
     name: "David Okafor",
-    campus: "Surulere Campus",
-    subgroup: "Yaba Subgroup",
+    location: "Campus · Subgroup C",
     issue: "Not enrolled",
     action: "Send cohort invitation",
   },
   {
     name: "Bisi Lawal",
-    campus: "Ogba Campus",
-    subgroup: "Magodo Subgroup",
+    location: "Campus · Subgroup A",
     issue: "Low engagement score",
     action: "Review ministry workload",
   },
 ];
 
 const insights = [
-  { title: "Magodo Campus has highest engagement growth.", tone: "positive", icon: TrendingUp },
-  { title: "Jericho Subgroup participation dropped 8%.", tone: "warning", icon: TrendingDown },
-  { title: "12 leaders are eligible for promotion review.", tone: "positive", icon: UserCheck },
-  { title: "Oluyole Campus requires follow-up.", tone: "attention", icon: AlertCircle },
+  { title: "Top campus engagement growth is up 18% this period.", tone: "positive", icon: TrendingUp },
+  { title: "One subgroup participation dropped 8% — review recommended.", tone: "warning", icon: TrendingDown },
+  { title: "12 leaders are eligible for a promotion review.", tone: "positive", icon: UserCheck },
+  { title: "Follow-up action required across two campuses.", tone: "attention", icon: AlertCircle },
 ];
 
 const activityFeed = [
   { title: "Course completion", body: "36 leaders completed Culture, Teams and Stewardship", time: "12 min ago" },
-  { title: "New enrollments", body: "Ilupeju Campus enrolled 48 leaders into Executive Ministry Leadership", time: "42 min ago" },
-  { title: "Certificates issued", body: "Magodo Subgroup crossed 231 certificates this quarter", time: "2 hrs ago" },
-  { title: "Subgroup milestone", body: "Yaba Campus reached 88% academy participation", time: "4 hrs ago" },
+  { title: "New enrollments", body: "48 leaders enrolled into Executive Ministry Leadership this week", time: "42 min ago" },
+  { title: "Certificates issued", body: "Subgroup crossed 231 certificates this quarter", time: "2 hrs ago" },
+  { title: "Milestone", body: "Campus reached 88% academy participation in the current cohort", time: "4 hrs ago" },
 ];
 
 function statusClasses(status: string) {
@@ -408,7 +403,7 @@ function LeadersAndActivity() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-zinc-950">{leader.name}</p>
-                      <p className="text-sm text-zinc-500">{leader.campus} · {leader.subgroup}</p>
+                      <p className="text-sm text-zinc-500">{leader.location}</p>
                     </div>
                     <CircleDot className="size-4 shrink-0 text-amber-500" />
                   </div>
@@ -447,31 +442,14 @@ function LeadersAndActivity() {
 }
 
 export default function GroupDashboardPage() {
-  const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const groupName = profile?.group ?? "Group Alpha";
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadProfile() {
-      const result = await getCurrentUserProfile();
-      if (active && result.profile) {
-        setProfile(result.profile);
-      }
-    }
-
-    loadProfile();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const hierarchy = useHierarchy();
+  const groupName = hierarchy.groupName || "…";
 
   return (
     <ProtectedRoute allowedRoles={["Group Pastor", "Directional Leader", "District Pastor / Pastoral Leader", "Super Admin", "Admin"]}>
       <DashboardShell searchPlaceholder="Search subgroups, campuses, leaders..." showDate>
         <Hero groupName={groupName} />
-        <PersonalLearningLayer role={profile?.role ?? "Group Pastor"} />
+        <PersonalLearningLayer role={(hierarchy.role || "Group Pastor") as import("@/lib/mock-auth").MockRole} />
         <OversightLayerIntro
           title="Group oversight intelligence"
           description={`Role-aware intelligence for ${groupName} ministry health, subgroup analytics, leadership pipeline visibility, and campus growth signals.`}

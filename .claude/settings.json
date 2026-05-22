@@ -8,7 +8,8 @@
       "Bash(Get-ChildItem -Recurse \"c:\\\\Users\\\\hp\\\\Desktop\\\\harvesters-academy\\\\src\\\\app\\\\dashboard\\\\admin\\\\courses\")",
       "Bash(Select-Object FullName)",
       "Bash(netstat -ano)",
-      "Bash(findstr \":3000\")"
+      "Bash(findstr \":3000\")",
+      "Bash(findstr \"dashboard\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\hp\\.claude\\projects\\c--Users-hp-Desktop-harvesters-academy\\memory"

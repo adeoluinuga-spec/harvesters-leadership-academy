@@ -206,15 +206,15 @@ export const leaders: Leader[] = [
 ];
 
 export const subgroupInsights = [
-  "Magodo Subgroup is leading Group Alpha in completion and engagement.",
-  "Oluyole and Abeokuta Campuses require focused follow-up this week.",
-  "Yaba Campus is ready for advanced leadership track expansion.",
-  "12 leaders across Jericho Subgroup qualify for promotion review.",
+  "Leadership participation rate improved significantly this month.",
+  "Multiple campuses require focused pastoral follow-up this week.",
+  "Academy certificate counts are tracking ahead of quarterly targets.",
+  "12 leaders across your subgroup qualify for a promotion review.",
 ];
 
 export const activityItems = [
-  "Yaba Campus completed 42 lessons this week.",
-  "Magodo Campus issued 18 new certificates.",
-  "Ilupeju Campus enrolled 24 leaders into Culture, Teams and Stewardship.",
-  "Port Harcourt Campus submitted 11 mentorship notes.",
+  "42 lessons completed across the subgroup this week.",
+  "18 new certificates issued in the current cohort.",
+  "24 leaders enrolled into Culture, Teams and Stewardship.",
+  "11 mentorship notes submitted by campus teams.",
 ];

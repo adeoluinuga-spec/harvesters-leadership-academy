@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, Award, Building2, ChevronDown, GraduationCap, Users } from "lucide-react";
 
@@ -13,12 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { campuses, leaders, subgroupInsights, activityItems } from "@/lib/hierarchy-data";
 import { cn } from "@/lib/utils";
-import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
+import { useHierarchy } from "@/hooks/use-hierarchy";
 
 export default function SubgroupDashboardPage() {
-  const [expanded, setExpanded] = useState("ilupeju");
-  const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const subgroupName = profile?.subgroup ?? "Magodo Subgroup";
+  const hierarchy = useHierarchy();
+  const { subgroupName, groupName } = hierarchy;
+
+  const [expanded, setExpanded] = useState("");
   const subgroupCampuses = useMemo(
     () => campuses.filter((campus) => campus.subgroup === subgroupName),
     [subgroupName]
@@ -36,32 +37,15 @@ export default function SubgroupDashboardPage() {
     : 0;
   const certificateEstimate = Math.max(0, Math.round(totalLeaders * 0.3));
   const kpis = [
-    { label: "Campuses", value: String(subgroupCampuses.length), detail: `${subgroupName} network`, icon: Building2 },
-    { label: "Total Leaders", value: totalLeaders.toLocaleString(), detail: "Across ministry teams", icon: Users },
-    { label: "Course Participation", value: `${averageParticipation}%`, detail: "Active academy learners", icon: GraduationCap },
-    { label: "Certificates", value: certificateEstimate.toLocaleString(), detail: "Issued this quarter", icon: Award },
+    { label: "Campuses", value: String(subgroupCampuses.length || "–"), detail: `${subgroupName} network`, icon: Building2 },
+    { label: "Total Leaders", value: totalLeaders > 0 ? totalLeaders.toLocaleString() : "–", detail: "Across ministry teams", icon: Users },
+    { label: "Course Participation", value: averageParticipation > 0 ? `${averageParticipation}%` : "–", detail: "Active academy learners", icon: GraduationCap },
+    { label: "Certificates", value: certificateEstimate > 0 ? certificateEstimate.toLocaleString() : "–", detail: "Issued this quarter", icon: Award },
     { label: "Follow-ups", value: String(followUps.length), detail: "Open leader actions", icon: AlertCircle },
   ];
   const expandedCampusId = subgroupCampuses.some((campus) => campus.id === expanded)
     ? expanded
     : subgroupCampuses[0]?.id ?? "";
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadProfile() {
-      const result = await getCurrentUserProfile();
-      if (active && result.profile) {
-        setProfile(result.profile);
-      }
-    }
-
-    loadProfile();
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   return (
     <ProtectedRoute allowedRoles={["Sub-Group Pastor", "Group Pastor", "Super Admin", "Admin"]}>
@@ -74,7 +58,7 @@ export default function SubgroupDashboardPage() {
           {subgroupName} Oversight Intelligence
         </h1>
         <p className="mt-3 max-w-2xl text-base text-zinc-500">
-          Your personal learning continues while {subgroupName} health, campus comparison, and leader performance signals stay visible within {profile?.group ?? "your group"}.
+          Your personal learning continues while {subgroupName} health, campus comparison, and leader performance signals stay visible within {groupName}.
         </p>
       </motion.section>
 

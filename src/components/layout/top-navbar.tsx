@@ -129,23 +129,24 @@ export function TopNavbar({
 function formatMinistryIdentity(profile: AuthProfile | null) {
   if (!profile) return "Leader";
 
-  if (profile.role === "Campus Pastor" && profile.campus) {
-    return `${profile.role}, ${formatHarvestersCampus(profile.campus)}`;
+  if (profile.role === "Platform Super Admin" || profile.role === "Super Admin" || profile.role === "Admin") {
+    return "Platform Administration";
+  }
+
+  if (profile.role === "Campus Pastor") {
+    return profile.campus
+      ? `${profile.role}, ${formatHarvestersCampus(profile.campus)}`
+      : profile.role;
   }
 
   if (
-    (profile.role === "Sub-Group Pastor" || profile.role === "Subgroup Pastor" || profile.role === "Sub-group Pastor") &&
-    profile.subgroup
+    profile.role === "Sub-Group Pastor" || profile.role === "Subgroup Pastor" || profile.role === "Sub-group Pastor"
   ) {
-    return `${profile.role}, ${profile.subgroup}`;
+    return profile.subgroup ? `${profile.role}, ${profile.subgroup}` : profile.role;
   }
 
-  if (profile.role === "Group Pastor" && profile.group) {
-    return `${profile.role}, ${profile.group}`;
-  }
-
-  if (profile.role === "Platform Super Admin" || profile.role === "Super Admin" || profile.role === "Admin") {
-    return "Platform Super Admin";
+  if (profile.role === "Group Pastor") {
+    return profile.group ? `${profile.role}, ${profile.group}` : profile.role;
   }
 
   if (profile.campus) {

@@ -265,9 +265,9 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
   const campusId = data?.campus_id ?? null;
   let subgroupId = data?.subgroup_id ?? null;
   let groupId = data?.group_id ?? null;
-  let campusName = data?.campus ?? relatedName(data?.campuses);
-  let subgroupName = data?.subgroup ?? relatedName(data?.subgroups);
-  let groupName = data?.group_name ?? data?.group ?? relatedName(data?.groups);
+  let campusName = relatedName(data?.campuses) ?? data?.campus ?? null;
+  let subgroupName = relatedName(data?.subgroups) ?? data?.subgroup ?? null;
+  let groupName = relatedName(data?.groups) ?? data?.group_name ?? data?.group ?? null;
   let campusPastor = data?.campus_pastor ?? null;
 
   if (campusId && (!campusName || !subgroupId || !groupId || !campusPastor)) {
@@ -318,16 +318,16 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
     campusId,
     subgroupId,
     groupId,
-    campus: campusName ?? defaultLeadershipProfile.campus,
-    subgroup: subgroupName ?? defaultLeadershipProfile.subgroup,
-    group: groupName ?? defaultLeadershipProfile.group,
-    campusPastor: campusPastor ?? defaultLeadershipProfile.campusPastor,
+    campus: campusName ?? "",
+    subgroup: subgroupName ?? "",
+    group: groupName ?? "",
+    campusPastor: campusPastor ?? "",
     currentLeadershipRole:
-      data?.current_leadership_role ?? defaultLeadershipProfile.currentLeadershipRole,
+      data?.current_leadership_role ?? "None",
     leadershipAspiration:
       data?.aspirational_leadership_role ??
       data?.leadership_aspiration ??
-      defaultLeadershipProfile.leadershipAspiration,
+      "Pastoral Leadership",
   } satisfies AuthProfile;
 }
 

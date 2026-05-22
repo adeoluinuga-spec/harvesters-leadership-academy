@@ -126,6 +126,7 @@ export async function createCourse(data: CourseFormData): Promise<{ course: LMSC
       is_required: data.is_required,
       is_featured: data.is_featured,
       status: data.status,
+      is_published: data.status === "published",
     })
     .select("*")
     .single();
@@ -149,7 +150,10 @@ export async function updateCourse(id: string, data: Partial<CourseFormData>): P
   if (data.leadership_targets !== undefined) payload.leadership_targets = data.leadership_targets;
   if (data.is_required !== undefined) payload.is_required = data.is_required;
   if (data.is_featured !== undefined) payload.is_featured = data.is_featured;
-  if (data.status !== undefined) payload.status = data.status;
+  if (data.status !== undefined) {
+    payload.status = data.status;
+    payload.is_published = data.status === "published";
+  }
 
   const { error } = await supabase.from("courses").update(payload).eq("id", id);
   return { error: error?.message ?? null };

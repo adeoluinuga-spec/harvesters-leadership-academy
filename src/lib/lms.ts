@@ -40,10 +40,12 @@ export function getLeadershipLevel(role: string): number {
   return LEADERSHIP_LEVEL[role] ?? 0;
 }
 
-export function canUserSeeCourse(userLevel: number, targets: string[]): boolean {
+export function canUserSeeCourse(userRole: string, targets: string[]): boolean {
   if (!targets || targets.length === 0) return true;
-  const minTargetLevel = Math.min(...targets.map((t) => getLeadershipLevel(t)));
-  return userLevel >= minTargetLevel;
+  if (targets.includes(userRole)) return true;
+  // Admin-level roles can always see all published courses
+  if (["Platform Super Admin", "Super Admin", "Admin"].includes(userRole)) return true;
+  return false;
 }
 
 export async function getCurrentUserRole(): Promise<{ role: string; level: number }> {
@@ -80,7 +82,7 @@ async function fetchAllCoursesWithProgress(userId: string | null): Promise<Cours
   const { data: courses, error } = await supabase
     .from("courses")
     .select("*")
-    .eq("is_published", true)
+    .or("status.eq.published,is_published.eq.true")
     .order("is_featured", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -167,24 +169,12 @@ export async function fetchCourseCatalog(): Promise<CatalogCourses> {
   const userLevel = getLeadershipLevel(userRole);
 
   const visible = all.filter((c) =>
-    canUserSeeCourse(userLevel, c.leadership_targets ?? [])
+    canUserSeeCourse(userRole, c.leadership_targets ?? [])
   );
 
   const required = visible.filter((c) => c.is_required);
   const pathway = visible.filter(
-    (c) =>
-      !c.is_required &&
-      (c.leadership_targets ?? []).length > 0 &&
-      (c.leadership_targets ?? []).some(
-        (t) => t === userRole || getLeadershipLevel(t) === userLevel
-      )
-  );
-  const rest = visible.filter(
-    (c) =>
-      !c.is_required &&
-      !(c.leadership_targets ?? []).some(
-        (t) => t === userRole || getLeadershipLevel(t) === userLevel
-      )
+    (c) => !c.is_required && (c.leadership_targets ?? []).includes(userRole)
   );
 
   return { required, pathway, all: visible, userRole };
