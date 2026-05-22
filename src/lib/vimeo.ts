@@ -27,5 +27,5 @@ export function isVimeoUrl(url: string): boolean {
 }
 
 export function vimeoEmbedUrl(id: string): string {
-  return `https://player.vimeo.com/video/${id}?title=0&byline=0&portrait=0&dnt=1`;
+  return `https://player.vimeo.com/video/${id}?title=0&byline=0&portrait=0&dnt=1&transparent=0&fullscreen=1`;
 }

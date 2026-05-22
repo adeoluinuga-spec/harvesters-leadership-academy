@@ -86,7 +86,7 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-20 flex-col border-r border-white/10 bg-[#050505] text-white shadow-2xl shadow-black/25 lg:w-72">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-20 flex-col border-r border-white/10 bg-[#050505] text-white shadow-2xl shadow-black/25 md:flex lg:w-72">
       <div className="flex h-20 items-center gap-3 border-b border-white/10 px-5 lg:px-6">
         <div className="flex size-10 items-center justify-center rounded-lg border border-white/15 bg-white text-black">
           <Sparkles className="size-5" />

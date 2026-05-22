@@ -58,7 +58,9 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
           setEnrolled(true);
         } else {
           const data = await res.json().catch(() => ({}));
-          setEnrollError((data as { error?: string }).error ?? "Enrollment failed. Please try again.");
+          setEnrollError(
+            (data as { error?: string }).error ?? "Enrollment failed. Please try again."
+          );
         }
       } catch {
         setEnrollError("Network error. Please check your connection and try again.");
@@ -84,7 +86,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
           <button
             type="button"
             onClick={() => router.push("/courses")}
-            className="mt-5 inline-flex h-9 items-center gap-2 rounded-lg bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+            className="mt-5 inline-flex h-11 items-center gap-2 rounded-lg bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
           >
             <ArrowLeft className="size-4" />
             Back to courses
@@ -104,12 +106,12 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   return (
     <DashboardShell searchPlaceholder="Search courses..." showDate={false}>
 
-      {/* ── Hero banner ─────────────────────────────────────── */}
+      {/* ── Hero banner — full-bleed on mobile ──────────────────── */}
       <motion.section
         variants={shellItem}
-        className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
+        className="-mx-5 overflow-hidden border-y border-zinc-200 bg-white sm:mx-0 sm:rounded-xl sm:border shadow-sm"
       >
-        <div className="relative min-h-[380px] bg-zinc-950">
+        <div className="relative min-h-[220px] bg-zinc-950 sm:min-h-[320px] md:min-h-[380px]">
           {course.thumbnail_url && (
             <div
               className="absolute inset-0 bg-cover bg-center opacity-60"
@@ -118,17 +120,18 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
           )}
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-black/10" />
 
-          <div className="relative flex min-h-[380px] flex-col justify-between p-6 md:p-8">
+          <div className="relative flex min-h-[220px] flex-col justify-between p-4 sm:min-h-[320px] sm:p-6 md:min-h-[380px] md:p-8">
             <Link
               href="/courses"
-              className="inline-flex w-fit items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-white/20"
+              className="inline-flex w-fit items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-white/20 active:bg-white/30"
             >
               <ArrowLeft className="size-4" />
-              Course library
+              <span className="hidden xs:inline">Course library</span>
+              <span className="xs:hidden">Back</span>
             </Link>
 
             <div className="max-w-3xl">
-              <div className="mb-4 flex flex-wrap gap-2">
+              <div className="mb-3 flex flex-wrap gap-1.5 sm:mb-4 sm:gap-2">
                 <Badge className="rounded-md border-white/15 bg-white text-zinc-950 hover:bg-white">
                   {course.category}
                 </Badge>
@@ -142,20 +145,20 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                 )}
               </div>
 
-              <h1 className="font-heading text-4xl font-semibold tracking-tight text-white md:text-5xl">
+              <h1 className="font-heading text-2xl font-semibold tracking-tight text-white sm:text-3xl md:text-4xl lg:text-5xl">
                 {course.title}
               </h1>
               {course.description && (
-                <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300">
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-300 sm:mt-4 sm:text-base sm:leading-7">
                   {course.description}
                 </p>
               )}
 
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-4 flex flex-wrap gap-3 sm:mt-7">
                 {isEnrolled ? (
                   <a
                     href="#video"
-                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-sm font-medium text-black transition-colors hover:bg-zinc-100"
+                    className="inline-flex h-12 items-center gap-2 rounded-lg bg-white px-6 text-sm font-medium text-black transition-colors hover:bg-zinc-100 active:bg-zinc-200 sm:h-10 sm:px-5"
                   >
                     <PlayCircle className="size-4" />
                     Start watching
@@ -165,7 +168,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                     type="button"
                     onClick={handleEnroll}
                     disabled={enrolling}
-                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-sm font-medium text-black transition-colors hover:bg-zinc-100 disabled:opacity-70"
+                    className="inline-flex h-12 items-center gap-2 rounded-lg bg-white px-6 text-sm font-medium text-black transition-colors hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-70 sm:h-10 sm:px-5"
                   >
                     {enrolling ? (
                       <Loader2 className="size-4 animate-spin" />
@@ -184,27 +187,35 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         </div>
       </motion.section>
 
-      {/* ── Video embed ──────────────────────────────────────── */}
+      {/* ── Video embed — full-bleed on mobile ──────────────────── */}
       {vimeoId && (
-        <motion.section variants={shellItem} id="video">
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-950 shadow-sm">
-            <div className="relative aspect-video w-full">
+        <motion.section
+          variants={shellItem}
+          id="video"
+          className="-mx-5 scroll-mt-24 sm:mx-0 sm:scroll-mt-20"
+        >
+          <div className="overflow-hidden border-y border-zinc-200 bg-zinc-950 sm:rounded-xl sm:border shadow-sm">
+            {/* 16:9 responsive container — iframe positioned absolutely inside */}
+            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
               <iframe
                 src={vimeoEmbedUrl(vimeoId)}
-                className="h-full w-full"
-                allow="autoplay; fullscreen; picture-in-picture"
+                className="absolute inset-0 h-full w-full"
+                allow="autoplay; fullscreen; picture-in-picture; clipboard-write"
                 allowFullScreen
                 title={course.title}
+                style={{ border: 0 }}
               />
             </div>
             {!isEnrolled && (
-              <div className="flex items-center justify-between gap-4 border-t border-white/10 px-5 py-3">
-                <p className="text-sm text-zinc-400">Enrol to track your progress through this course</p>
+              <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-3">
+                <p className="text-sm text-zinc-400">
+                  Enrol to track your progress through this course
+                </p>
                 <button
                   type="button"
                   onClick={handleEnroll}
                   disabled={enrolling}
-                  className="inline-flex h-8 items-center gap-2 rounded-lg bg-white px-4 text-xs font-medium text-black transition-colors hover:bg-zinc-100 disabled:opacity-70"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-medium text-black transition-colors hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-70 sm:h-8 sm:w-auto sm:text-xs"
                 >
                   {enrolling ? <Loader2 className="size-3.5 animate-spin" /> : null}
                   {enrolling ? "Enrolling..." : "Enrol now"}
@@ -215,23 +226,25 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         </motion.section>
       )}
 
-      {/* ── No video placeholder ─────────────────────────────── */}
+      {/* ── No video placeholder ─────────────────────────────────── */}
       {!vimeoId && (
         <motion.section variants={shellItem}>
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white py-14">
             <PlayCircle className="size-10 text-zinc-300" />
             <p className="mt-3 text-sm font-medium text-zinc-500">Video not yet available</p>
-            <p className="mt-1 text-xs text-zinc-400">The course instructor hasn't uploaded a video yet</p>
+            <p className="mt-1 text-xs text-zinc-400">
+              The course instructor hasn&apos;t uploaded a video yet
+            </p>
           </div>
         </motion.section>
       )}
 
-      {/* ── Course info + Overview ───────────────────────────── */}
+      {/* ── Course details + Overview ────────────────────────────── */}
       <motion.section variants={shellItem} className="grid gap-4 lg:grid-cols-[0.75fr_1.25fr]">
 
-        {/* Course info card */}
+        {/* Course details card */}
         <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
-          <CardHeader className="border-b border-zinc-100">
+          <CardHeader className="border-b border-zinc-100 pb-3">
             <CardTitle className="font-heading text-base font-semibold text-zinc-950">
               Course details
             </CardTitle>
@@ -240,7 +253,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
 
             {/* Instructor */}
             <div className="flex items-start gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100">
                 <Users className="size-4 text-zinc-500" />
               </div>
               <div>
@@ -252,7 +265,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
             {/* Duration */}
             {course.duration_minutes > 0 && (
               <div className="flex items-start gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100">
                   <Clock3 className="size-4 text-zinc-500" />
                 </div>
                 <div>
@@ -265,12 +278,14 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
             )}
 
             {/* Enrollment status */}
-            <div className={cn(
-              "rounded-lg border p-3 text-center text-xs font-medium",
-              isEnrolled
-                ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-                : "border-zinc-100 bg-zinc-50 text-zinc-500"
-            )}>
+            <div
+              className={cn(
+                "rounded-lg border p-3 text-center text-xs font-medium",
+                isEnrolled
+                  ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                  : "border-zinc-100 bg-zinc-50 text-zinc-500"
+              )}
+            >
               {isEnrolled ? "You are enrolled in this course" : "Not yet enrolled"}
             </div>
 
@@ -296,7 +311,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                 type="button"
                 onClick={handleEnroll}
                 disabled={enrolling}
-                className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-zinc-950 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-70"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-zinc-950 text-sm font-medium text-white transition-colors hover:bg-zinc-800 active:bg-zinc-700 disabled:opacity-70 sm:h-10"
               >
                 {enrolling ? <Loader2 className="size-4 animate-spin" /> : null}
                 {enrolling ? "Enrolling..." : "Enrol now"}
@@ -308,13 +323,15 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         {/* Overview card */}
         {course.overview ? (
           <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-zinc-100">
+            <CardHeader className="border-b border-zinc-100 pb-3">
               <CardTitle className="font-heading text-base font-semibold text-zinc-950">
                 Course overview
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
-              <p className="text-sm leading-7 text-zinc-600 whitespace-pre-line">{course.overview}</p>
+              <p className="text-sm leading-7 text-zinc-600 whitespace-pre-line">
+                {course.overview}
+              </p>
             </CardContent>
           </Card>
         ) : (
