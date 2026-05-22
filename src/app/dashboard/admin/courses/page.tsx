@@ -182,6 +182,13 @@ function CourseCard({ course, onStatusChange, onDelete }: {
             <Pencil className="size-3.5" />
             Edit
           </Link>
+          <Link
+            href={`/dashboard/admin/courses/${course.id}/lessons`}
+            className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            <BookOpen className="size-3.5" />
+            Lessons
+          </Link>
 
           <div className="relative">
             <Button

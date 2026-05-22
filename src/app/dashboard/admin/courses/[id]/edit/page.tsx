@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, BookOpen, Loader2, Trash2 } from "lucide-react";
 
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -234,7 +234,7 @@ export default function EditCoursePage({ params }: EditPageProps) {
 
   return (
     <DashboardShell searchPlaceholder="Edit course..." showDate={false}>
-      <motion.div variants={shellItem} className="flex items-center justify-between">
+      <motion.div variants={shellItem} className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <Link
             href="/dashboard/admin/courses"
@@ -248,15 +248,24 @@ export default function EditCoursePage({ params }: EditPageProps) {
             <p className="text-xs text-zinc-500">Changes are saved when you click save</p>
           </div>
         </div>
-        <button
-          type="button"
-          disabled={deleting}
-          onClick={handleDelete}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
-        >
-          {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-          Delete course
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/admin/courses/${id}/lessons`}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            <BookOpen className="size-4" />
+            Manage lessons
+          </Link>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={handleDelete}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+          >
+            {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+            Delete course
+          </button>
+        </div>
       </motion.div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -363,6 +372,20 @@ export default function EditCoursePage({ params }: EditPageProps) {
           description="Select which leadership roles this course is intended for"
         >
           <LeadershipCadreSelect value={leadershipTargets} onChange={setLeadershipTargets} />
+        </SectionCard>
+
+        {/* Lessons */}
+        <SectionCard
+          title="Course content"
+          description="Add and organise modules and lessons for this course"
+        >
+          <Link
+            href={`/dashboard/admin/courses/${id}/lessons`}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          >
+            <BookOpen className="size-4" />
+            Open lesson builder
+          </Link>
         </SectionCard>
 
         {/* Status */}
