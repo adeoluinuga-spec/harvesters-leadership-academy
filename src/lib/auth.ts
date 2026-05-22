@@ -492,10 +492,7 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
     }
   }
 
-  await ensureUserProfile(authData.user, {
-    designation: input.designation,
-  });
-
+  // Build the update payload — does NOT include id or created_at (immutable fields)
   const updatePayload: Record<string, unknown> = {
     email: input.email.trim(),
     designation: normalizeDesignation(input.designation),
@@ -528,23 +525,50 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
 
   if (input.campus.source === "supabase") {
     updatePayload.campus_id = input.campus.id;
-
-    if (input.campus.subgroupId) {
-      updatePayload.subgroup_id = input.campus.subgroupId;
-    }
-
-    if (input.campus.groupId) {
-      updatePayload.group_id = input.campus.groupId;
-    }
+    if (input.campus.subgroupId) updatePayload.subgroup_id = input.campus.subgroupId;
+    if (input.campus.groupId) updatePayload.group_id = input.campus.groupId;
   }
 
-  const { error } = await supabase
+  // ── Step 1: check whether the public.users row already exists ───────────
+  // We do this BEFORE any write to decide UPDATE vs INSERT.
+  // UPDATE never triggers the email unique constraint (modifying an existing row).
+  // We only fall through to upsert when no row exists at all.
+  const { data: existingRow } = await supabase
     .from("users")
-    .update(updatePayload)
-    .eq("id", authData.user.id);
+    .select("id")
+    .eq("id", authData.user.id)
+    .maybeSingle<{ id: string }>();
 
-  if (error) {
-    throw new Error(error.message);
+  if (existingRow?.id) {
+    // ── Row exists: UPDATE only. This path can never produce a duplicate-email error.
+    const { error: updateError } = await supabase
+      .from("users")
+      .update(updatePayload)
+      .eq("id", authData.user.id);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+    return;
+  }
+
+  // ── Step 2: no row found (trigger didn't fire, edge case) ───────────────
+  // Use upsert with onConflict: "id" so a concurrent row creation is handled
+  // gracefully. We never use email as the conflict target.
+  const { error: upsertError } = await supabase
+    .from("users")
+    .upsert(
+      {
+        id: authData.user.id,
+        email: authData.user.email ?? input.email.trim(),
+        created_at: new Date().toISOString(),
+        ...updatePayload,
+      },
+      { onConflict: "id" }
+    );
+
+  if (upsertError) {
+    throw new Error(upsertError.message);
   }
 }
 
