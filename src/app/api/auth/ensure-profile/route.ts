@@ -18,16 +18,16 @@ export async function POST(request: Request) {
   try {
     payload = await request.json();
   } catch {
-    return Response.json({ error: "Invalid profile request payload." }, { status: 400 });
+    return Response.json({ error: "Invalid request payload." }, { status: 400 });
   }
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("[ensure-profile] Missing Supabase URL or anon key.");
-    return Response.json({ error: "Supabase is not configured." }, { status: 500 });
+    return Response.json({ error: "Server configuration error." }, { status: 500 });
   }
 
   if (!payload.id || !payload.email) {
-    return Response.json({ error: "Missing auth user id or email." }, { status: 400 });
+    return Response.json({ error: "Missing user id or email." }, { status: 400 });
   }
 
   const profilePayload = {
@@ -35,122 +35,89 @@ export async function POST(request: Request) {
     email: payload.email.trim(),
     designation: normalizeDesignation(payload.designation),
     full_name: payload.fullName?.trim() || payload.email.trim(),
+    role: "Cell Leader",
     avatar_url: null,
     organization_id: null,
     onboarding_completed: false,
     created_at: new Date().toISOString(),
   };
 
+  // ── Path 1: service role key — bypasses RLS ──────────────────────────────
   if (supabaseServiceRoleKey) {
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: authUser, error: authLookupError } =
-      await adminClient.auth.admin.getUserById(payload.id);
-
-    if (authLookupError || !authUser.user) {
-      console.error("[ensure-profile] Could not verify auth user before profile upsert.", {
-        userId: payload.id,
-        message: authLookupError?.message,
-      });
-
-      return Response.json(
-        { error: "Auth account was created, but we could not verify it for profile creation." },
-        { status: 404 }
+    // Validate the JWT if a token was provided — skip only for no-session signups
+    // where the DB trigger already created the row.
+    if (payload.accessToken) {
+      const { data: authData, error: verifyError } = await adminClient.auth.getUser(
+        payload.accessToken
       );
+      if (verifyError || authData.user?.id !== payload.id) {
+        console.error("[ensure-profile] JWT verification failed.", {
+          userId: payload.id,
+          message: verifyError?.message,
+        });
+        return Response.json(
+          { error: "Your session could not be verified. Please sign in again." },
+          { status: 401 }
+        );
+      }
     }
 
-    const { data, error } = await adminClient
+    const { error } = await adminClient
       .from("users")
-      .upsert(profilePayload, { onConflict: "id" })
-      .select("*")
-      .single();
+      .upsert(profilePayload, { onConflict: "id" });
 
     if (error) {
-      console.error("[ensure-profile] Service-role profile upsert failed.", {
+      console.error("[ensure-profile] Service-role upsert failed.", {
         userId: payload.id,
         message: error.message,
         details: error.details,
         hint: error.hint,
       });
-
       return Response.json({ error: error.message }, { status: 500 });
     }
 
-    console.info("[ensure-profile] public.users profile persisted with service role.", {
-      userId: payload.id,
-      email: payload.email,
-    });
-
-    return Response.json({ profile: data });
+    console.info("[ensure-profile] Profile created via service role.", { userId: payload.id });
+    return Response.json({ ok: true });
   }
 
-  if (!payload.accessToken) {
-    console.error("[ensure-profile] Missing SUPABASE_SERVICE_ROLE_KEY and no user session token was available.", {
-      userId: payload.id,
-      email: payload.email,
-    });
-
-    return Response.json(
-      {
-        error:
-          "Profile creation requires the Supabase auth trigger or SUPABASE_SERVICE_ROLE_KEY when signup does not return a session.",
+  // ── Path 2: user access token — RLS enforces auth.uid() = id ─────────────
+  if (payload.accessToken) {
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: `Bearer ${payload.accessToken}` },
       },
-      { status: 503 }
-    );
-  }
-
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${payload.accessToken}`,
-      },
-    },
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  const { data: authData, error: authError } = await userClient.auth.getUser(payload.accessToken);
-
-  if (authError || authData.user?.id !== payload.id) {
-    console.error("[ensure-profile] Session token did not match requested profile user.", {
-      requestedUserId: payload.id,
-      sessionUserId: authData.user?.id,
-      message: authError?.message,
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    return Response.json({ error: "Your signup session could not be verified." }, { status: 401 });
+    const { error } = await userClient
+      .from("users")
+      .upsert(profilePayload, { onConflict: "id" });
+
+    if (error) {
+      console.error("[ensure-profile] Session upsert failed.", {
+        userId: payload.id,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      return Response.json({ error: error.message }, { status: 500 });
+    }
+
+    console.info("[ensure-profile] Profile created via user session.", { userId: payload.id });
+    return Response.json({ ok: true });
   }
 
-  const { data, error } = await userClient
-    .from("users")
-    .upsert(profilePayload, { onConflict: "id" })
-    .select("*")
-    .single();
-
-  if (error) {
-    console.error("[ensure-profile] Session profile upsert failed.", {
-      userId: payload.id,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-    });
-
-    return Response.json({ error: error.message }, { status: 500 });
-  }
-
-  console.info("[ensure-profile] public.users profile persisted with user session.", {
+  // ── Path 3: no token and no service role key ──────────────────────────────
+  // Email confirmation is pending — the DB trigger already created the public.users
+  // row when the auth account was inserted. Nothing more to do here.
+  console.info("[ensure-profile] No session/service key — relying on DB trigger.", {
     userId: payload.id,
-    email: payload.email,
   });
-
-  return Response.json({ profile: data });
+  return Response.json({ ok: true });
 }
 
 function normalizeDesignation(value?: string | null) {

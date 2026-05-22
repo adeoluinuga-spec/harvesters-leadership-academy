@@ -161,6 +161,7 @@ export async function ensureUserProfile(
     email,
     designation,
     full_name: fullName,
+    role: "Cell Leader",
     avatar_url: null,
     organization_id: null,
     onboarding_completed: false,

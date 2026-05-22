@@ -62,7 +62,7 @@ export default function SignupPage() {
         data: {
           designation: form.designation.trim() || "None",
           full_name: form.fullName.trim(),
-          role: "Cell Leader / Assistant HOD",
+          role: "Cell Leader",
         },
       },
     });
@@ -87,9 +87,7 @@ export default function SignupPage() {
     try {
       const profileResponse = await fetch("/api/auth/ensure-profile", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: data.user.id,
           email: form.email.trim(),
@@ -100,32 +98,20 @@ export default function SignupPage() {
       });
 
       if (!profileResponse.ok) {
-        const profileResult = (await profileResponse.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-
-        throw new Error(profileResult?.error ?? "Profile creation failed.");
-      }
-    } catch (profileError) {
-      console.error("[signup] Failed to create public.users profile", profileError);
-
-      if (!data.session) {
-        setError("Your auth account was created, but profile creation needs the Supabase database trigger or server service role key. Please apply the migration, then sign in again.");
+        const result = (await profileResponse.json().catch(() => null)) as { error?: string } | null;
+        const msg = result?.error ?? "We could not create your ministry profile. Please try signing in again.";
+        setError(msg);
         setLoading(false);
         return;
       }
-
-        setError("Your auth account was created, but we could not create your ministry profile. Please try signing in again or contact academy support.");
-        setLoading(false);
-        return;
+    } catch {
+      // Non-fatal: the DB trigger may have already created the profile.
+      // Let the user continue — onboarding will create the profile as a fallback.
+      console.warn("[signup] ensure-profile call failed; continuing to rely on DB trigger.");
     }
 
     if (!data.session) {
-      console.info("[signup] Auth user created without a session; public.users row should be created by the Supabase auth trigger", {
-        userId: data.user.id,
-        email: form.email.trim(),
-      });
-      setError("Your account was created. Please confirm your email, then sign in to continue onboarding.");
+      setError("Account created — please check your email to confirm your address, then sign in to continue onboarding.");
       setLoading(false);
       return;
     }
