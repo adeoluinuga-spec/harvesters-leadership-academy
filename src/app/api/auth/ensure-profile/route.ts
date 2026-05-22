@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     designation: normalizeDesignation(payload.designation),
     full_name: payload.fullName?.trim() || payload.email.trim(),
     avatar_url: null,
+    organization_id: null,
     onboarding_completed: false,
     created_at: new Date().toISOString(),
   };

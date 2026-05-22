@@ -61,6 +61,7 @@ const learningMetrics: LearningMetric[] = [
 ];
 
 const roleContext: Record<MockRole, string> = {
+  "Platform Super Admin": "platform-wide tenant governance, AI systems, white-label readiness, and global course architecture",
   "Cell Leader / Assistant HOD": "the cell members you influence and the ministry habits you are forming",
   "Zonal Leader / HOD": "zonal leadership, team development, and readiness signals",
   "Community Leader": "community leadership health, leader maturity, and participation patterns",
@@ -71,11 +72,11 @@ const roleContext: Record<MockRole, string> = {
   "Sub-Group Pastor": "sub-group health, campus comparisons, leadership performance, and participation trends",
   "Group Pastor": "group-wide ministry intelligence, sub-group analytics, pipeline visibility, and campus growth",
   "Campus Admin": "campus operations, enrollment management, and campus-level learning analytics",
-  "Super Admin": "global platform stewardship, hierarchy governance, pastor management, and system-wide analytics",
+  "Super Admin": "platform-wide tenant governance, AI systems, white-label readiness, and global course architecture",
   Leader: "the leaders you influence and the ministry habits you are forming",
   "Sub-group Pastor": "sub-group health, campus comparisons, leadership performance, and participation trends",
   "Subgroup Pastor": "sub-group health, campus comparisons, leadership performance, and participation trends",
-  Admin: "global platform stewardship, hierarchy governance, pastor management, and system-wide analytics",
+  Admin: "platform-wide tenant governance, AI systems, white-label readiness, and global course architecture",
 };
 
 export function PersonalLearningLayer({ role }: { role: MockRole }) {

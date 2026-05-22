@@ -5,12 +5,13 @@ import { useEffect, useState } from "react";
 import {
   Award,
   BookOpenCheck,
+  Building2,
   ChevronRight,
   CircleCheck,
   ClipboardCheck,
+  Cpu,
   LineChart,
   Plus,
-  ShieldCheck,
   Users,
 } from "lucide-react";
 
@@ -29,77 +30,77 @@ import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 
 const kpis = [
   {
+    label: "Total Organizations",
+    value: "12",
+    delta: "+3 pilots",
+    detail: "Tenant environments provisioned",
+    icon: Building2,
+    sparkline: [4, 5, 6, 7, 8, 10, 12],
+  },
+  {
     label: "Total Leaders",
     value: "12,840",
     delta: "+12.4%",
-    detail: "Across 34 ministry centers",
+    detail: "Across active organizations",
     icon: Users,
     sparkline: [34, 45, 40, 58, 52, 66, 73],
   },
   {
-    label: "Active Courses",
+    label: "Global Courses",
     value: "48",
     delta: "+6 new",
-    detail: "Leadership tracks live",
+    detail: "Shared architecture tracks",
     icon: BookOpenCheck,
     sparkline: [28, 34, 33, 42, 44, 47, 48],
   },
   {
-    label: "Completion Rate",
-    value: "84%",
-    delta: "+9.1%",
-    detail: "Quarterly cohort average",
-    icon: CircleCheck,
-    sparkline: [54, 58, 62, 61, 70, 79, 84],
-  },
-  {
-    label: "Certificates Issued",
-    value: "3,921",
-    delta: "+318",
-    detail: "Verified this quarter",
-    icon: ShieldCheck,
-    sparkline: [31, 38, 44, 43, 55, 61, 69],
+    label: "AI Systems",
+    value: "7",
+    delta: "healthy",
+    detail: "Course, analytics, and insight engines",
+    icon: Cpu,
+    sparkline: [3, 3, 4, 5, 5, 6, 7],
   },
 ];
 
-const ministryGroups = [
-  { name: "Campus Pastors", leaders: 324, completion: 92, engagement: "Very high" },
-  { name: "Service Directors", leaders: 812, completion: 86, engagement: "High" },
-  { name: "Small Group Leads", leaders: 2104, completion: 78, engagement: "Rising" },
-  { name: "Volunteer Coordinators", leaders: 679, completion: 81, engagement: "Strong" },
+const tenantPortfolio = [
+  { name: "Harvesters International Christian Centre", leaders: 12840, completion: 84, engagement: "Very high" },
+  { name: "Pilot Ministry Network", leaders: 1480, completion: 72, engagement: "Rising" },
+  { name: "Leadership Residency Cloud", leaders: 920, completion: 79, engagement: "Strong" },
+  { name: "White-label Sandbox", leaders: 240, completion: 61, engagement: "Provisioning" },
 ];
 
 const activityFeed = [
   {
     title: "Certificate earned",
-    description: "12 leaders completed Ministry Culture Essentials",
+    description: "12 leaders completed Ministry Culture Essentials across tenant environments",
     time: "8 min ago",
     icon: Award,
   },
   {
     title: "Assessment submitted",
-    description: "Campus Pastors cohort submitted Q2 leadership review",
+    description: "Harvesters submitted Q2 leadership review",
     time: "24 min ago",
     icon: ClipboardCheck,
   },
   {
     title: "New enrollments",
-    description: "86 leaders joined Discipleship Systems",
+    description: "86 leaders joined Discipleship Systems across active organizations",
     time: "1 hr ago",
     icon: Users,
   },
   {
     title: "Course completion",
-    description: "Prayer Team Leads reached 94% completion",
+    description: "Global Prayer Team Leads track reached 94% completion",
     time: "2 hrs ago",
     icon: CircleCheck,
   },
 ];
 
 const engagementMetrics = [
-  { label: "Weekly learning hours", value: "18,420", change: "+14%" },
-  { label: "Assessment pass rate", value: "91%", change: "+5%" },
-  { label: "Avg. lesson rating", value: "4.8", change: "+0.3" },
+  { label: "Tenant learning hours", value: "18,420", change: "+14%" },
+  { label: "Platform pass rate", value: "91%", change: "+5%" },
+  { label: "AI quality score", value: "4.8", change: "+0.3" },
 ];
 
 function Sparkline({ values }: { values: number[] }) {
@@ -157,23 +158,23 @@ function DashboardHero() {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Badge className="mb-5 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
-            Super admin learning and oversight
+            Platform Super Admin
           </Badge>
           <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Welcome back, {firstName}
+            Platform Governance Command Center
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
-            Your own leadership learning stays connected to academy-wide stewardship, governance, and learning quality.
+            Welcome back, {firstName}. Oversee organizations, tenant provisioning, AI systems, white-label readiness, and global course architecture from one executive layer.
           </p>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button className="h-10 rounded-lg bg-black px-4 text-white hover:bg-zinc-800">
             <Plus className="size-4" />
-            New course
+            Provision tenant
           </Button>
           <Button variant="outline" className="h-10 rounded-lg border-zinc-200 bg-white px-4">
-            View reports
+            Platform reports
             <ChevronRight className="size-4" />
           </Button>
         </div>
@@ -225,32 +226,32 @@ function AnalyticsSection() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
-                Group performance
+                Organization portfolio
               </CardTitle>
               <p className="mt-1 text-sm text-zinc-500">
-                Completion velocity by leadership segment
+                Tenant health, leaders, and adoption across the LMS ecosystem
               </p>
             </div>
             <LineChart className="size-5 text-zinc-400" />
           </div>
         </CardHeader>
         <CardContent className="space-y-5 pt-1">
-          {ministryGroups.map((group) => (
-            <div key={group.name} className="rounded-lg border border-zinc-100 p-4">
+          {tenantPortfolio.map((tenant) => (
+            <div key={tenant.name} className="rounded-lg border border-zinc-100 p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium text-zinc-950">{group.name}</p>
-                  <p className="text-sm text-zinc-500">{group.leaders.toLocaleString()} leaders</p>
+                  <p className="font-medium text-zinc-950">{tenant.name}</p>
+                  <p className="text-sm text-zinc-500">{tenant.leaders.toLocaleString()} leaders</p>
                 </div>
                 <div className="text-right">
                   <p className="font-heading text-xl font-semibold tracking-tight text-zinc-950">
-                    {group.completion}%
+                    {tenant.completion}%
                   </p>
-                  <p className="text-xs text-zinc-500">{group.engagement} engagement</p>
+                  <p className="text-xs text-zinc-500">{tenant.engagement} engagement</p>
                 </div>
               </div>
               <Progress
-                value={group.completion}
+                value={tenant.completion}
                 className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
               />
             </div>
@@ -260,8 +261,8 @@ function AnalyticsSection() {
 
       <Card className="rounded-xl border-zinc-200 bg-[#0b0b0b] text-white shadow-sm">
         <CardHeader>
-          <CardTitle className="font-heading text-lg font-semibold">Engagement metrics</CardTitle>
-          <p className="text-sm text-zinc-400">Learning signals from the last 7 days</p>
+          <CardTitle className="font-heading text-lg font-semibold">Platform intelligence</CardTitle>
+          <p className="text-sm text-zinc-400">System-wide signals from the last 7 days</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {engagementMetrics.map((metric) => (
@@ -297,7 +298,7 @@ function ActivityFeed() {
                 Recent activity
               </CardTitle>
               <p className="mt-1 text-sm text-zinc-500">
-                Live learning moments across the academy
+                Live platform governance moments across tenants
               </p>
             </div>
             <Button variant="outline" size="sm" className="rounded-lg border-zinc-200 bg-white">
@@ -326,19 +327,19 @@ function ActivityFeed() {
 
 export default function AdminDashboardPage() {
   return (
-    <ProtectedRoute allowedRoles={["Super Admin", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Platform Super Admin"]}>
       <DashboardShell>
         <DashboardHero />
-        <PersonalLearningLayer role="Super Admin" />
+        <PersonalLearningLayer role="Platform Super Admin" />
         <OversightLayerIntro
-          title="Academy oversight intelligence"
-          description="Role-aware intelligence for academy learning quality, user participation, certification velocity, and network engagement."
+          title="Platform ecosystem intelligence"
+          description="Platform-wide intelligence for organizations, tenant provisioning, white-label readiness, AI systems, global course architecture, and system health."
           modules={[
-            "Academy learning quality",
-            "Learner participation",
-            "Course governance",
-            "Certification velocity",
-            "Network engagement",
+            "Organization management",
+            "Tenant provisioning",
+            "White-label readiness",
+            "AI ecosystem oversight",
+            "Global course architecture",
           ]}
         />
         <KpiCards />

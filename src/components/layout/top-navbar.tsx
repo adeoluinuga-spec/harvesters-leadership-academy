@@ -144,8 +144,8 @@ function formatMinistryIdentity(profile: AuthProfile | null) {
     return `${profile.role}, ${profile.group}`;
   }
 
-  if (profile.role === "Super Admin" || profile.role === "Admin") {
-    return profile.role;
+  if (profile.role === "Platform Super Admin" || profile.role === "Super Admin" || profile.role === "Admin") {
+    return "Platform Super Admin";
   }
 
   if (profile.campus) {

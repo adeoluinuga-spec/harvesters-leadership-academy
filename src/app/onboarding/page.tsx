@@ -280,7 +280,7 @@ export default function OnboardingPage() {
       }
 
       if (!selfOnboardingRoles.includes(selectedRole) && selectedRole !== assignedRole) {
-        setError("This role is pre-created by Super Admin. Please select a leader onboarding role.");
+        setError("This role is pre-created by Platform Super Admin. Please select a leader onboarding role.");
         return false;
       }
     }
@@ -491,7 +491,7 @@ export default function OnboardingPage() {
                         </span>
                         {!canSelfSelect ? (
                           <Badge className={`rounded-md ${selectedRole === role.name ? "bg-white text-black hover:bg-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-100"}`}>
-                            Super Admin
+                            Platform Super Admin
                           </Badge>
                         ) : null}
                       </button>

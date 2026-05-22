@@ -54,7 +54,7 @@ export function PermissionExamples() {
     },
     {
       status: "Allowed",
-      copy: "Super Admin sees global platform stewardship, while Directional Leaders carry pastoral oversight through the ministry reporting chain.",
+      copy: "Platform Super Admin governs organizations and tenant systems, while Directional Leaders carry pastoral oversight through their ministry reporting chain.",
       icon: CheckCircle2,
     },
     {

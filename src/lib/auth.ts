@@ -20,6 +20,9 @@ export type AuthProfile = MockLeadershipProfile & {
   avatarUrl: string;
   role: MockRole;
   onboardingCompleted: boolean;
+  organizationId: string | null;
+  organizationName: string;
+  tenantSlug: string;
   campusId: string | null;
   subgroupId: string | null;
   groupId: string | null;
@@ -34,6 +37,7 @@ type ProfileRow = {
   created_at?: string | null;
   role?: string | null;
   role_id?: string | null;
+  organization_id?: string | null;
   campus_id?: string | null;
   subgroup_id?: string | null;
   group_id?: string | null;
@@ -54,6 +58,8 @@ type ProfileRow = {
   years_in_ministry?: number | string | null;
   onboarding_completed?: boolean | null;
   roles?: RelatedName | RelatedName[] | null;
+  organization?: RelatedName | RelatedName[] | null;
+  organizations?: OrganizationRelation | OrganizationRelation[] | null;
 };
 
 type RelatedName = {
@@ -62,12 +68,17 @@ type RelatedName = {
   title?: string | null;
 };
 
+type OrganizationRelation = RelatedName & {
+  slug?: string | null;
+};
+
 type LookupRow = {
   id?: string | number | null;
   name?: string | null;
   title?: string | null;
   group_id?: string | number | null;
   subgroup_id?: string | number | null;
+  slug?: string | null;
   campus_pastor?: string | null;
   pastor?: string | null;
 };
@@ -151,6 +162,7 @@ export async function ensureUserProfile(
     designation,
     full_name: fullName,
     avatar_url: null,
+    organization_id: null,
     onboarding_completed: false,
     created_at: new Date().toISOString(),
   };
@@ -198,7 +210,7 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
   const supabase = createClient();
   let { data } = await supabase
     .from("users")
-    .select("*, roles(name), campuses(name), subgroups(name), groups(name)")
+    .select("*, roles(name), organizations(name, slug), campuses(name), subgroups(name), groups(name)")
     .eq("id", user.id)
     .maybeSingle<ProfileRow>();
 
@@ -234,6 +246,21 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
   const role = roleName
     ? normalizeRole(roleName)
     : normalizeRole((metadata.role as string | undefined) ?? fallbackRole);
+
+  const organizationId = data?.organization_id ?? null;
+  let organizationName = relatedOrganization(data?.organizations)?.name ?? relatedName(data?.organization);
+  let tenantSlug = relatedOrganization(data?.organizations)?.slug ?? null;
+
+  if (organizationId && (!organizationName || !tenantSlug)) {
+    const { data: organizationRow } = await supabase
+      .from("organizations")
+      .select("name, slug")
+      .eq("id", organizationId)
+      .maybeSingle<LookupRow>();
+
+    organizationName = organizationName ?? organizationRow?.name ?? null;
+    tenantSlug = tenantSlug ?? organizationRow?.slug ?? null;
+  }
 
   const campusId = data?.campus_id ?? null;
   let subgroupId = data?.subgroup_id ?? null;
@@ -285,6 +312,9 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
     avatarUrl: data?.avatar_url ?? "",
     role,
     onboardingCompleted: data?.onboarding_completed ?? false,
+    organizationId,
+    organizationName: organizationName ?? "Harvesters International Christian Centre",
+    tenantSlug: tenantSlug ?? "harvesters",
     campusId,
     subgroupId,
     groupId,
@@ -321,6 +351,7 @@ export async function upsertSignupProfile({
       designation: normalizeDesignation(designation),
       full_name: fullName,
       avatar_url: null,
+      organization_id: null,
       onboarding_completed: false,
       created_at: new Date().toISOString(),
     },
@@ -471,6 +502,18 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
     onboarding_completed: true,
   };
 
+  if (input.campus.source === "supabase" && input.campus.groupId) {
+    const { data: groupRow } = await supabase
+      .from("groups")
+      .select("organization_id")
+      .eq("id", input.campus.groupId)
+      .maybeSingle<{ organization_id?: string | null }>();
+
+    if (groupRow?.organization_id) {
+      updatePayload.organization_id = groupRow.organization_id;
+    }
+  }
+
   if (input.roleId) {
     updatePayload.role_id = input.roleId;
   }
@@ -504,6 +547,16 @@ export function dashboardForAuthRole(role: MockRole) {
 function relatedName(value?: RelatedName | RelatedName[] | null) {
   const related = Array.isArray(value) ? value[0] : value;
   return related?.name ?? related?.title ?? null;
+}
+
+function relatedOrganization(value?: OrganizationRelation | OrganizationRelation[] | null) {
+  const related = Array.isArray(value) ? value[0] : value;
+  return related
+    ? {
+        name: related.name ?? related.title ?? null,
+        slug: related.slug ?? null,
+      }
+    : null;
 }
 
 function stringifyId(value: unknown) {

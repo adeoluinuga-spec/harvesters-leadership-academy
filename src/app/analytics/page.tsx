@@ -113,6 +113,7 @@ const chartZinc = "#71717a";
 const chartSoft = "#d4d4d8";
 
 function scopeForRole(role: MockRole): AnalyticsScope {
+  if (role === "Platform Super Admin" || role === "Super Admin" || role === "Admin") return "ecosystem";
   if (role === "Leader") return "personal";
   if (role === "Campus Pastor") return "campus";
   if (role === "Subgroup Pastor" || role === "Sub-Group Pastor") return "subgroup";
@@ -121,7 +122,7 @@ function scopeForRole(role: MockRole): AnalyticsScope {
 }
 
 export default function AnalyticsPage() {
-  const [role, setRole] = useState<MockRole>("Super Admin");
+  const [role, setRole] = useState<MockRole>("Platform Super Admin");
   const [profile, setProfile] = useState<AuthProfile | null>(null);
 
   useEffect(() => {
@@ -211,7 +212,7 @@ export default function AnalyticsPage() {
   const aiRecommendations = buildRecommendations(role, scope, profile);
 
   return (
-    <ProtectedRoute allowedRoles={["Cell Leader / Assistant HOD", "Zonal Leader / HOD", "Community Leader", "Area Leader", "District Pastor / Pastoral Leader", "Directional Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Campus Admin", "Super Admin", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Cell Leader / Assistant HOD", "Zonal Leader / HOD", "Community Leader", "Area Leader", "District Pastor / Pastoral Leader", "Directional Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Campus Admin", "Platform Super Admin", "Super Admin", "Admin"]}>
       <DashboardShell searchPlaceholder="Search analytics, campuses, pathways, leaders..." showDate={false}>
         <motion.section variants={shellItem} className="grid gap-5 xl:grid-cols-[1fr_390px]">
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">

@@ -1,4 +1,5 @@
 export type MockRole =
+  | "Platform Super Admin"
   | "Cell Leader / Assistant HOD"
   | "Zonal Leader / HOD"
   | "Community Leader"
@@ -45,6 +46,7 @@ export type MockLeadershipProfile = {
 };
 
 export const mockRoles: MockRole[] = [
+  "Platform Super Admin",
   "Cell Leader / Assistant HOD",
   "Zonal Leader / HOD",
   "Community Leader",
@@ -58,6 +60,7 @@ export const mockRoles: MockRole[] = [
 ];
 
 export const controlledPreseedRoles: MockRole[] = [
+  "Platform Super Admin",
   "Group Pastor",
   "Sub-Group Pastor",
   "Campus Pastor",
@@ -75,6 +78,7 @@ export const selfOnboardingRoles: MockRole[] = [
 ];
 
 export const roleDashboardRoutes: Record<MockRole, string> = {
+  "Platform Super Admin": "/dashboard/admin",
   "Cell Leader / Assistant HOD": "/dashboard/leader",
   "Zonal Leader / HOD": "/dashboard/community",
   "Community Leader": "/dashboard/community",
@@ -127,7 +131,13 @@ export function dashboardForRole(role: MockRole) {
 }
 
 export function roleCanAccess(role: MockRole, allowedRoles: MockRole[]) {
-  return allowedRoles.map(normalizeStoredRole).includes(normalizeStoredRole(role));
+  const normalizedRole = normalizeStoredRole(role);
+
+  if (normalizedRole === "Platform Super Admin") {
+    return true;
+  }
+
+  return allowedRoles.map(normalizeStoredRole).includes(normalizedRole);
 }
 
 export function isControlledPreseedRole(role: MockRole) {
@@ -135,8 +145,8 @@ export function isControlledPreseedRole(role: MockRole) {
 }
 
 export function normalizeStoredRole(role?: string | null): MockRole {
-  if (role === "Admin" || role === "Super Admin") {
-    return "Super Admin";
+  if (role === "Platform Super Admin" || role === "Admin" || role === "Super Admin") {
+    return "Platform Super Admin";
   }
 
   if (role === "Group Pastor") {

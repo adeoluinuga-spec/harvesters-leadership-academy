@@ -8,6 +8,14 @@ import {
 
 export const roles = [
   {
+    name: "Platform Super Admin",
+    route: "/dashboard/admin",
+    layer: "Platform governance + tenant operations",
+    description: "Ecosystem-wide governance for organizations, tenant provisioning, AI systems, global courses, analytics, and white-label readiness.",
+    inviteOnly: true,
+    icon: LayoutDashboard,
+  },
+  {
     name: "Cell Leader / Assistant HOD",
     route: "/dashboard/leader",
     layer: "Personal learning + responsibility signals",
@@ -90,8 +98,8 @@ export const roles = [
   {
     name: "Super Admin",
     route: "/dashboard/admin",
-    layer: "Global platform administration",
-    description: "System-wide analytics, hierarchy management, pastor management, governance, and backend stewardship.",
+    layer: "Legacy platform administration",
+    description: "Legacy global administration role that now resolves into Platform Super Admin access.",
     inviteOnly: true,
     icon: LayoutDashboard,
   },

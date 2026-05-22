@@ -194,7 +194,7 @@ const preferenceOptions = [
 
 export default function NotificationsPage() {
   const [activeFilter, setActiveFilter] = useState<"All" | NotificationType>("All");
-  const [role, setRole] = useState<MockRole>("Super Admin");
+  const [role, setRole] = useState<MockRole>("Platform Super Admin");
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [broadcast, setBroadcast] = useState({
     audience: "All active leaders",
@@ -228,7 +228,7 @@ export default function NotificationsPage() {
     () =>
       notifications.filter(
         (notification) =>
-          notification.audience.includes(role) &&
+          (role === "Platform Super Admin" || notification.audience.includes(role)) &&
           (activeFilter === "All" || notification.type === activeFilter)
       ),
     [activeFilter, role]
@@ -241,7 +241,7 @@ export default function NotificationsPage() {
   ).length;
 
   return (
-    <ProtectedRoute allowedRoles={["Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Super Admin"]}>
+    <ProtectedRoute allowedRoles={["Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Platform Super Admin", "Super Admin"]}>
       <DashboardShell searchPlaceholder="Search notifications, broadcasts, reminders..." showDate={false}>
         <motion.section variants={shellItem} className="grid gap-5 xl:grid-cols-[1fr_380px]">
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
@@ -379,7 +379,7 @@ export default function NotificationsPage() {
                   <Megaphone className="size-5" />
                 </div>
                 <div>
-                  <CardTitle className="font-heading text-lg font-semibold">Super Admin broadcast interface</CardTitle>
+                  <CardTitle className="font-heading text-lg font-semibold">Platform broadcast interface</CardTitle>
                   <p className="text-sm text-zinc-500">Compose targeted announcements for roles, campuses, subgroups, and course participants.</p>
                 </div>
               </div>
@@ -395,7 +395,7 @@ export default function NotificationsPage() {
                 <SelectField
                   label="Role"
                   value={broadcast.role}
-                  options={["Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Super Admin"]}
+                  options={["Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Platform Super Admin"]}
                   onChange={(nextRole) => setBroadcast((current) => ({ ...current, role: nextRole }))}
                 />
                 <SelectField
