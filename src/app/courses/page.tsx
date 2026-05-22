@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Bookmark,
@@ -23,12 +24,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import {
-  Course,
-  courses,
-  recentlyWatched,
-  recommendedCourses,
-} from "@/lib/course-data";
+import { courses as staticCourses, recentlyWatched, recommendedCourses } from "@/lib/course-data";
+import type { Course } from "@/lib/course-data";
+import { fetchCoursesWithProgress } from "@/lib/lms";
+import type { CourseWithProgress } from "@/lib/lms-types";
+import { formatDuration } from "@/lib/lms-types";
 
 const libraryStats = [
   { label: "Total courses", value: "64", detail: "12 growth tracks" },
@@ -44,6 +44,30 @@ const filters = [
   { label: "Duration", value: "Any length" },
   { label: "Status", value: "All statuses" },
 ];
+
+function liveToCourse(c: CourseWithProgress): Course {
+  const status =
+    c.certificate
+      ? "completed"
+      : c.enrolled
+      ? "in-progress"
+      : "not-enrolled";
+
+  return {
+    id: c.slug,
+    title: c.title,
+    category: c.category,
+    instructor: c.instructor_name,
+    lessons: c.total_lessons || c.lesson_count || 0,
+    duration: formatDuration(c.duration_minutes),
+    enrolled: c.enrolled ? String(c.total_lessons) : "0",
+    progress: c.progress_percent,
+    status,
+    thumbnail: c.thumbnail_url ?? "",
+    level: c.level,
+    description: c.description ?? "",
+  };
+}
 
 function LibraryHero() {
   return (
@@ -127,7 +151,10 @@ function CourseCard({ course }: { course: Course }) {
   return (
     <motion.article variants={shellItem} whileHover={{ y: -4 }} className="h-full">
       <Card className="h-full rounded-xl border-zinc-200 bg-white p-0 shadow-sm transition-shadow hover:shadow-xl hover:shadow-zinc-200/70">
-        <Link href={`/courses/${course.id}`} className="group relative block aspect-[16/10] overflow-hidden rounded-t-xl bg-zinc-900">
+        <Link
+          href={`/courses/${course.id}`}
+          className="group relative block aspect-[16/10] overflow-hidden rounded-t-xl bg-zinc-900"
+        >
           <div
             className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
             style={{ backgroundImage: `url(${course.thumbnail})` }}
@@ -163,7 +190,7 @@ function CourseCard({ course }: { course: Course }) {
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-zinc-500">
               <span className="flex items-center gap-1">
                 <BookOpen className="size-3.5" />
-                {course.lessons} lessons
+                {course.lessons > 0 ? `${course.lessons} lessons` : "—"}
               </span>
               <span className="flex items-center gap-1">
                 <Clock3 className="size-3.5" />
@@ -212,7 +239,7 @@ function CourseCard({ course }: { course: Course }) {
   );
 }
 
-function CourseGrid() {
+function CourseGrid({ courses }: { courses: Course[] }) {
   return (
     <motion.section variants={shellContainer} className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
       {courses.map((course) => (
@@ -298,11 +325,25 @@ function RecentlyWatched() {
 }
 
 export default function CoursesPage() {
+  const [displayCourses, setDisplayCourses] = useState<Course[]>(staticCourses);
+
+  useEffect(() => {
+    fetchCoursesWithProgress()
+      .then((live) => {
+        if (live.length > 0) {
+          setDisplayCourses(live.map(liveToCourse));
+        }
+      })
+      .catch(() => {
+        // keep static fallback on error
+      });
+  }, []);
+
   return (
     <DashboardShell searchPlaceholder="Search courses, tracks, instructors..." showDate={false}>
       <LibraryHero />
       <CourseControls />
-      <CourseGrid />
+      <CourseGrid courses={displayCourses} />
       <RecommendedSection />
       <RecentlyWatched />
     </DashboardShell>

@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock3,
   FileCheck2,
+  Loader2,
   PlayCircle,
   Users,
 } from "lucide-react";
@@ -19,24 +20,102 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { courses } from "@/lib/course-data";
+import { courses as staticCourses } from "@/lib/course-data";
+import { fetchCourseWithLessons } from "@/lib/lms";
+import type { CourseWithLessons } from "@/lib/lms-types";
+import { formatDuration, formatSeconds } from "@/lib/lms-types";
 
 type CourseDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
-const modules = [
-  { title: "Leadership posture and ministry clarity", length: "28 min", complete: true },
-  { title: "Building culture through repeated rhythms", length: "36 min", complete: true },
-  { title: "Operational scorecards for campus teams", length: "42 min", complete: false },
-  { title: "Coaching leaders through execution gaps", length: "31 min", complete: false },
-];
-
 export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   const { id } = use(params);
-  const course = courses.find((item) => item.id === id) ?? courses[0];
-  const completed = course.status === "completed";
-  const cta = completed ? "View Certificate" : course.status === "in-progress" ? "Continue learning" : "Enrol now";
+  const staticCourse = staticCourses.find((c) => c.id === id) ?? staticCourses[0];
+
+  const [live, setLive] = useState<CourseWithLessons | null>(null);
+  const [enrolling, startEnroll] = useTransition();
+  const [enrolled, setEnrolled] = useState(false);
+
+  useEffect(() => {
+    fetchCourseWithLessons(id)
+      .then((data) => {
+        if (data) {
+          setLive(data);
+          setEnrolled(data.enrolled);
+        }
+      })
+      .catch(() => {});
+  }, [id]);
+
+  const title = live?.title ?? staticCourse.title;
+  const description = live?.description ?? staticCourse.description;
+  const thumbnail = live?.thumbnail_url ?? staticCourse.thumbnail;
+  const category = live?.category ?? staticCourse.category;
+  const level = live?.level ?? staticCourse.level;
+  const instructorName = live?.instructor_name ?? staticCourse.instructor;
+  const durationStr = live ? formatDuration(live.duration_minutes) : staticCourse.duration;
+  const lessonCount = live?.lessons.length ?? staticCourse.lessons;
+  const progressPercent = live?.progress_percent ?? staticCourse.progress;
+  const hasCertificate = Boolean(live?.certificate);
+
+  const cta = hasCertificate
+    ? "View Certificate"
+    : enrolled || live?.enrolled
+    ? "Continue learning"
+    : "Enrol now";
+
+  const ctaHref =
+    hasCertificate
+      ? `/courses/${id}/certificate`
+      : enrolled || live?.enrolled
+      ? `/courses/${id}/learn`
+      : undefined;
+
+  function handleEnroll() {
+    if (!live?.id) return;
+    startEnroll(async () => {
+      try {
+        const res = await fetch("/api/lms/enroll", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ course_id: live.id }),
+        });
+        if (res.ok) {
+          setEnrolled(true);
+        }
+      } catch {}
+    });
+  }
+
+  const modules =
+    live?.lessons && live.lessons.length > 0
+      ? (() => {
+          if (live.modules.length > 0) {
+            return live.modules.map((m) => ({
+              title: m.title,
+              length: `${m.lessons?.length ?? 0} lessons`,
+              complete: m.lessons?.every((l) => live.completed_lesson_ids.has(l.id)) ?? false,
+            }));
+          }
+          const grouped: Array<{ title: string; length: string; complete: boolean }> = [];
+          for (let i = 0; i < live.lessons.length; i += 3) {
+            const chunk = live.lessons.slice(i, i + 3);
+            const totalSecs = chunk.reduce((a, l) => a + l.duration_seconds, 0);
+            grouped.push({
+              title: chunk[0].title,
+              length: formatSeconds(totalSecs),
+              complete: chunk.every((l) => live.completed_lesson_ids.has(l.id)),
+            });
+          }
+          return grouped;
+        })()
+      : [
+          { title: "Leadership posture and ministry clarity", length: "28 min", complete: false },
+          { title: "Building culture through repeated rhythms", length: "36 min", complete: false },
+          { title: "Operational scorecards for campus teams", length: "42 min", complete: false },
+          { title: "Coaching leaders through execution gaps", length: "31 min", complete: false },
+        ];
 
   return (
     <DashboardShell searchPlaceholder="Search course lessons, modules, notes..." showDate={false}>
@@ -47,7 +126,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
         <div className="relative min-h-[420px] bg-zinc-950">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-70"
-            style={{ backgroundImage: `url(${course.thumbnail})` }}
+            style={{ backgroundImage: `url(${thumbnail})` }}
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-black/10" />
           <div className="relative flex min-h-[420px] flex-col justify-between p-6 md:p-8">
@@ -65,29 +144,43 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
             <div className="max-w-3xl">
               <div className="mb-5 flex flex-wrap gap-2">
                 <Badge className="rounded-md border-white/15 bg-white text-zinc-950 hover:bg-white">
-                  {course.category}
+                  {category}
                 </Badge>
                 <Badge className="rounded-md border-white/15 bg-white/10 text-white hover:bg-white/10">
-                  {course.level}
+                  {level}
                 </Badge>
               </div>
               <h1 className="font-heading text-4xl font-semibold tracking-tight text-white md:text-5xl">
-                {course.title}
+                {title}
               </h1>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300">
-                {course.description}
-              </p>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300">{description}</p>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <Button className="h-10 rounded-lg bg-white px-4 text-black hover:bg-zinc-100">
-                  <PlayCircle className="size-4" />
-                  {cta}
-                </Button>
+                {ctaHref ? (
+                  <Button asChild className="h-10 rounded-lg bg-white px-4 text-black hover:bg-zinc-100">
+                    <Link href={ctaHref}>
+                      <PlayCircle className="size-4" />
+                      {cta}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleEnroll}
+                    disabled={enrolling}
+                    className="h-10 rounded-lg bg-white px-4 text-black hover:bg-zinc-100"
+                  >
+                    {enrolling ? <Loader2 className="size-4 animate-spin" /> : <PlayCircle className="size-4" />}
+                    {cta}
+                  </Button>
+                )}
                 <Button
+                  asChild
                   variant="outline"
                   className="h-10 rounded-lg border-white/20 bg-white/10 px-4 text-white hover:bg-white/20 hover:text-white"
                 >
-                  <FileCheck2 className="size-4" />
-                  Course outline
+                  <Link href={`/courses/${id}/learn`}>
+                    <FileCheck2 className="size-4" />
+                    Course outline
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -105,10 +198,10 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: "Instructor", value: course.instructor, icon: Users },
-                { label: "Lessons", value: `${course.lessons}`, icon: BookOpen },
-                { label: "Duration", value: course.duration, icon: Clock3 },
-                { label: "Enrolled", value: course.enrolled, icon: Award },
+                { label: "Instructor", value: instructorName, icon: Users },
+                { label: "Lessons", value: String(lessonCount), icon: BookOpen },
+                { label: "Duration", value: durationStr, icon: Clock3 },
+                { label: "Certificate", value: hasCertificate ? "Earned" : "Earn upon completion", icon: Award },
               ].map((metric) => (
                 <div key={metric.label} className="rounded-lg border border-zinc-100 p-4">
                   <metric.icon className="mb-3 size-4 text-zinc-400" />
@@ -123,10 +216,10 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
             <div className="rounded-lg border border-zinc-100 p-4">
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-medium text-zinc-950">Completion progress</span>
-                <span className="font-semibold text-zinc-950">{course.progress}%</span>
+                <span className="font-semibold text-zinc-950">{progressPercent}%</span>
               </div>
               <Progress
-                value={course.progress}
+                value={progressPercent}
                 className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
               />
             </div>
@@ -163,8 +256,8 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                     <p className="text-sm text-zinc-500">{module.length}</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="rounded-lg border-zinc-200 bg-white">
-                  Open
+                <Button asChild variant="outline" size="sm" className="rounded-lg border-zinc-200 bg-white">
+                  <Link href={`/courses/${id}/learn`}>Open</Link>
                 </Button>
               </div>
             ))}

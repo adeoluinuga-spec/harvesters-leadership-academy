@@ -1,0 +1,50 @@
+import { createClient } from "@/lib/server";
+
+export async function POST(request: Request) {
+  let body: { course_id?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  if (!body.course_id) {
+    return Response.json({ error: "course_id is required." }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return Response.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  const { data: course } = await supabase
+    .from("courses")
+    .select("id, title, is_published")
+    .eq("id", body.course_id)
+    .eq("is_published", true)
+    .maybeSingle();
+
+  if (!course) {
+    return Response.json({ error: "Course not found." }, { status: 404 });
+  }
+
+  const { data, error } = await supabase
+    .from("enrollments")
+    .upsert(
+      { user_id: user.id, course_id: body.course_id },
+      { onConflict: "user_id,course_id" }
+    )
+    .select("*")
+    .single();
+
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  return Response.json({ enrollment: data });
+}

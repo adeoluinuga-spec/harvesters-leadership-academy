@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Activity,
   Award,
   BarChart3,
   Bell,
+  BookOpenCheck,
   Brain,
   ClipboardCheck,
   GraduationCap,
@@ -17,6 +19,9 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/client";
+
+const ADMIN_COURSE_ROLES = ["Platform Super Admin", "Group Pastor", "Sub-Group Pastor", "Subgroup Pastor", "Campus Pastor"];
 
 const sidebarItems = [
   { label: "My Dashboard", href: "/dashboard/leader", icon: LayoutDashboard },
@@ -24,14 +29,30 @@ const sidebarItems = [
   { label: "AI Intelligence", href: "/ai-course-intelligence", icon: Brain },
   { label: "Notifications", href: "/notifications", icon: Bell },
   { label: "Users", href: "/users", icon: Users },
-  { label: "Assessments", href: "#", icon: ClipboardCheck },
-  { label: "Certificates", href: "#", icon: Award },
+  { label: "Assessments", href: "/assessments", icon: ClipboardCheck },
+  { label: "Certificates", href: "/certificates", icon: Award },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
   { label: "Settings", href: "#", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [canManageCourses, setCanManageCourses] = useState(false);
+
+  useEffect(() => {
+    async function checkRole() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+        setCanManageCourses(ADMIN_COURSE_ROLES.includes(data?.role ?? ""));
+      } catch {
+        // silently ignore — non-critical
+      }
+    }
+    checkRole();
+  }, []);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-20 flex-col border-r border-white/10 bg-[#050505] text-white shadow-2xl shadow-black/25 lg:w-72">
@@ -67,6 +88,23 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {canManageCourses && (() => {
+          const href = "/dashboard/admin/courses";
+          const active = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link
+              href={href}
+              className={cn(
+                "group flex h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition-all hover:bg-white/8 hover:text-white lg:justify-start",
+                active && "bg-white text-black shadow-sm hover:bg-white hover:text-black"
+              )}
+            >
+              <BookOpenCheck className="size-4 shrink-0" />
+              <span className="hidden lg:inline">Manage Courses</span>
+            </Link>
+          );
+        })()}
       </nav>
 
       <div className="border-t border-white/10 p-3 lg:p-4">
