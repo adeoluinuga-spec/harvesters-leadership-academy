@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const sidebarItems = [
-  { label: "My Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "My Dashboard", href: "/dashboard/leader", icon: LayoutDashboard },
   { label: "Courses", href: "/courses", icon: GraduationCap },
   { label: "AI Intelligence", href: "/ai-course-intelligence", icon: Brain },
   { label: "Notifications", href: "/notifications", icon: Bell },

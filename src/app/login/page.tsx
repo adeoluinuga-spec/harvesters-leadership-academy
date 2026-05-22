@@ -10,12 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authErrorMessage, dashboardForAuthRole, getAuthProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
-import { MockRole, mockRoles, setLeadershipProfile, setMockRole } from "@/lib/mock-auth";
+import { isControlledPreseedRole } from "@/lib/mock-auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [selectedRole, setSelectedRole] = useState<MockRole>("Admin");
   const [forgotOpen, setForgotOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,25 +39,33 @@ export default function LoginPage() {
     });
 
     if (loginError || !data.user) {
+      console.error("[login] Supabase login failed", {
+        message: loginError?.message,
+        status: loginError?.status,
+      });
       setError(authErrorMessage(loginError?.message));
       setLoading(false);
       return;
     }
 
-    const profile = await getAuthProfile(data.user, selectedRole);
-    setMockRole(profile.role);
-    setLeadershipProfile({
-      campus: profile.campus,
-      subgroup: profile.subgroup,
-      group: profile.group,
-      campusPastor: profile.campusPastor,
-      department: profile.department,
-      currentLeadershipRole: profile.currentLeadershipRole,
-      leadershipAspiration: profile.leadershipAspiration,
-    });
+    let profile;
+
+    try {
+      profile = await getAuthProfile(data.user);
+    } catch (profileError) {
+      console.error("[login] Failed to fetch or create public.users profile", profileError);
+      setError("You are signed in, but we could not load your academy profile. Please try again or contact academy support.");
+      setLoading(false);
+      return;
+    }
 
     setLoading(false);
-    router.push(profile.onboardingCompleted ? dashboardForAuthRole(profile.role) : "/onboarding");
+    const shouldOpenDashboard = profile.onboardingCompleted || isControlledPreseedRole(profile.role);
+    window.localStorage.setItem(
+      "harvesters_profile_incomplete",
+      profile.onboardingCompleted ? "false" : "true"
+    );
+    router.push(shouldOpenDashboard ? dashboardForAuthRole(profile.role) : "/onboarding");
   }
 
   async function handlePasswordReset() {
@@ -129,26 +136,6 @@ export default function LoginPage() {
           <button onClick={() => setForgotOpen(true)} className="font-medium text-zinc-950 hover:underline">
             Forgot password?
           </button>
-        </div>
-
-        <div className="mt-5">
-          <p className="mb-2 text-sm font-medium text-zinc-700">Role fallback for local preview</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {mockRoles.map((role) => (
-              <button
-                key={role}
-                onClick={() => setSelectedRole(role)}
-                disabled={loading}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-all ${
-                  selectedRole === role
-                    ? "border-black bg-black text-white"
-                    : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300"
-                }`}
-              >
-                {role}
-              </button>
-            ))}
-          </div>
         </div>
 
         {error ? (

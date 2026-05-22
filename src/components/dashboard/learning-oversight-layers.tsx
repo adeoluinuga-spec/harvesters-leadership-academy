@@ -22,12 +22,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { courses, recommendedCourses, recentlyWatched } from "@/lib/course-data";
-import {
-  defaultLeadershipProfile,
-  getLeadershipProfile,
-  MockLeadershipProfile,
-  MockRole,
-} from "@/lib/mock-auth";
+import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
+import { MockRole } from "@/lib/mock-auth";
 import { motion } from "framer-motion";
 
 type LearningMetric = {
@@ -65,33 +61,47 @@ const learningMetrics: LearningMetric[] = [
 ];
 
 const roleContext: Record<MockRole, string> = {
-  Leader: "the leaders you influence and the ministry habits you are forming",
+  "Cell Leader / Assistant HOD": "the cell members you influence and the ministry habits you are forming",
+  "Zonal Leader / HOD": "zonal or departmental leadership, team development, and readiness signals",
+  "Community Leader": "community leadership health, leader maturity, and participation patterns",
+  "Area Leader": "area leadership health, community comparison, and follow-up intelligence",
+  "District Pastor / Pastoral Leader": "pastoral oversight, district health, and leader care signals",
+  "Directional Leader": "directional oversight, pastoral reporting, and leadership pipeline intelligence",
   "Campus Pastor": "campus participation, inactive leaders, mentorship, and department performance",
-  "Subgroup Pastor": "subgroup health, campus comparisons, leadership performance, and participation trends",
-  "Group Pastor": "strategic ministry intelligence, subgroup analytics, pipeline visibility, and campus growth",
-  Admin: "academy-wide stewardship, platform quality, and learning health across every leadership layer",
+  "Sub-Group Pastor": "sub-group health, campus comparisons, leadership performance, and participation trends",
+  "Group Pastor": "group-wide ministry intelligence, sub-group analytics, pipeline visibility, and campus growth",
+  "Campus Admin": "campus operations, enrollment management, and campus-level learning analytics",
+  "Super Admin": "global platform stewardship, hierarchy governance, pastor management, and system-wide analytics",
+  Leader: "the leaders you influence and the ministry habits you are forming",
+  "Sub-group Pastor": "sub-group health, campus comparisons, leadership performance, and participation trends",
+  "Subgroup Pastor": "sub-group health, campus comparisons, leadership performance, and participation trends",
+  Admin: "global platform stewardship, hierarchy governance, pastor management, and system-wide analytics",
 };
 
 export function PersonalLearningLayer({ role }: { role: MockRole }) {
-  const [profile, setProfile] = useState<MockLeadershipProfile>(defaultLeadershipProfile);
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
   const activeCourse = courses.find((course) => course.status === "in-progress") ?? courses[0];
 
   useEffect(() => {
-    function syncProfile() {
-      setProfile(getLeadershipProfile());
+    let active = true;
+
+    async function syncProfile() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setProfile(result.profile);
+      }
     }
 
     syncProfile();
-    window.addEventListener("harvesters-profile-change", syncProfile);
-    window.addEventListener("storage", syncProfile);
 
     return () => {
-      window.removeEventListener("harvesters-profile-change", syncProfile);
-      window.removeEventListener("storage", syncProfile);
+      active = false;
     };
   }, []);
 
-  const aiInsight = `As a ${role} preparing for ${profile.leadershipAspiration}, prioritize ${activeCourse.title} alongside ${roleContext[role]}.`;
+  const currentRole = profile?.currentLeadershipRole ?? role;
+  const aspiration = profile?.leadershipAspiration ?? "your next leadership step";
+  const aiInsight = `As a ${role} preparing for ${aspiration}, prioritize ${activeCourse.title} alongside ${roleContext[role]}.`;
 
   return (
     <motion.section variants={shellItem} className="space-y-4">
@@ -108,16 +118,16 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
           </p>
         </div>
         <Badge className="w-fit rounded-md bg-black px-3 py-1.5 text-white hover:bg-black">
-          Learner profile: {profile.currentLeadershipRole}
+          Learner profile: {currentRole}
         </Badge>
       </div>
 
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
         <CardContent className="grid gap-3 pt-1 md:grid-cols-3">
           {[
-            ["Current leadership role", profile.currentLeadershipRole],
-            ["Leadership aspiration", profile.leadershipAspiration],
-            ["Learning context", `${profile.department} - ${profile.campus}`],
+            ["Current leadership role", currentRole],
+            ["Leadership aspiration", aspiration],
+            ["Learning context", profile?.campus ?? "Campus"],
           ].map(([label, value]) => (
             <div key={label} className="rounded-lg border border-zinc-100 bg-zinc-50 p-4">
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
@@ -134,7 +144,7 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
           <CardHeader className="border-b border-zinc-100">
             <CardTitle className="font-heading text-lg font-semibold">Continue learning</CardTitle>
             <p className="text-sm text-zinc-500">
-              Current course for your {profile.leadershipAspiration} pathway
+              Current course for your {aspiration} pathway
             </p>
           </CardHeader>
           <CardContent className="grid gap-4 pt-1 lg:grid-cols-[1fr_0.78fr]">

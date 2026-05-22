@@ -45,13 +45,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { courses } from "@/lib/course-data";
 import { campuses, leaders } from "@/lib/hierarchy-data";
-import {
-  defaultLeadershipProfile,
-  getLeadershipProfile,
-  getMockRole,
-  MockLeadershipProfile,
-  MockRole,
-} from "@/lib/mock-auth";
+import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
+import { MockRole } from "@/lib/mock-auth";
 import { cn } from "@/lib/utils";
 
 type AnalyticsScope = "personal" | "campus" | "subgroup" | "organization" | "ecosystem";
@@ -120,61 +115,61 @@ const chartSoft = "#d4d4d8";
 function scopeForRole(role: MockRole): AnalyticsScope {
   if (role === "Leader") return "personal";
   if (role === "Campus Pastor") return "campus";
-  if (role === "Subgroup Pastor") return "subgroup";
+  if (role === "Subgroup Pastor" || role === "Sub-Group Pastor") return "subgroup";
   if (role === "Group Pastor") return "organization";
   return "ecosystem";
 }
 
 export default function AnalyticsPage() {
-  const [role, setRole] = useState<MockRole>("Admin");
-  const [profile, setProfile] = useState<MockLeadershipProfile>(defaultLeadershipProfile);
+  const [role, setRole] = useState<MockRole>("Super Admin");
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
 
   useEffect(() => {
-    function syncContext() {
-      setRole(getMockRole());
-      setProfile(getLeadershipProfile());
+    let active = true;
+
+    async function syncContext() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setRole(result.profile.role);
+        setProfile(result.profile);
+      }
     }
 
     syncContext();
-    window.addEventListener("harvesters-role-change", syncContext);
-    window.addEventListener("harvesters-profile-change", syncContext);
-    window.addEventListener("storage", syncContext);
 
     return () => {
-      window.removeEventListener("harvesters-role-change", syncContext);
-      window.removeEventListener("harvesters-profile-change", syncContext);
-      window.removeEventListener("storage", syncContext);
+      active = false;
     };
   }, []);
 
   const scope = scopeForRole(role);
   const scopedCampuses = useMemo(() => {
     if (scope === "campus" || scope === "personal") {
-      return campuses.filter((campus) => campus.name === profile.campus);
+      return campuses.filter((campus) => campus.name === profile?.campus);
     }
 
     if (scope === "subgroup") {
-      return campuses.filter((campus) => campus.subgroup === profile.subgroup);
+      return campuses.filter((campus) => campus.subgroup === profile?.subgroup);
     }
 
     return campuses;
-  }, [profile.campus, profile.subgroup, scope]);
+  }, [profile?.campus, profile?.subgroup, scope]);
 
   const scopedLeaders = useMemo(() => {
     if (scope === "personal") {
-      return leaders.filter((leader) => leader.name === "Tomi Adebayo" || leader.campus === profile.campus).slice(0, 1);
+      return leaders.filter((leader) => leader.name === profile?.fullName || leader.campus === profile?.campus).slice(0, 1);
     }
 
     if (scope === "campus") {
-      return leaders.filter((leader) => leader.campus === profile.campus);
+      return leaders.filter((leader) => leader.campus === profile?.campus);
     }
 
     if (scope === "subgroup") {
-      return leaders.filter((leader) => leader.subgroup === profile.subgroup);
+      return leaders.filter((leader) => leader.subgroup === profile?.subgroup);
     }
 
     return leaders;
-  }, [profile.campus, profile.subgroup, scope]);
+  }, [profile?.campus, profile?.fullName, profile?.subgroup, scope]);
 
   const totals = useMemo(() => {
     const leaderTotal = scopedCampuses.reduce((sum, campus) => sum + campus.leaders, 0);
@@ -216,7 +211,7 @@ export default function AnalyticsPage() {
   const aiRecommendations = buildRecommendations(role, scope, profile);
 
   return (
-    <ProtectedRoute allowedRoles={["Leader", "Campus Pastor", "Subgroup Pastor", "Group Pastor", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Cell Leader / Assistant HOD", "Zonal Leader / HOD", "Community Leader", "Area Leader", "District Pastor / Pastoral Leader", "Directional Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Campus Admin", "Super Admin", "Admin"]}>
       <DashboardShell searchPlaceholder="Search analytics, campuses, pathways, leaders..." showDate={false}>
         <motion.section variants={shellItem} className="grid gap-5 xl:grid-cols-[1fr_390px]">
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
@@ -697,11 +692,11 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
   );
 }
 
-function scopeLabel(scope: AnalyticsScope, profile: MockLeadershipProfile) {
+function scopeLabel(scope: AnalyticsScope, profile: AuthProfile | null) {
   if (scope === "personal") return "Your personal leadership pathway";
-  if (scope === "campus") return profile.campus;
-  if (scope === "subgroup") return profile.subgroup;
-  if (scope === "organization") return profile.group;
+  if (scope === "campus") return profile?.campus ?? "Campus";
+  if (scope === "subgroup") return profile?.subgroup ?? "Subgroup";
+  if (scope === "organization") return profile?.group ?? "Group";
   return "Harvesters Academy ecosystem";
 }
 
@@ -724,7 +719,7 @@ function weakestCampus(currentCampuses: typeof campuses) {
 function buildRecommendations(
   role: MockRole,
   scope: AnalyticsScope,
-  profile: MockLeadershipProfile
+  profile: AuthProfile | null
 ): InsightRecommendation[] {
   const context = scopeLabel(scope, profile);
 

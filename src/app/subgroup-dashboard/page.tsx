@@ -28,7 +28,7 @@ export default function SubgroupDashboardPage() {
   const followUps = leaders.filter((leader) => leader.subgroup === "Magodo Subgroup" && leader.issue);
 
   return (
-    <ProtectedRoute allowedRoles={["Subgroup Pastor", "Group Pastor", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Sub-Group Pastor", "Group Pastor", "Super Admin", "Admin"]}>
     <DashboardShell searchPlaceholder="Search campuses, leaders, follow-ups...">
       <motion.section variants={shellItem} className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
         <Badge className="mb-5 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
@@ -42,7 +42,7 @@ export default function SubgroupDashboardPage() {
         </p>
       </motion.section>
 
-      <PersonalLearningLayer role="Subgroup Pastor" />
+      <PersonalLearningLayer role="Sub-Group Pastor" />
 
       <OversightLayerIntro
         title="Subgroup oversight intelligence"

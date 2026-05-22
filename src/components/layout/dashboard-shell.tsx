@@ -1,6 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopNavbar } from "@/components/layout/top-navbar";
@@ -29,6 +31,23 @@ export function DashboardShell({
   searchPlaceholder,
   showDate = true,
 }: DashboardShellProps) {
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
+
+  useEffect(() => {
+    function syncProfileStatus() {
+      setProfileIncomplete(window.localStorage.getItem("harvesters_profile_incomplete") === "true");
+    }
+
+    syncProfileStatus();
+    window.addEventListener("harvesters-profile-change", syncProfileStatus);
+    window.addEventListener("storage", syncProfileStatus);
+
+    return () => {
+      window.removeEventListener("harvesters-profile-change", syncProfileStatus);
+      window.removeEventListener("storage", syncProfileStatus);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950">
       <Sidebar />
@@ -40,6 +59,14 @@ export function DashboardShell({
           variants={shellContainer}
           className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 px-5 py-5 lg:px-8 lg:py-8"
         >
+          {profileIncomplete ? (
+            <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+              Your leadership account is active. Complete or update your profile so reporting, avatar, and ministry hierarchy stay accurate.{" "}
+              <Link href="/onboarding" className="font-semibold text-amber-950 underline-offset-4 hover:underline">
+                Update profile
+              </Link>
+            </div>
+          ) : null}
           {children}
         </motion.main>
       </div>

@@ -1,11 +1,32 @@
-export type MockRole = "Leader" | "Campus Pastor" | "Subgroup Pastor" | "Group Pastor" | "Admin";
-export type CurrentLeadershipRole =
-  | "Directional Leader"
-  | "Pastoral Leader"
-  | "Community Leader"
-  | "Zonal Leader / HOD"
+export type MockRole =
   | "Cell Leader / Assistant HOD"
+  | "Zonal Leader / HOD"
+  | "Community Leader"
+  | "Area Leader"
+  | "District Pastor / Pastoral Leader"
+  | "Directional Leader"
+  | "Campus Pastor"
+  | "Sub-Group Pastor"
+  | "Group Pastor"
+  | "Campus Admin"
+  | "Super Admin"
+  | "Leader"
+  | "Subgroup Pastor"
+  | "Sub-group Pastor"
+  | "Admin";
+
+export type CurrentLeadershipRole =
+  | "Cell Leader / Assistant HOD"
+  | "Zonal Leader / HOD"
+  | "Community Leader"
+  | "Area Leader"
+  | "District Pastor / Pastoral Leader"
+  | "Directional Leader"
+  | "Campus Pastor"
+  | "Sub-Group Pastor"
+  | "Group Pastor"
   | "None";
+
 export type LeadershipAspiration =
   | "Cell Leader"
   | "Zonal Leader / HOD"
@@ -14,40 +35,73 @@ export type LeadershipAspiration =
   | "Directional Leadership";
 
 export type MockLeadershipProfile = {
+  avatarUrl?: string;
   campus: string;
   subgroup: string;
   group: string;
   campusPastor: string;
-  department: string;
   currentLeadershipRole: CurrentLeadershipRole;
   leadershipAspiration: LeadershipAspiration;
 };
 
 export const mockRoles: MockRole[] = [
-  "Leader",
+  "Cell Leader / Assistant HOD",
+  "Zonal Leader / HOD",
+  "Community Leader",
+  "Area Leader",
+  "Directional Leader",
   "Campus Pastor",
-  "Subgroup Pastor",
+  "Sub-Group Pastor",
   "Group Pastor",
-  "Admin",
+  "Campus Admin",
+  "Super Admin",
+];
+
+export const controlledPreseedRoles: MockRole[] = [
+  "Group Pastor",
+  "Sub-Group Pastor",
+  "Campus Pastor",
+  "Campus Admin",
+  "Super Admin",
+];
+
+export const selfOnboardingRoles: MockRole[] = [
+  "Cell Leader / Assistant HOD",
+  "Zonal Leader / HOD",
+  "Community Leader",
+  "Area Leader",
+  "District Pastor / Pastoral Leader",
+  "Directional Leader",
 ];
 
 export const roleDashboardRoutes: Record<MockRole, string> = {
-  Leader: "/leader-dashboard",
-  "Campus Pastor": "/campus-dashboard",
-  "Subgroup Pastor": "/subgroup-dashboard",
-  "Group Pastor": "/group-dashboard",
-  Admin: "/dashboard",
+  "Cell Leader / Assistant HOD": "/dashboard/leader",
+  "Zonal Leader / HOD": "/dashboard/community",
+  "Community Leader": "/dashboard/community",
+  "Area Leader": "/dashboard/community",
+  "District Pastor / Pastoral Leader": "/dashboard/directional",
+  "Directional Leader": "/dashboard/directional",
+  "Campus Pastor": "/dashboard/campus",
+  "Sub-Group Pastor": "/dashboard/subgroup",
+  "Group Pastor": "/dashboard/group",
+  "Campus Admin": "/dashboard/campus-admin",
+  "Super Admin": "/dashboard/admin",
+  Leader: "/dashboard/leader",
+  "Subgroup Pastor": "/dashboard/subgroup",
+  "Sub-group Pastor": "/dashboard/subgroup",
+  Admin: "/dashboard/admin",
 };
 
-const roleStorageKey = "harvesters_mock_role";
-const profileStorageKey = "harvesters_mock_leadership_profile";
-
 export const currentLeadershipRoles: CurrentLeadershipRole[] = [
-  "Directional Leader",
-  "Pastoral Leader",
-  "Community Leader",
-  "Zonal Leader / HOD",
   "Cell Leader / Assistant HOD",
+  "Zonal Leader / HOD",
+  "Community Leader",
+  "Area Leader",
+  "District Pastor / Pastoral Leader",
+  "Directional Leader",
+  "Campus Pastor",
+  "Sub-Group Pastor",
+  "Group Pastor",
   "None",
 ];
 
@@ -64,81 +118,62 @@ export const defaultLeadershipProfile: MockLeadershipProfile = {
   subgroup: "Magodo Subgroup",
   group: "Group Alpha",
   campusPastor: "Pastor Adeolu Osinuga",
-  department: "Media Department",
   currentLeadershipRole: "Cell Leader / Assistant HOD",
   leadershipAspiration: "Zonal Leader / HOD",
 };
 
-export function getMockRole(): MockRole {
-  if (typeof window === "undefined") return "Admin";
-
-  const storedRole = window.localStorage.getItem(roleStorageKey);
-  return mockRoles.includes(storedRole as MockRole) ? (storedRole as MockRole) : "Admin";
-}
-
-export function setMockRole(role: MockRole) {
-  window.localStorage.setItem(roleStorageKey, role);
-  window.dispatchEvent(new CustomEvent("harvesters-role-change", { detail: role }));
-}
-
-export function getLeadershipProfile(): MockLeadershipProfile {
-  if (typeof window === "undefined") return defaultLeadershipProfile;
-
-  const storedProfile = window.localStorage.getItem(profileStorageKey);
-
-  if (!storedProfile) {
-    return defaultLeadershipProfile;
-  }
-
-  try {
-    return { ...defaultLeadershipProfile, ...JSON.parse(storedProfile) };
-  } catch {
-    return defaultLeadershipProfile;
-  }
-}
-
-export function setLeadershipProfile(profile: MockLeadershipProfile) {
-  window.localStorage.setItem(profileStorageKey, JSON.stringify(profile));
-  window.dispatchEvent(new CustomEvent("harvesters-profile-change", { detail: profile }));
-}
-
-export function identityForRole(role: MockRole, profile = defaultLeadershipProfile) {
-  if (role === "Group Pastor") {
-    return { name: "Pastor Mayowa Agboade", title: "Group Pastor" };
-  }
-
-  if (role === "Campus Pastor") {
-    return {
-      name: profile.campusPastor,
-      title: `Campus Pastor — ${profile.campus}`,
-    };
-  }
-
-  if (role === "Subgroup Pastor") {
-    return {
-      name: profile.subgroup === "Magodo Subgroup" ? "Pastor Gbenga Agboola" : "Subgroup Pastor",
-      title: `Subgroup Pastor — ${profile.subgroup}`,
-    };
-  }
-
-  if (role === "Admin") {
-    return { name: "Pastor Mayowa Agboade", title: "Academy Administrator" };
-  }
-
-  return {
-    name: "Tolu Adebayo",
-    title: `Leader — ${profile.department}`,
-  };
-}
-
 export function dashboardForRole(role: MockRole) {
-  return roleDashboardRoutes[role];
+  return roleDashboardRoutes[normalizeStoredRole(role)];
 }
 
 export function roleCanAccess(role: MockRole, allowedRoles: MockRole[]) {
-  if (process.env.NODE_ENV !== "production") {
-    return true;
+  return allowedRoles.map(normalizeStoredRole).includes(normalizeStoredRole(role));
+}
+
+export function isControlledPreseedRole(role: MockRole) {
+  return controlledPreseedRoles.includes(normalizeStoredRole(role));
+}
+
+export function normalizeStoredRole(role?: string | null): MockRole {
+  if (role === "Admin" || role === "Super Admin") {
+    return "Super Admin";
   }
 
-  return allowedRoles.includes(role);
+  if (role === "Group Pastor") {
+    return "Group Pastor";
+  }
+
+  if (role === "Campus Admin") {
+    return "Campus Admin";
+  }
+
+  if (role === "Directional Leader") {
+    return "Directional Leader";
+  }
+
+  if (role === "District Pastor / Pastoral Leader" || role === "District Pastor" || role === "Pastoral Leader") {
+    return "District Pastor / Pastoral Leader";
+  }
+
+  if (role === "Subgroup Pastor" || role === "Sub-group Pastor" || role === "Sub-Group Pastor") {
+    return "Sub-Group Pastor";
+  }
+
+  if (role === "Campus Pastor") {
+    return "Campus Pastor";
+  }
+
+  if (role === "Area Leader") {
+    return "Area Leader";
+  }
+
+  if (role === "Community Leader") {
+    return "Community Leader";
+  }
+
+  if (role === "Zonal Leader / HOD" || role === "Zonal Leader" || role === "HOD") {
+    return "Zonal Leader / HOD";
+  }
+
+  return "Cell Leader / Assistant HOD";
 }

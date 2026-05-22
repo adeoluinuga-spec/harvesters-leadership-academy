@@ -5,18 +5,11 @@ import { useEffect, useState } from "react";
 import { Bell, LogOut, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MockRoleSwitcher } from "@/components/auth/mock-role-switcher";
+import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
-import {
-  getLeadershipProfile,
-  getMockRole,
-  identityForRole,
-  MockLeadershipProfile,
-  MockRole,
-} from "@/lib/mock-auth";
 
 type TopNavbarProps = {
   searchPlaceholder?: string;
@@ -29,11 +22,11 @@ export function TopNavbar({
 }: TopNavbarProps) {
   const router = useRouter();
   const supabase = createClient();
-  const [role, setRole] = useState<MockRole>(() => getMockRole());
-  const [profile, setProfile] = useState<MockLeadershipProfile>(() => getLeadershipProfile());
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [signingOut, setSigningOut] = useState(false);
-  const identity = identityForRole(role, profile);
-  const initials = identity.name
+  const displayName = profile?.fullName || "Academy Leader";
+  const displayRole = profile?.role || "Leader";
+  const initials = displayName
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
@@ -41,21 +34,25 @@ export function TopNavbar({
     .join("");
 
   useEffect(() => {
-    function syncIdentity() {
-      setRole(getMockRole());
-      setProfile(getLeadershipProfile());
+    let active = true;
+
+    async function syncIdentity() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setProfile(result.profile);
+      }
     }
 
-    window.addEventListener("harvesters-role-change", syncIdentity);
-    window.addEventListener("harvesters-profile-change", syncIdentity);
-    window.addEventListener("storage", syncIdentity);
+    syncIdentity();
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      syncIdentity();
+    });
 
     return () => {
-      window.removeEventListener("harvesters-role-change", syncIdentity);
-      window.removeEventListener("harvesters-profile-change", syncIdentity);
-      window.removeEventListener("storage", syncIdentity);
+      active = false;
+      listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase.auth]);
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -81,7 +78,6 @@ export function TopNavbar({
               Thursday, May 21, 2026
             </p>
           ) : null}
-          <MockRoleSwitcher />
           <Button
             asChild
             variant="outline"
@@ -94,13 +90,14 @@ export function TopNavbar({
           </Button>
           <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-2 py-1.5">
             <Avatar>
+              {profile?.avatarUrl ? <AvatarImage src={profile.avatarUrl} alt="" /> : null}
               <AvatarFallback className="bg-black text-xs font-semibold text-white">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="hidden pr-2 sm:block">
-              <p className="text-sm font-semibold leading-none text-zinc-950">{identity.name}</p>
-              <p className="mt-1 text-xs text-zinc-500">{identity.title}</p>
+              <p className="text-sm font-semibold leading-none text-zinc-950">{displayName}</p>
+              <p className="mt-1 text-xs text-zinc-500">{displayRole}</p>
             </div>
           </div>
           <Button

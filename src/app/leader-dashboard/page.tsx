@@ -14,11 +14,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  defaultLeadershipProfile,
-  getLeadershipProfile,
-  MockLeadershipProfile,
-} from "@/lib/mock-auth";
+import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 
 type LeaderMetric = {
   label: string;
@@ -27,7 +23,7 @@ type LeaderMetric = {
 };
 
 export default function LeaderDashboardPage() {
-  const [profile, setProfile] = useState<MockLeadershipProfile>(defaultLeadershipProfile);
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
   const metrics: LeaderMetric[] = [
     { label: "Course progress", value: "62%", icon: BookOpenCheck },
     { label: "Certificates", value: "3", icon: Award },
@@ -35,22 +31,26 @@ export default function LeaderDashboardPage() {
   ];
 
   useEffect(() => {
-    function syncProfile() {
-      setProfile(getLeadershipProfile());
+    let active = true;
+
+    async function syncProfile() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setProfile(result.profile);
+      }
     }
 
     syncProfile();
-    window.addEventListener("harvesters-profile-change", syncProfile);
-    window.addEventListener("storage", syncProfile);
 
     return () => {
-      window.removeEventListener("harvesters-profile-change", syncProfile);
-      window.removeEventListener("storage", syncProfile);
+      active = false;
     };
   }, []);
 
+  const firstName = profile?.fullName?.split(" ").filter(Boolean)[0] ?? "Leader";
+
   return (
-    <ProtectedRoute allowedRoles={["Leader", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Cell Leader / Assistant HOD", "Zonal Leader / HOD", "Community Leader", "Area Leader", "Directional Leader", "District Pastor / Pastoral Leader", "Leader", "Super Admin", "Admin"]}>
       <DashboardShell searchPlaceholder="Search courses, notes, certificates..." showDate={false}>
         <motion.section
           variants={shellItem}
@@ -60,16 +60,16 @@ export default function LeaderDashboardPage() {
             Leader dashboard
           </Badge>
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Welcome back to your leadership growth pathway
+            Welcome back, {firstName}
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
-            Continue growing as a learner while strengthening the responsibility habits needed for {profile.leadershipAspiration}.
+            Continue growing as a learner while strengthening the responsibility habits needed for {profile?.leadershipAspiration ?? "your next leadership step"}.
           </p>
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {[
-              ["Current role", profile.currentLeadershipRole],
-              ["Preparing for", profile.leadershipAspiration],
-              ["Ministry context", `${profile.department} - ${profile.campus}`],
+              ["Current role", profile?.currentLeadershipRole ?? "Cell Leader / Assistant HOD"],
+              ["Preparing for", profile?.leadershipAspiration ?? "Zonal Leader / HOD"],
+              ["Ministry context", profile?.campus ?? "Campus"],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-zinc-100 bg-zinc-50 p-3">
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
@@ -81,7 +81,7 @@ export default function LeaderDashboardPage() {
           </div>
         </motion.section>
 
-        <PersonalLearningLayer role="Leader" />
+        <PersonalLearningLayer role={profile?.role ?? "Cell Leader / Assistant HOD"} />
 
         <OversightLayerIntro
           title="Personal ministry responsibility intelligence"

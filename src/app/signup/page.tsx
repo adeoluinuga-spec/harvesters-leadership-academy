@@ -8,14 +8,16 @@ import { useRouter } from "next/navigation";
 import { AuthFooterLink, AuthLayout, AuthSubmitButton } from "@/components/auth/auth-layout";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { authErrorMessage, upsertSignupProfile } from "@/lib/auth";
+import { authErrorMessage } from "@/lib/auth";
 import { createClient } from "@/lib/client";
-import { setMockRole } from "@/lib/mock-auth";
+
+const designationOptions = ["Pastor", "Dcns", "Dcn", "Minister", "Pst", "Bro", "Sis", "None"];
 
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
   const [form, setForm] = useState({
+    designation: "None",
     fullName: "",
     email: "",
     password: "",
@@ -31,7 +33,8 @@ export default function SignupPage() {
     value: string;
     field: keyof typeof form;
   }> = [
-    { label: "Full name", placeholder: "Pastor Adeolu Osinuga", icon: User, type: "text", value: form.fullName, field: "fullName" },
+    { label: "Designation", placeholder: "Pastor, Dcns, Dcn, Minister, Pst, Bro, Sis, None", icon: User, type: "text", value: form.designation, field: "designation" },
+    { label: "Full name", placeholder: "Adeolu Osinuga", icon: User, type: "text", value: form.fullName, field: "fullName" },
     { label: "Email address", placeholder: "adeolu@harvestersng.org", icon: Mail, type: "email", value: form.email, field: "email" },
     { label: "Password", placeholder: "Create password", icon: LockKeyhole, type: "password", value: form.password, field: "password" },
     { label: "Confirm password", placeholder: "Confirm password", icon: LockKeyhole, type: "password", value: form.confirmPassword, field: "confirmPassword" },
@@ -57,33 +60,76 @@ export default function SignupPage() {
       password: form.password,
       options: {
         data: {
+          designation: form.designation.trim() || "None",
           full_name: form.fullName.trim(),
-          role: "Leader",
+          role: "Cell Leader / Assistant HOD",
         },
       },
     });
 
     if (signupError) {
+      console.error("[signup] Supabase signup failed", {
+        message: signupError.message,
+        status: signupError.status,
+      });
       setError(authErrorMessage(signupError.message));
       setLoading(false);
       return;
     }
 
-    if (data.user) {
-      try {
-        await upsertSignupProfile({
+    if (!data.user) {
+      console.error("[signup] Supabase signup returned no user and no explicit error");
+      setError("We could not complete account creation. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const profileResponse = await fetch("/api/auth/ensure-profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           id: data.user.id,
           email: form.email.trim(),
+          designation: form.designation.trim() || "None",
           fullName: form.fullName.trim(),
-        });
-      } catch {
-        setError("Your auth account was created, but we could not create your ministry profile. Please try signing in again or contact academy support.");
+          accessToken: data.session?.access_token,
+        }),
+      });
+
+      if (!profileResponse.ok) {
+        const profileResult = (await profileResponse.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+
+        throw new Error(profileResult?.error ?? "Profile creation failed.");
+      }
+    } catch (profileError) {
+      console.error("[signup] Failed to create public.users profile", profileError);
+
+      if (!data.session) {
+        setError("Your auth account was created, but profile creation needs the Supabase database trigger or server service role key. Please apply the migration, then sign in again.");
         setLoading(false);
         return;
       }
+
+        setError("Your auth account was created, but we could not create your ministry profile. Please try signing in again or contact academy support.");
+        setLoading(false);
+        return;
     }
 
-    setMockRole("Leader");
+    if (!data.session) {
+      console.info("[signup] Auth user created without a session; public.users row should be created by the Supabase auth trigger", {
+        userId: data.user.id,
+        email: form.email.trim(),
+      });
+      setError("Your account was created. Please confirm your email, then sign in to continue onboarding.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(false);
     router.push("/onboarding");
   }
@@ -110,6 +156,7 @@ export default function SignupPage() {
               <div className="relative">
                 <Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
                 <Input
+                  list={field === "designation" ? "signup-designations" : undefined}
                   className="h-11 rounded-lg border-zinc-200 bg-zinc-50 pl-9"
                   type={type}
                   placeholder={placeholder}
@@ -119,6 +166,13 @@ export default function SignupPage() {
                     setForm((current) => ({ ...current, [field]: event.target.value }))
                   }
                 />
+                {field === "designation" ? (
+                  <datalist id="signup-designations">
+                    {designationOptions.map((option) => (
+                      <option key={option} value={option} />
+                    ))}
+                  </datalist>
+                ) : null}
               </div>
             </label>
           ))}

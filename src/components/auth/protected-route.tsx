@@ -6,7 +6,7 @@ import { LoaderCircle } from "lucide-react";
 
 import { getAuthProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
-import { getMockRole, MockRole, setLeadershipProfile, setMockRole } from "@/lib/mock-auth";
+import { isControlledPreseedRole, MockRole, roleCanAccess } from "@/lib/mock-auth";
 
 type ProtectedRouteProps = {
   allowedRoles: MockRole[];
@@ -36,22 +36,26 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
         return;
       }
 
-      const profile = await getAuthProfile(data.session.user, getMockRole());
+      let profile;
+
+      try {
+        profile = await getAuthProfile(data.session.user, "Cell Leader / Assistant HOD");
+      } catch (profileError) {
+        console.error("[protected-route] Failed to fetch or create academy profile", profileError);
+        setAllowed(false);
+        setChecked(true);
+        router.replace("/login");
+        return;
+      }
 
       if (!active) return;
 
-      setMockRole(profile.role);
-      setLeadershipProfile({
-        campus: profile.campus,
-        subgroup: profile.subgroup,
-        group: profile.group,
-        campusPastor: profile.campusPastor,
-        department: profile.department,
-        currentLeadershipRole: profile.currentLeadershipRole,
-        leadershipAspiration: profile.leadershipAspiration,
-      });
+      window.localStorage.setItem(
+        "harvesters_profile_incomplete",
+        profile.onboardingCompleted ? "false" : "true"
+      );
 
-      if (!profile.onboardingCompleted && pathname !== "/onboarding") {
+      if (!profile.onboardingCompleted && !isControlledPreseedRole(profile.role) && pathname !== "/onboarding") {
         setAllowed(false);
         setChecked(true);
         router.replace("/onboarding");
@@ -59,7 +63,7 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
       }
 
       const allowedRoleList = allowedRoleKey.split("|") as MockRole[];
-      const canAccess = allowedRoleList.includes(profile.role);
+      const canAccess = roleCanAccess(profile.role, allowedRoleList);
       setAllowed(canAccess);
       setChecked(true);
 

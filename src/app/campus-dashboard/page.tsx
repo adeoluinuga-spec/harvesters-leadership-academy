@@ -23,7 +23,7 @@ const stats = [
 
 export default function CampusDashboardPage() {
   return (
-    <ProtectedRoute allowedRoles={["Campus Pastor", "Subgroup Pastor", "Group Pastor", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Campus Admin", "Super Admin", "Admin"]}>
     <DashboardShell searchPlaceholder="Search campus leaders, departments, assessments...">
       <motion.section variants={shellItem} className="grid gap-5 xl:grid-cols-[1fr_380px]">
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">

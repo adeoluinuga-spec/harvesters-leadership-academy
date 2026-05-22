@@ -9,12 +9,12 @@ import { PermissionExamples } from "@/components/auth/role-components";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { dashboardForRole, getMockRole, MockRole, mockRoles } from "@/lib/mock-auth";
+import { dashboardForRole, normalizeStoredRole } from "@/lib/mock-auth";
 
 function AccessDeniedContent() {
   const searchParams = useSearchParams();
   const roleParam = searchParams.get("role");
-  const role = mockRoles.includes(roleParam as MockRole) ? (roleParam as MockRole) : getMockRole();
+  const role = normalizeStoredRole(roleParam);
   const from = searchParams.get("from") ?? "this leadership layer";
 
   return (
@@ -30,13 +30,13 @@ function AccessDeniedContent() {
             <ShieldAlert className="size-6" />
           </div>
           <p className="text-sm leading-6 text-zinc-500">
-            This is not a technical error. Your current mock role is{" "}
+            This is not a technical error. Your current ministry role is{" "}
             <span className="font-medium text-zinc-950">{role}</span>, and it is not assigned
             to access <span className="font-medium text-zinc-950">{from}</span>.
           </p>
           <div className="mt-4 rounded-lg bg-zinc-50 p-4 text-sm leading-6 text-zinc-500">
-            Role access is being simulated on the frontend for testing. Use the mock role
-            switcher in the app navbar or sign in again with a different role.
+            This leadership layer requires a confirmed ministry assignment. Contact an administrator
+            if your access should be updated.
           </div>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row">
             <Button asChild className="rounded-lg bg-black text-white hover:bg-zinc-800">

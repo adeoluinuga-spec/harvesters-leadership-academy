@@ -22,7 +22,7 @@ export default function UsersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <ProtectedRoute allowedRoles={["Admin"]}>
+    <ProtectedRoute allowedRoles={["Super Admin", "Admin"]}>
     <DashboardShell searchPlaceholder="Search users, roles, campuses..." showDate={false}>
       <motion.section variants={shellItem} className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

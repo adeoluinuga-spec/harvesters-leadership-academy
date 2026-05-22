@@ -27,13 +27,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import {
-  getLeadershipProfile,
-  getMockRole,
-  MockLeadershipProfile,
-  MockRole,
-  defaultLeadershipProfile,
-} from "@/lib/mock-auth";
+import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
+import { MockRole } from "@/lib/mock-auth";
 
 type NotificationType = "Learning" | "Assessments" | "Certificates" | "Follow-up" | "System";
 type NotificationPriority = "Care" | "Action" | "Insight" | "Celebration";
@@ -66,7 +61,7 @@ const notifications: AcademyNotification[] = [
     type: "Learning",
     priority: "Action",
     time: "Today, 8:30 AM",
-    audience: ["Leader", "Admin"],
+    audience: ["Cell Leader / Assistant HOD", "Super Admin"],
     icon: BookOpenCheck,
   },
   {
@@ -76,7 +71,7 @@ const notifications: AcademyNotification[] = [
     type: "Assessments",
     priority: "Care",
     time: "Today, 7:45 AM",
-    audience: ["Leader", "Admin"],
+    audience: ["Cell Leader / Assistant HOD", "Super Admin"],
     icon: CalendarClock,
   },
   {
@@ -86,7 +81,7 @@ const notifications: AcademyNotification[] = [
     type: "Certificates",
     priority: "Celebration",
     time: "Yesterday",
-    audience: ["Leader", "Admin"],
+    audience: ["Cell Leader / Assistant HOD", "Super Admin"],
     icon: Award,
   },
   {
@@ -96,7 +91,7 @@ const notifications: AcademyNotification[] = [
     type: "Learning",
     priority: "Insight",
     time: "Yesterday",
-    audience: ["Leader", "Admin"],
+    audience: ["Cell Leader / Assistant HOD", "Super Admin"],
     icon: Brain,
   },
   {
@@ -106,7 +101,7 @@ const notifications: AcademyNotification[] = [
     type: "Learning",
     priority: "Action",
     time: "Today, 9:10 AM",
-    audience: ["Campus Pastor", "Admin"],
+    audience: ["Campus Pastor", "Campus Admin", "Super Admin"],
     icon: Users,
   },
   {
@@ -116,7 +111,7 @@ const notifications: AcademyNotification[] = [
     type: "Follow-up",
     priority: "Care",
     time: "Today, 8:55 AM",
-    audience: ["Campus Pastor", "Subgroup Pastor", "Group Pastor", "Admin"],
+    audience: ["Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Super Admin"],
     icon: HeartHandshake,
   },
   {
@@ -126,7 +121,7 @@ const notifications: AcademyNotification[] = [
     type: "Assessments",
     priority: "Celebration",
     time: "Yesterday",
-    audience: ["Campus Pastor", "Subgroup Pastor", "Group Pastor", "Admin"],
+    audience: ["Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Super Admin"],
     icon: CheckCircle2,
   },
   {
@@ -136,7 +131,7 @@ const notifications: AcademyNotification[] = [
     type: "System",
     priority: "Insight",
     time: "Monday",
-    audience: ["Campus Pastor", "Group Pastor", "Admin"],
+    audience: ["Campus Pastor", "Group Pastor", "Super Admin"],
     icon: Brain,
   },
   {
@@ -146,7 +141,7 @@ const notifications: AcademyNotification[] = [
     type: "Certificates",
     priority: "Celebration",
     time: "Today, 10:20 AM",
-    audience: ["Subgroup Pastor", "Group Pastor", "Admin"],
+    audience: ["Sub-Group Pastor", "Group Pastor", "Super Admin"],
     icon: ShieldCheck,
   },
   {
@@ -156,7 +151,7 @@ const notifications: AcademyNotification[] = [
     type: "Follow-up",
     priority: "Care",
     time: "Today, 9:40 AM",
-    audience: ["Group Pastor", "Subgroup Pastor", "Admin"],
+    audience: ["Group Pastor", "Sub-Group Pastor", "Super Admin"],
     icon: HeartHandshake,
   },
   {
@@ -166,7 +161,7 @@ const notifications: AcademyNotification[] = [
     type: "Certificates",
     priority: "Action",
     time: "Yesterday",
-    audience: ["Group Pastor", "Admin"],
+    audience: ["Group Pastor", "Super Admin"],
     icon: Award,
   },
   {
@@ -176,7 +171,7 @@ const notifications: AcademyNotification[] = [
     type: "System",
     priority: "Insight",
     time: "Monday",
-    audience: ["Subgroup Pastor", "Group Pastor", "Admin"],
+    audience: ["Sub-Group Pastor", "Group Pastor", "Super Admin"],
     icon: Sparkles,
   },
 ];
@@ -199,8 +194,8 @@ const preferenceOptions = [
 
 export default function NotificationsPage() {
   const [activeFilter, setActiveFilter] = useState<"All" | NotificationType>("All");
-  const [role, setRole] = useState<MockRole>("Admin");
-  const [profile, setProfile] = useState<MockLeadershipProfile>(defaultLeadershipProfile);
+  const [role, setRole] = useState<MockRole>("Super Admin");
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [broadcast, setBroadcast] = useState({
     audience: "All active leaders",
     role: "Leader",
@@ -212,20 +207,20 @@ export default function NotificationsPage() {
   });
 
   useEffect(() => {
-    function syncRole() {
-      setRole(getMockRole());
-      setProfile(getLeadershipProfile());
+    let active = true;
+
+    async function syncRole() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setRole(result.profile.role);
+        setProfile(result.profile);
+      }
     }
 
     syncRole();
-    window.addEventListener("harvesters-role-change", syncRole);
-    window.addEventListener("harvesters-profile-change", syncRole);
-    window.addEventListener("storage", syncRole);
 
     return () => {
-      window.removeEventListener("harvesters-role-change", syncRole);
-      window.removeEventListener("harvesters-profile-change", syncRole);
-      window.removeEventListener("storage", syncRole);
+      active = false;
     };
   }, []);
 
@@ -246,7 +241,7 @@ export default function NotificationsPage() {
   ).length;
 
   return (
-    <ProtectedRoute allowedRoles={["Leader", "Campus Pastor", "Subgroup Pastor", "Group Pastor", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Super Admin"]}>
       <DashboardShell searchPlaceholder="Search notifications, broadcasts, reminders..." showDate={false}>
         <motion.section variants={shellItem} className="grid gap-5 xl:grid-cols-[1fr_380px]">
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
@@ -269,7 +264,7 @@ export default function NotificationsPage() {
               </div>
               <div>
                 <p className="font-heading font-semibold">Communication health</p>
-                <p className="text-sm text-zinc-400">{role} view tuned to {profile.campus}</p>
+                <p className="text-sm text-zinc-400">{role} view tuned to {profile?.campus ?? "your campus"}</p>
               </div>
             </div>
             <div className="mt-5 grid gap-3">
@@ -384,7 +379,7 @@ export default function NotificationsPage() {
                   <Megaphone className="size-5" />
                 </div>
                 <div>
-                  <CardTitle className="font-heading text-lg font-semibold">Admin broadcast interface</CardTitle>
+                  <CardTitle className="font-heading text-lg font-semibold">Super Admin broadcast interface</CardTitle>
                   <p className="text-sm text-zinc-500">Compose targeted announcements for roles, campuses, subgroups, and course participants.</p>
                 </div>
               </div>
@@ -400,7 +395,7 @@ export default function NotificationsPage() {
                 <SelectField
                   label="Role"
                   value={broadcast.role}
-                  options={["Leader", "Campus Pastor", "Subgroup Pastor", "Group Pastor", "Admin"]}
+                  options={["Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Super Admin"]}
                   onChange={(nextRole) => setBroadcast((current) => ({ ...current, role: nextRole }))}
                 />
                 <SelectField

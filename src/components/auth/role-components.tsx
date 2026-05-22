@@ -54,7 +54,7 @@ export function PermissionExamples() {
     },
     {
       status: "Allowed",
-      copy: "Admin sees personal learning plus academy-wide stewardship for users, courses, certificates, and learning quality.",
+      copy: "Super Admin sees global platform stewardship, while Directional Leaders carry pastoral oversight through the ministry reporting chain.",
       icon: CheckCircle2,
     },
     {

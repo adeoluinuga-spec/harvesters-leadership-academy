@@ -10,12 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { invitationProfiles } from "@/lib/role-data";
-import { MockRole, setMockRole } from "@/lib/mock-auth";
 
 export default function InvitationPage() {
   const router = useRouter();
   const invitation = invitationProfiles[1];
-  const invitedRole = invitation.role as MockRole;
 
   return (
     <AuthLayout
@@ -57,7 +55,6 @@ export default function InvitationPage() {
             <Button
               className="rounded-lg bg-black text-white hover:bg-zinc-800"
               onClick={() => {
-                setMockRole(invitedRole);
                 router.push("/onboarding");
               }}
             >

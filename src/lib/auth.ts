@@ -8,14 +8,16 @@ import {
   LeadershipAspiration,
   MockLeadershipProfile,
   MockRole,
-  mockRoles,
   CurrentLeadershipRole,
+  normalizeStoredRole,
 } from "@/lib/mock-auth";
 
 export type AuthProfile = MockLeadershipProfile & {
   id: string;
   email: string;
+  designation: string;
   fullName: string;
+  avatarUrl: string;
   role: MockRole;
   onboardingCompleted: boolean;
 };
@@ -23,7 +25,10 @@ export type AuthProfile = MockLeadershipProfile & {
 type ProfileRow = {
   id?: string | null;
   email?: string | null;
+  designation?: string | null;
   full_name?: string | null;
+  avatar_url?: string | null;
+  created_at?: string | null;
   role?: string | null;
   role_id?: string | null;
   campus_id?: string | null;
@@ -81,11 +86,14 @@ export type MinistryLookupOption = {
 };
 
 export type OnboardingProfileInput = {
+  designation: string;
+  fullName: string;
+  email: string;
+  avatarUrl: string | null;
   phone: string;
   gender: string;
   campus: MinistryCampusOption;
-  departmentId: string;
-  roleId: string;
+  roleId: string | null;
   role: MockRole;
   currentLeadershipRole: CurrentLeadershipRole;
   aspirationalLeadershipRole: LeadershipAspiration;
@@ -93,11 +101,7 @@ export type OnboardingProfileInput = {
 };
 
 export function normalizeRole(role?: string | null): MockRole {
-  if (mockRoles.includes(role as MockRole)) {
-    return role as MockRole;
-  }
-
-  return "Leader";
+  return normalizeStoredRole(role);
 }
 
 export function authErrorMessage(message?: string) {
@@ -118,11 +122,78 @@ export function authErrorMessage(message?: string) {
   return message || "Something went wrong. Please try again.";
 }
 
+export async function ensureUserProfile(
+  user: User,
+  input: {
+    designation?: string;
+    fullName?: string;
+  } = {}
+) {
+  const supabase = createClient();
+  const metadata = user.user_metadata ?? {};
+  const email = user.email ?? "";
+  const fullName =
+    input.fullName?.trim() ||
+    (metadata.full_name as string | undefined)?.trim() ||
+    email ||
+    "Academy Leader";
+  const designation =
+    normalizeDesignation(input.designation ?? (metadata.designation as string | undefined));
+
+  const profilePayload = {
+    id: user.id,
+    email,
+    designation,
+    full_name: fullName,
+    avatar_url: null,
+    onboarding_completed: false,
+    created_at: new Date().toISOString(),
+  };
+
+  const { data: existingProfile, error: lookupError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle<ProfileRow>();
+
+  if (lookupError) {
+    console.error("[auth] Failed to look up public.users profile", {
+      userId: user.id,
+      message: lookupError.message,
+      details: lookupError.details,
+      hint: lookupError.hint,
+    });
+  }
+
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  const { data: insertedProfile, error: insertError } = await supabase
+    .from("users")
+    .upsert(profilePayload, { onConflict: "id" })
+    .select("*")
+    .single<ProfileRow>();
+
+  if (!insertError && insertedProfile) {
+    return insertedProfile;
+  }
+
+  console.error("[auth] Failed to create public.users profile", {
+    userId: user.id,
+    message: insertError?.message,
+    details: insertError?.details,
+    hint: insertError?.hint,
+  });
+
+  throw new Error("We could not create your academy profile. Please try again or contact academy support.");
+}
+
 export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leader") {
   const supabase = createClient();
   let { data } = await supabase
     .from("users")
-    .select("*, roles(name), campuses(name), subgroups(name), groups(name), departments(name)")
+    .select("*, roles(name), campuses(name), subgroups(name), groups(name)")
     .eq("id", user.id)
     .maybeSingle<ProfileRow>();
 
@@ -136,6 +207,14 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
   }
 
   const metadata = user.user_metadata ?? {};
+
+  if (!data) {
+    data = await ensureUserProfile(user, {
+      fullName: metadata.full_name as string | undefined,
+      designation: metadata.designation as string | undefined,
+    });
+  }
+
   let roleName = data?.role ?? relatedName(data?.roles);
 
   if (!roleName && data?.role_id) {
@@ -154,14 +233,15 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
   return {
     id: user.id,
     email: data?.email ?? user.email ?? "",
+    designation: normalizeDesignation(data?.designation ?? (metadata.designation as string | undefined)),
     fullName: data?.full_name ?? (metadata.full_name as string | undefined) ?? user.email ?? "Academy Leader",
+    avatarUrl: data?.avatar_url ?? "",
     role,
     onboardingCompleted: data?.onboarding_completed ?? false,
     campus: data?.campus ?? relatedName(data?.campuses) ?? defaultLeadershipProfile.campus,
     subgroup: data?.subgroup ?? relatedName(data?.subgroups) ?? defaultLeadershipProfile.subgroup,
     group: data?.group_name ?? data?.group ?? relatedName(data?.groups) ?? defaultLeadershipProfile.group,
     campusPastor: data?.campus_pastor ?? defaultLeadershipProfile.campusPastor,
-    department: data?.department ?? relatedName(data?.departments) ?? defaultLeadershipProfile.department,
     currentLeadershipRole:
       data?.current_leadership_role ?? defaultLeadershipProfile.currentLeadershipRole,
     leadershipAspiration:
@@ -174,10 +254,12 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
 export async function upsertSignupProfile({
   id,
   email,
+  designation,
   fullName,
 }: {
   id: string;
   email: string;
+  designation: string;
   fullName: string;
 }) {
   const supabase = createClient();
@@ -186,8 +268,11 @@ export async function upsertSignupProfile({
     {
       id,
       email,
+      designation: normalizeDesignation(designation),
       full_name: fullName,
+      avatar_url: null,
       onboarding_completed: false,
+      created_at: new Date().toISOString(),
     },
     { onConflict: "id" }
   );
@@ -205,8 +290,20 @@ export async function getCurrentUserProfile() {
     return { user: null, profile: null, error: error?.message ?? "No authenticated user session was found." };
   }
 
-  const profile = await getAuthProfile(data.user);
-  return { user: data.user, profile, error: null };
+  try {
+    const profile = await getAuthProfile(data.user);
+    return { user: data.user, profile, error: null };
+  } catch (profileError) {
+    console.error("[auth] Failed to resolve current user profile", profileError);
+    return {
+      user: data.user,
+      profile: null,
+      error:
+        profileError instanceof Error
+          ? profileError.message
+          : "We could not load your academy profile.",
+    };
+  }
 }
 
 export async function fetchMinistryCampuses(): Promise<MinistryCampusOption[]> {
@@ -272,13 +369,13 @@ export async function fetchMinistryCampuses(): Promise<MinistryCampusOption[]> {
       groupName: group?.name ?? groupAlpha.group,
       groupPastor: stringValue(group?.pastor) ?? groupAlpha.groupPastor,
       campusPastor: stringValue(campus.campus_pastor ?? campus.pastor) ?? "Campus Pastor",
-      subgroupPastor: stringValue(subgroup?.pastor) ?? "Subgroup Pastor",
+      subgroupPastor: stringValue(subgroup?.pastor) ?? "Sub-group Pastor",
       source: "supabase",
     };
   });
 }
 
-export async function fetchLookupOptions(table: "roles" | "departments"): Promise<MinistryLookupOption[]> {
+export async function fetchLookupOptions(table: "roles"): Promise<MinistryLookupOption[]> {
   const supabase = createClient();
   const { data, error } = await supabase.from(table).select("id, name, title").order("name");
 
@@ -295,16 +392,8 @@ export async function fetchLookupOptions(table: "roles" | "departments"): Promis
 }
 
 export async function saveOnboardingProfile(input: OnboardingProfileInput) {
-  if (!input.roleId) {
-    throw new Error("Missing role. Please select a valid ministry role before continuing.");
-  }
-
-  if (!input.departmentId) {
-    throw new Error("Missing department. Please enter a valid department from academy records.");
-  }
-
-  if (input.campus.source !== "supabase" || !input.campus.subgroupId || !input.campus.groupId) {
-    throw new Error("Invalid hierarchy mapping. Please select a campus that is linked to a subgroup and group.");
+  if (!input.campus.id || !input.campus.name) {
+    throw new Error("Please select a valid campus before continuing.");
   }
 
   const supabase = createClient();
@@ -314,21 +403,43 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
     throw new Error("Your session has expired. Please sign in again before completing onboarding.");
   }
 
+  await ensureUserProfile(authData.user, {
+    designation: input.designation,
+  });
+
+  const updatePayload: Record<string, unknown> = {
+    email: input.email.trim(),
+    designation: normalizeDesignation(input.designation),
+    full_name: input.fullName.trim(),
+    avatar_url: input.avatarUrl,
+    phone: input.phone,
+    gender: input.gender,
+    role: input.role,
+    current_leadership_role: input.currentLeadershipRole,
+    aspirational_leadership_role: input.aspirationalLeadershipRole,
+    years_in_ministry: input.yearsInMinistry,
+    onboarding_completed: true,
+  };
+
+  if (input.roleId) {
+    updatePayload.role_id = input.roleId;
+  }
+
+  if (input.campus.source === "supabase") {
+    updatePayload.campus_id = input.campus.id;
+
+    if (input.campus.subgroupId) {
+      updatePayload.subgroup_id = input.campus.subgroupId;
+    }
+
+    if (input.campus.groupId) {
+      updatePayload.group_id = input.campus.groupId;
+    }
+  }
+
   const { error } = await supabase
     .from("users")
-    .update({
-      phone: input.phone,
-      gender: input.gender,
-      campus_id: input.campus.id,
-      subgroup_id: input.campus.subgroupId,
-      group_id: input.campus.groupId,
-      department_id: input.departmentId,
-      role_id: input.roleId,
-      current_leadership_role: input.currentLeadershipRole,
-      aspirational_leadership_role: input.aspirationalLeadershipRole,
-      years_in_ministry: input.yearsInMinistry,
-      onboarding_completed: true,
-    })
+    .update(updatePayload)
     .eq("id", authData.user.id);
 
   if (error) {
@@ -356,4 +467,9 @@ function uniqueIds(values: unknown[]) {
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value : null;
+}
+
+export function normalizeDesignation(value?: string | null) {
+  const trimmedValue = value?.trim();
+  return trimmedValue ? trimmedValue : "None";
 }

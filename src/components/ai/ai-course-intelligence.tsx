@@ -30,10 +30,9 @@ import {
   transcriptSections,
 } from "@/lib/ai-course-intelligence-data";
 import {
-  defaultLeadershipProfile,
-  getLeadershipProfile,
-  type MockLeadershipProfile,
-} from "@/lib/mock-auth";
+  AuthProfile,
+  getCurrentUserProfile,
+} from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 function SectionHeading({
@@ -308,20 +307,22 @@ export function ReflectionPromptSystem() {
 }
 
 export function PathwayRecommendations() {
-  const [profile, setProfile] = useState<MockLeadershipProfile>(defaultLeadershipProfile);
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
 
   useEffect(() => {
-    function syncProfile() {
-      setProfile(getLeadershipProfile());
+    let active = true;
+
+    async function syncProfile() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setProfile(result.profile);
+      }
     }
 
     syncProfile();
-    window.addEventListener("harvesters-profile-change", syncProfile);
-    window.addEventListener("storage", syncProfile);
 
     return () => {
-      window.removeEventListener("harvesters-profile-change", syncProfile);
-      window.removeEventListener("storage", syncProfile);
+      active = false;
     };
   }, []);
 
@@ -335,11 +336,11 @@ export function PathwayRecommendations() {
                 AI leadership pathway recommendations
               </CardTitle>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-500">
-                As a {profile.currentLeadershipRole} preparing for {profile.leadershipAspiration}, your pathway is adapting to course behavior, engagement, and assessment patterns.
+                As a {profile?.currentLeadershipRole ?? "leader"} preparing for {profile?.leadershipAspiration ?? "your next leadership step"}, your pathway is adapting to course behavior, engagement, and assessment patterns.
               </p>
             </div>
             <Badge className="w-fit rounded-md bg-black px-3 py-1.5 text-white hover:bg-black">
-              {profile.department}
+              {profile?.campus ?? "Campus"}
             </Badge>
           </div>
         </CardHeader>
@@ -425,7 +426,7 @@ export function AiCourseIntelligenceSections() {
       <SectionHeading
         eyebrow="AI course generation flow"
         title="Transform teachings into structured leadership development"
-        description="A simulated admin flow for converting sermons, trainings, and conference sessions into LMS-ready courses."
+        description="An admin flow for converting sermons, trainings, and conference sessions into LMS-ready courses."
       />
       <AiCourseGenerationFlow />
 

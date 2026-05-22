@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import {
   Award,
   BookOpenCheck,
@@ -24,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 
 const kpis = [
   {
@@ -126,6 +128,27 @@ function Sparkline({ values }: { values: number[] }) {
 }
 
 function DashboardHero() {
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfile() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setProfile(result.profile);
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const firstName = profile?.fullName?.split(" ").filter(Boolean)[0] ?? "Leader";
+
   return (
     <motion.section
       variants={shellItem}
@@ -134,10 +157,10 @@ function DashboardHero() {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Badge className="mb-5 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
-            Admin learning and oversight
+            Super admin learning and oversight
           </Badge>
           <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Good Evening, Pastor Mayowa Agboade
+            Welcome back, {firstName}
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
             Your own leadership learning stays connected to academy-wide stewardship, governance, and learning quality.
@@ -303,10 +326,10 @@ function ActivityFeed() {
 
 export default function DashboardPage() {
   return (
-    <ProtectedRoute allowedRoles={["Admin"]}>
+    <ProtectedRoute allowedRoles={["Super Admin", "Admin"]}>
       <DashboardShell>
         <DashboardHero />
-        <PersonalLearningLayer role="Admin" />
+        <PersonalLearningLayer role="Super Admin" />
         <OversightLayerIntro
           title="Academy oversight intelligence"
           description="Role-aware intelligence for academy learning quality, user participation, certification velocity, and network engagement."

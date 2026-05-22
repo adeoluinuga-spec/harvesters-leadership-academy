@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
@@ -24,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 
 const heroStats = [
   { label: "Total campuses", value: "13" },
@@ -160,7 +162,7 @@ function statusClasses(status: string) {
   return "bg-rose-50 text-rose-700 border-rose-100";
 }
 
-function Hero() {
+function Hero({ name }: { name: string }) {
   return (
     <motion.section variants={shellItem} className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
       <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
@@ -169,7 +171,7 @@ function Hero() {
             Group pastor intelligence
           </Badge>
           <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Good Evening, Pastor Mayowa Agboade
+            Welcome back, {name}
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
             Your personal leadership growth continues alongside strategic ministry intelligence across Group Alpha.
@@ -443,11 +445,30 @@ function LeadersAndActivity() {
 }
 
 export default function GroupDashboardPage() {
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfile() {
+      const result = await getCurrentUserProfile();
+      if (active && result.profile) {
+        setProfile(result.profile);
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
-    <ProtectedRoute allowedRoles={["Group Pastor", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Group Pastor", "Directional Leader", "District Pastor / Pastoral Leader", "Super Admin", "Admin"]}>
       <DashboardShell searchPlaceholder="Search subgroups, campuses, leaders..." showDate>
-        <Hero />
-        <PersonalLearningLayer role="Group Pastor" />
+        <Hero name={profile?.fullName?.split(" ").filter(Boolean)[0] ?? "Leader"} />
+        <PersonalLearningLayer role={profile?.role ?? "Group Pastor"} />
         <OversightLayerIntro
           title="Group oversight intelligence"
           description="Role-aware intelligence for strategic ministry health, subgroup analytics, leadership pipeline visibility, and campus growth signals."
