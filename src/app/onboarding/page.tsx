@@ -118,55 +118,66 @@ export default function OnboardingPage() {
 
     async function loadLookups() {
       setLoadingLookups(true);
-      const [campuses, roleRows, profileResult] = await Promise.all([
-        fetchMinistryCampuses(),
-        fetchLookupOptions("roles"),
-        getCurrentUserProfile(),
-      ]);
+      try {
+        const [campuses, roleRows, profileResult] = await Promise.all([
+          fetchMinistryCampuses(),
+          fetchLookupOptions("roles"),
+          getCurrentUserProfile(),
+        ]);
 
-      if (!active) return;
+        if (!active) return;
 
-      if (profileResult.error) {
-        console.error("[onboarding] Failed to load current profile", profileResult.error);
-        router.replace("/login");
-        return;
-      }
-
-      const profile = profileResult.profile;
-      const detectedRole: MockRole = profile?.role ?? "Cell Leader / Assistant HOD";
-
-      setCampusOptions(campuses);
-      setRoleOptions(roleRows);
-      setDesignation(profile?.designation ?? "None");
-      setFullName(profile?.fullName ?? "");
-      setEmail(profile?.email ?? "");
-      setAvatarUrl(profile?.avatarUrl ?? "");
-      setAvatarPreview(profile?.avatarUrl ?? "");
-      setSelectedRole(detectedRole);
-      setAssignedRole(detectedRole);
-
-      // Campus Pastors: fetch claimed campus IDs (excluding self) and smart-default their campus
-      if (detectedRole === "Campus Pastor") {
-        const claimed = await fetchClaimedCampusIds(profile?.id);
-        if (active) {
-          setClaimedCampusIds(claimed);
+        if (profileResult.error) {
+          console.error("[onboarding] Failed to load current profile", profileResult.error);
+          router.replace("/login");
+          return;
         }
-        // Pre-select their existing campus if already assigned; otherwise leave blank
-        const preSeededCampusId = profile?.campusId ?? null;
-        if (preSeededCampusId && campuses.some((c) => c.id === preSeededCampusId)) {
-          setSelectedCampusId(preSeededCampusId);
+
+        const profile = profileResult.profile;
+        const detectedRole: MockRole = profile?.role ?? "Cell Leader / Assistant HOD";
+
+        setCampusOptions(campuses);
+        setRoleOptions(roleRows);
+        setDesignation(profile?.designation ?? "None");
+        setFullName(profile?.fullName ?? "");
+        setEmail(profile?.email ?? "");
+        setAvatarUrl(profile?.avatarUrl ?? "");
+        setAvatarPreview(profile?.avatarUrl ?? "");
+        setSelectedRole(detectedRole);
+        setAssignedRole(detectedRole);
+
+        // Campus Pastors: fetch claimed campus IDs (excluding self) and smart-default their campus
+        if (detectedRole === "Campus Pastor") {
+          const claimed = await fetchClaimedCampusIds(profile?.id);
+          if (active) {
+            setClaimedCampusIds(claimed);
+          }
+          // Pre-select their existing campus if already assigned; otherwise leave blank
+          const preSeededCampusId = profile?.campusId ?? null;
+          if (preSeededCampusId && campuses.some((c) => c.id === preSeededCampusId)) {
+            setSelectedCampusId(preSeededCampusId);
+          } else {
+            // Force them to choose — do not default to first campus
+            setSelectedCampusId("");
+          }
         } else {
-          // Force them to choose — do not default to first campus
-          setSelectedCampusId("");
+          // For all other roles, default to Ilupeju Campus or first campus
+          setSelectedCampusId(
+            campuses.find((c) => c.name === "Ilupeju Campus")?.id ?? campuses[0]?.id ?? ""
+          );
         }
-      } else {
-        // For all other roles, default to Ilupeju Campus or first campus
-        setSelectedCampusId(
-          campuses.find((c) => c.name === "Ilupeju Campus")?.id ?? campuses[0]?.id ?? ""
-        );
-      }
 
-      setLoadingLookups(false);
+        setLoadingLookups(false);
+      } catch (loadError) {
+        if (!active) return;
+        console.error("[onboarding] loadLookups failed:", loadError);
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Failed to load required data. Please refresh the page."
+        );
+        setLoadingLookups(false);
+      }
     }
 
     loadLookups();
@@ -382,15 +393,6 @@ export default function OnboardingPage() {
         }
       } else if (!selectedCampusRecord) {
         setError("Please select a valid campus before continuing.");
-        return false;
-      }
-
-      // Ensure the campus ID is a real UUID — if fetchMinistryCampuses fell back to
-      // hardcoded slugs (no service role key + RLS blocks), the ID will not be a UUID.
-      if (!isValidUUID(selectedCampusRecord?.id)) {
-        setError(
-          "Your campus list could not be loaded from the server. Please refresh the page and try again."
-        );
         return false;
       }
 

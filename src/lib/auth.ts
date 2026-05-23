@@ -1,87 +1,82 @@
-export async function saveOnboardingProfile(input: OnboardingProfileInput): Promise<void> {
-  if (!input.campus?.id || input.campus.source !== "supabase") {
-    throw new Error("Please select a valid campus before continuing.");
-  }
-
+export async function fetchMinistryCampuses(): Promise<MinistryCampusOption[]> {
   const supabase = createClient();
 
-  const { data: authData, error: authError } = await supabase.auth.getUser();
+  const { data: campusRows, error: campusError } = await supabase
+    .from("campuses")
+    .select("id, name, subgroup_id")
+    .order("name", { ascending: true });
 
-  if (authError || !authData.user) {
-    throw new Error("Your session has expired. Please sign in again before completing onboarding.");
+  if (campusError) {
+    console.error("[fetchMinistryCampuses] campus fetch failed", campusError);
+    throw new Error("Your campus list could not be loaded from the server. Please refresh the page and try again.");
   }
 
-  const user = authData.user;
-
-  const payload = {
-    email: input.email || user.email || "",
-    designation: normalizeDesignation(input.designation),
-    full_name: input.fullName,
-    avatar_url: input.avatarUrl,
-    phone: input.phone,
-    gender: input.gender,
-    role: input.role,
-    role_id: input.roleId,
-    campus_id: input.campus.id,
-    subgroup_id: input.campus.subgroupId,
-    group_id: input.campus.groupId,
-    current_leadership_role: input.currentLeadershipRole,
-    aspirational_leadership_role: input.aspirationalLeadershipRole,
-    leadership_aspiration: input.aspirationalLeadershipRole,
-    years_in_ministry: input.yearsInMinistry,
-    onboarding_completed: true,
-  };
-
-  const { data: existingById } = await supabase
-    .from("users")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (existingById) {
-    const { error } = await supabase
-      .from("users")
-      .update(payload)
-      .eq("id", user.id);
-
-    if (error) {
-      console.error("[saveOnboardingProfile] update by id failed", error);
-      throw new Error(error.message);
-    }
-
-    return;
+  if (!campusRows || campusRows.length === 0) {
+    console.error("[fetchMinistryCampuses] no campuses returned");
+    throw new Error("No campuses are available yet. Please contact academy support.");
   }
 
-  const { data: existingByEmail } = await supabase
-    .from("users")
-    .select("id")
-    .eq("email", user.email)
-    .maybeSingle();
+  const subgroupIds = Array.from(
+    new Set(
+      campusRows
+        .map((campus) => campus.subgroup_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
 
-  if (existingByEmail?.id) {
-    const { error } = await supabase
-      .from("users")
-      .update(payload)
-      .eq("email", user.email);
+  const { data: subgroupRows, error: subgroupError } = subgroupIds.length
+    ? await supabase
+        .from("subgroups")
+        .select("id, name, group_id")
+        .in("id", subgroupIds)
+    : { data: [], error: null };
 
-    if (error) {
-      console.error("[saveOnboardingProfile] update by email failed", error);
-      throw new Error(error.message);
-    }
-
-    return;
+  if (subgroupError) {
+    console.error("[fetchMinistryCampuses] subgroup fetch failed", subgroupError);
   }
 
-  const { error } = await supabase
-    .from("users")
-    .insert({
-      id: user.id,
-      ...payload,
-      created_at: new Date().toISOString(),
-    });
+  const groupIds = Array.from(
+    new Set(
+      (subgroupRows ?? [])
+        .map((subgroup) => subgroup.group_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
 
-  if (error) {
-    console.error("[saveOnboardingProfile] insert failed", error);
-    throw new Error(error.message);
+  const { data: groupRows, error: groupError } = groupIds.length
+    ? await supabase
+        .from("groups")
+        .select("id, name")
+        .in("id", groupIds)
+    : { data: [], error: null };
+
+  if (groupError) {
+    console.error("[fetchMinistryCampuses] group fetch failed", groupError);
   }
+
+  const subgroupMap = new Map(
+    (subgroupRows ?? []).map((subgroup) => [subgroup.id, subgroup])
+  );
+
+  const groupMap = new Map(
+    (groupRows ?? []).map((group) => [group.id, group])
+  );
+
+  return campusRows.map((campus) => {
+    const subgroup = campus.subgroup_id ? subgroupMap.get(campus.subgroup_id) : null;
+    const group = subgroup?.group_id ? groupMap.get(subgroup.group_id) : null;
+
+    return {
+      id: campus.id,
+      name: campus.name ?? "Unnamed Campus",
+      subgroupId: campus.subgroup_id ?? null,
+      subgroupName: subgroup?.name ?? "Unassigned subgroup",
+      groupId: subgroup?.group_id ?? null,
+      groupName: group?.name ?? "Group Alpha",
+      groupPastor: "",
+      campusPastor: "",
+      subgroupPastor: "",
+      source: "supabase",
+    };
+  });
 }
