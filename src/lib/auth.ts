@@ -527,6 +527,8 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput): Prom
       accessToken: token,
       campusName: input.campus.name,
       campusIdHint: input.campus.id,
+      campusSubgroupId: input.campus.subgroupId ?? null,
+      campusGroupId: input.campus.groupId ?? null,
       role: input.role,
       roleId: input.roleId ?? null,
       designation: input.designation,

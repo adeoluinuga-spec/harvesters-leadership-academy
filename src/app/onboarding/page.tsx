@@ -42,6 +42,11 @@ const leadershipRoleValues = new Set([
 function derivedCurrentLeadershipRole(role: MockRole): CurrentLeadershipRole {
   return leadershipRoleValues.has(role) ? (role as CurrentLeadershipRole) : "None";
 }
+
+function isValidUUID(value?: string | null): boolean {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
 const designationOptions = ["Pastor", "Dcns", "Dcn", "Minister", "Pst", "Bro", "Sis", "None"];
 const acceptedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxAvatarSize = 5 * 1024 * 1024;
@@ -267,6 +272,19 @@ export default function OnboardingPage() {
       const uploadedAvatarUrl = await uploadAvatarIfNeeded();
       setUploadingAvatar(false);
 
+      const finalSubmitPayload = {
+        role: selectedRole,
+        campusId: selectedCampusRecord?.id ?? null,
+        campusName: selectedCampusRecord?.name ?? null,
+        subgroupId: selectedCampusRecord?.subgroupId ?? null,
+        groupId: selectedCampusRecord?.groupId ?? null,
+        campusSource: selectedCampusRecord
+          ? isValidUUID(selectedCampusRecord.id) ? "uuid" : "slug-fallback"
+          : "none",
+        leadershipAspiration,
+      };
+      console.log("[onboarding] finalSubmitPayload:", finalSubmitPayload);
+
       await saveOnboardingProfile({
         designation,
         fullName: fullName.trim(),
@@ -344,6 +362,14 @@ export default function OnboardingPage() {
     }
 
     if (currentStep === 1) {
+      // Log campus state for debugging
+      console.log("[onboarding] validateStep(1) campus state:", {
+        selectedCampusId,
+        selectedSubgroupId: selectedCampusRecord?.subgroupId ?? null,
+        selectedGroupId: selectedCampusRecord?.groupId ?? null,
+        campusSource: selectedCampusRecord ? (isValidUUID(selectedCampusRecord.id) ? "uuid" : "slug-fallback") : "none",
+      });
+
       // Campus Pastor must claim an unclaimed campus
       if (isCampusPastor) {
         if (!selectedCampusId) {
@@ -356,6 +382,15 @@ export default function OnboardingPage() {
         }
       } else if (!selectedCampusRecord) {
         setError("Please select a valid campus before continuing.");
+        return false;
+      }
+
+      // Ensure the campus ID is a real UUID — if fetchMinistryCampuses fell back to
+      // hardcoded slugs (no service role key + RLS blocks), the ID will not be a UUID.
+      if (!isValidUUID(selectedCampusRecord?.id)) {
+        setError(
+          "Your campus list could not be loaded from the server. Please refresh the page and try again."
+        );
         return false;
       }
 
