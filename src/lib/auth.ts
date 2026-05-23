@@ -278,7 +278,17 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
           .select("name, campus_pastor, pastor")
           .eq("id", campusId)
           .maybeSingle<LookupRow>()
-          .then((r) => r.data)
+          .then((r) => {
+            if (r.error) {
+              console.error("[auth] campuses query failed", {
+                userId: user.id,
+                campusId,
+                message: r.error.message,
+                code: r.error.code,
+              });
+            }
+            return r.data;
+          })
       : Promise.resolve(null),
     subgroupId
       ? supabase

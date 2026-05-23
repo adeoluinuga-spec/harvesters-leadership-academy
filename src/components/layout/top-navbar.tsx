@@ -48,9 +48,23 @@ export function TopNavbar({
 
     async function syncIdentity() {
       const result = await getCurrentUserProfile();
-      if (active && result.profile) {
-        setProfile(result.profile);
+      if (!active || !result.profile) return;
+
+      let resolved = result.profile;
+
+      // Explicit campus name resolution — mirrors useHierarchy's approach
+      if (resolved.campusId && !resolved.campus) {
+        const { data: campusRow } = await supabase
+          .from("campuses")
+          .select("name")
+          .eq("id", resolved.campusId)
+          .maybeSingle<{ name: string | null }>();
+        if (campusRow?.name) {
+          resolved = { ...resolved, campus: campusRow.name };
+        }
       }
+
+      if (active) setProfile(resolved);
     }
 
     syncIdentity();
@@ -62,7 +76,7 @@ export function TopNavbar({
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase.auth]);
+  }, [supabase, supabase.auth]);
 
   async function handleSignOut() {
     setSigningOut(true);

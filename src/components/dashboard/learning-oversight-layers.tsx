@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { recommendedCourses, recentlyWatched } from "@/lib/course-data";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
+import { createClient } from "@/lib/client";
 import { MockRole } from "@/lib/mock-auth";
 import { fetchCoursesWithProgress } from "@/lib/lms";
 import type { CourseWithProgress } from "@/lib/lms-types";
@@ -93,8 +94,27 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
         fetchCoursesWithProgress(),
       ]);
       if (!active) return;
-      if (profileResult.profile) setProfile(profileResult.profile);
-      setEnrolledCourses(courses.filter((c) => c.enrolled));
+
+      if (profileResult.profile) {
+        let resolved = profileResult.profile;
+
+        // Explicit campus name resolution — do not rely on getAuthProfile join result
+        if (resolved.campusId && !resolved.campus) {
+          const supabase = createClient();
+          const { data: campusRow } = await supabase
+            .from("campuses")
+            .select("name")
+            .eq("id", resolved.campusId)
+            .maybeSingle<{ name: string | null }>();
+          if (campusRow?.name) {
+            resolved = { ...resolved, campus: campusRow.name };
+          }
+        }
+
+        if (active) setProfile(resolved);
+      }
+
+      if (active) setEnrolledCourses(courses.filter((c) => c.enrolled));
     }
 
     load();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createClient } from "@/lib/client";
 import { getCurrentUserProfile } from "@/lib/auth";
 import type { AuthProfile } from "@/lib/auth";
 
@@ -39,36 +40,15 @@ const LOADING_STATE: HierarchyProfile = {
   leadershipAspiration: "",
 };
 
-function buildHierarchyProfile(profile: AuthProfile): HierarchyProfile {
+function buildHierarchyProfile(profile: AuthProfile, resolvedCampusName: string): HierarchyProfile {
   const firstName = profile.fullName.split(" ").filter(Boolean)[0] ?? "Leader";
-
-  // Log resolution failures so they are visible in browser console/server logs
-  if (profile.campusId && !profile.campus) {
-    console.warn("[hierarchy] campus_id exists but name resolution returned null — check campuses table RLS and the stored campus_id value", {
-      campusId: profile.campusId,
-      userId: profile.id,
-    });
-  }
-  if (profile.subgroupId && !profile.subgroup) {
-    console.warn("[hierarchy] subgroup_id exists but name resolution returned null", {
-      subgroupId: profile.subgroupId,
-      userId: profile.id,
-    });
-  }
-  if (profile.groupId && !profile.group) {
-    console.warn("[hierarchy] group_id exists but name resolution returned null", {
-      groupId: profile.groupId,
-      userId: profile.id,
-    });
-  }
 
   return {
     loading: false,
     role: profile.role ?? "",
     fullName: profile.fullName ?? "",
     firstName,
-    // Show "not assigned" ONLY when campus_id is truly null — not when name lookup failed
-    campusName: profile.campus || (profile.campusId ? "" : "Campus not assigned"),
+    campusName: resolvedCampusName || (profile.campusId ? "" : "Campus not assigned"),
     subgroupName: profile.subgroup || "Subgroup not assigned",
     groupName: profile.group || "Group not assigned",
     campusPastor: profile.campusPastor || "",
@@ -85,13 +65,51 @@ export function useHierarchy(): HierarchyProfile {
 
   useEffect(() => {
     let active = true;
-    getCurrentUserProfile().then((result) => {
-      if (active && result.profile) {
-        setHierarchy(buildHierarchyProfile(result.profile));
-      } else if (active) {
+
+    async function resolve() {
+      const result = await getCurrentUserProfile();
+      if (!active) return;
+
+      if (!result.profile) {
         setHierarchy({ ...LOADING_STATE, loading: false });
+        return;
       }
-    });
+
+      const profile = result.profile;
+
+      // Diagnostic logs
+      console.log("[useHierarchy] auth.uid:", profile.id);
+      console.log("[useHierarchy] campus_id:", profile.campusId);
+
+      // Explicit campus name resolution — do not rely on getAuthProfile's join result
+      // Query public.campuses directly whenever campus_id is present
+      let resolvedCampusName = profile.campus;
+
+      if (profile.campusId) {
+        const supabase = createClient();
+        const { data: campusRow, error: campusError } = await supabase
+          .from("campuses")
+          .select("name")
+          .eq("id", profile.campusId)
+          .maybeSingle<{ name: string | null }>();
+
+        console.log("[useHierarchy] campus query result:", campusRow, "error:", campusError?.message ?? null);
+
+        if (campusRow?.name) {
+          resolvedCampusName = campusRow.name;
+        }
+      }
+
+      console.log(
+        "[useHierarchy] final campusName:",
+        resolvedCampusName || (profile.campusId ? "(name lookup failed)" : "Campus not assigned")
+      );
+
+      if (!active) return;
+      setHierarchy(buildHierarchyProfile(profile, resolvedCampusName));
+    }
+
+    resolve();
     return () => {
       active = false;
     };
