@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 type SaveOnboardingBody = {
   accessToken: string;
@@ -28,6 +28,9 @@ type GroupRow = {
 };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Optional — when present, used only for campus resolution (bypasses RLS).
+// Normal user profile writes always use the authenticated user session.
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function isUUID(value: string): boolean {
@@ -37,6 +40,30 @@ function isUUID(value: string): boolean {
 function normalizeDesignation(value?: string | null): string {
   const trimmed = value?.trim();
   return trimmed ? trimmed : "None";
+}
+
+async function resolveCampus(
+  campusName: string,
+  campusIdHint: string,
+  client: SupabaseClient
+): Promise<CampusRow | null> {
+  const { data: byName } = await client
+    .from("campuses")
+    .select("id, subgroup_id, group_id")
+    .eq("name", campusName.trim())
+    .maybeSingle<CampusRow>();
+  if (byName?.id) return byName;
+
+  if (campusIdHint && isUUID(campusIdHint)) {
+    const { data: byId } = await client
+      .from("campuses")
+      .select("id, subgroup_id, group_id")
+      .eq("id", campusIdHint)
+      .maybeSingle<CampusRow>();
+    if (byId?.id) return byId;
+  }
+
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -54,73 +81,81 @@ export async function POST(request: Request) {
     return Response.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.error("[save-onboarding] Missing Supabase configuration.");
+  // NEXT_PUBLIC_* variables are always available — fail fast if missing.
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("[save-onboarding] NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is not set.");
     return Response.json({ error: "Server configuration error." }, { status: 500 });
   }
 
-  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  if (!supabaseServiceRoleKey) {
+    console.warn(
+      "[save-onboarding] SUPABASE_SERVICE_ROLE_KEY is not set — campus resolution will use the user session (RLS applies). " +
+        "Set this key in your environment to guarantee campus reads for all leader roles."
+    );
+  }
+
+  // ── Clients ───────────────────────────────────────────────────────────────
+  // userClient: acts as the authenticated user — respects RLS (user can update own row).
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // adminClient: bypasses RLS — used only for campus resolution and preseeded-user lookups.
+  const adminClient = supabaseServiceRoleKey
+    ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+    : null;
+
   // ── 1. Verify JWT ─────────────────────────────────────────────────────────
-  const { data: authData, error: verifyError } = await adminClient.auth.getUser(accessToken);
+  const { data: authData, error: verifyError } = await (adminClient ?? userClient).auth.getUser(
+    accessToken
+  );
   if (verifyError || !authData.user) {
     console.error("[save-onboarding] JWT verification failed.", verifyError?.message);
     return Response.json({ error: "Invalid or expired session." }, { status: 401 });
   }
 
   const userId = authData.user.id;
-  const userEmail = authData.user.email ?? rest.email?.trim() ?? "";
+  const userEmail = authData.user.email ?? (rest.email ?? "").trim();
 
-  // ── 2. Resolve campus UUID via service role (bypasses RLS) ───────────────
-  let resolvedCampusId: string | null = null;
-  let resolvedSubgroupId: string | null = null;
-  let resolvedGroupId: string | null = null;
-
-  // Primary: look up by name
-  const { data: campusByName } = await adminClient
-    .from("campuses")
-    .select("id, subgroup_id, group_id")
-    .eq("name", campusName.trim())
-    .maybeSingle<CampusRow>();
-
-  if (campusByName?.id) {
-    resolvedCampusId = campusByName.id;
-    resolvedSubgroupId = campusByName.subgroup_id;
-    resolvedGroupId = campusByName.group_id;
-  } else if (campusIdHint && isUUID(campusIdHint)) {
-    // Secondary: campusIdHint is a real UUID — look up by id
-    const { data: campusById } = await adminClient
-      .from("campuses")
-      .select("id, subgroup_id, group_id")
-      .eq("id", campusIdHint)
-      .maybeSingle<CampusRow>();
-
-    if (campusById?.id) {
-      resolvedCampusId = campusById.id;
-      resolvedSubgroupId = campusById.subgroup_id;
-      resolvedGroupId = campusById.group_id;
-    }
+  // ── 2. Campus resolution ──────────────────────────────────────────────────
+  // Try admin client first (bypasses RLS). If unavailable or unsuccessful, try user session.
+  let campus: CampusRow | null = null;
+  if (adminClient) {
+    campus = await resolveCampus(campusName, campusIdHint, adminClient);
+  }
+  if (!campus) {
+    campus = await resolveCampus(campusName, campusIdHint, userClient);
   }
 
   console.log("[save-onboarding] campus resolution:", {
     userId,
     campusName,
     campusIdHint,
-    resolvedCampusId,
+    resolvedCampusId: campus?.id ?? null,
+    usedAdmin: Boolean(adminClient),
   });
 
-  if (!resolvedCampusId) {
+  if (!campus?.id) {
     return Response.json(
-      { error: "We could not find your selected campus. Please go back and re-select your campus." },
+      {
+        error:
+          "We could not find your selected campus. Please go back to Ministry Information and re-select your campus.",
+      },
       { status: 422 }
     );
   }
 
+  const resolvedCampusId = campus.id;
+  const resolvedSubgroupId = campus.subgroup_id;
+  const resolvedGroupId = campus.group_id;
+
   // ── 3. Campus Pastor claim check ─────────────────────────────────────────
   if (role === "Campus Pastor") {
-    const { data: claimRows } = await adminClient
+    const claimClient = adminClient ?? userClient;
+    const { data: claimRows } = await claimClient
       .from("users")
       .select("campus_id")
       .eq("role", "Campus Pastor")
@@ -141,10 +176,11 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── 4. Resolve organization_id from group ────────────────────────────────
+  // ── 4. Resolve organization_id from group ─────────────────────────────────
   let organizationId: string | null = null;
   if (resolvedGroupId) {
-    const { data: groupRow } = await adminClient
+    const orgClient = adminClient ?? userClient;
+    const { data: groupRow } = await orgClient
       .from("groups")
       .select("organization_id")
       .eq("id", resolvedGroupId)
@@ -152,7 +188,7 @@ export async function POST(request: Request) {
     organizationId = groupRow?.organization_id ?? null;
   }
 
-  // ── 5. Build update payload ───────────────────────────────────────────────
+  // ── 5. Build update payload (no campus/subgroup/group text columns) ────────
   const updatePayload: Record<string, unknown> = {
     email: userEmail,
     designation: normalizeDesignation(rest.designation),
@@ -175,8 +211,9 @@ export async function POST(request: Request) {
     updatePayload.role_id = roleId;
   }
 
-  // ── 6. UPDATE by auth uid (normal self-signup path) ──────────────────────
-  const { data: existingRow } = await adminClient
+  // ── 6. UPDATE by auth uid (normal self-signup path) ───────────────────────
+  // Use the user session — RLS allows each user to update their own row.
+  const { data: existingRow } = await userClient
     .from("users")
     .select("id")
     .eq("id", userId)
@@ -184,13 +221,13 @@ export async function POST(request: Request) {
 
   if (existingRow?.id) {
     console.log("[save-onboarding] path: UPDATE by id", userId);
-    const { error: updateError } = await adminClient
+    const { error: updateError } = await userClient
       .from("users")
       .update(updatePayload)
       .eq("id", userId);
 
     if (updateError) {
-      console.error("[save-onboarding] UPDATE by id failed:", updateError.message);
+      console.error("[save-onboarding] UPDATE by id failed:", updateError.message, updateError.details);
       return Response.json({ error: updateError.message }, { status: 500 });
     }
 
@@ -198,16 +235,20 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, campus_id: resolvedCampusId });
   }
 
-  // ── 7. Pre-seeded user: UPDATE by email (row exists with a different id) ──
-  const { data: emailRow } = await adminClient
+  // ── 7. Pre-seeded user: UPDATE by email ───────────────────────────────────
+  // Row exists with a different id (admin pre-created). Requires admin client to
+  // bypass RLS (the user session can't update a row where auth.uid() ≠ id).
+  const lookupClient = adminClient ?? userClient;
+  const { data: emailRow } = await lookupClient
     .from("users")
     .select("id")
     .eq("email", userEmail)
     .maybeSingle<{ id: string }>();
 
   if (emailRow?.id) {
-    console.log("[save-onboarding] path: UPDATE by email (preseeded row)", userEmail);
-    const { error: updateError } = await adminClient
+    console.log("[save-onboarding] path: UPDATE by email (preseeded)", userEmail);
+    const writeClient = adminClient ?? userClient;
+    const { error: updateError } = await writeClient
       .from("users")
       .update(updatePayload)
       .eq("email", userEmail);
@@ -221,7 +262,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, campus_id: resolvedCampusId });
   }
 
-  // ── 8. No existing row — should not occur if ensureUserProfile ran ────────
+  // ── 8. No row found ───────────────────────────────────────────────────────
   console.error("[save-onboarding] No user row found for", { userId, userEmail });
   return Response.json(
     { error: "Academy profile not found. Please try signing in again." },

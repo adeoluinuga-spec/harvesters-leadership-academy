@@ -34,8 +34,14 @@ export async function GET(request: Request) {
   }
 
   if (!supabaseUrl || !supabaseServiceRoleKey) {
-    console.error("[api/auth/campuses] Missing Supabase configuration.");
-    return Response.json({ error: "Server configuration error." }, { status: 500 });
+    // Service role key is required for this route (RLS bypass). Without it, return
+    // empty so fetchMinistryCampuses falls back to its hardcoded data gracefully.
+    if (!supabaseServiceRoleKey) {
+      console.warn("[api/auth/campuses] SUPABASE_SERVICE_ROLE_KEY not set — returning empty campus list.");
+    } else {
+      console.error("[api/auth/campuses] NEXT_PUBLIC_SUPABASE_URL not set.");
+    }
+    return Response.json({ campuses: [] });
   }
 
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
