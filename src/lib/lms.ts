@@ -24,6 +24,9 @@ const LEADERSHIP_LEVEL: Record<string, number> = {
   "Zonal Leader / HOD": 1,
   "Community Leader": 2,
   "Area Leader": 3,
+  "District Pastor": 3,
+  "Pastoral Leader": 3,
+  "District Pastor / Pastoral Leader": 3,
   "Directional Leader": 4,
   "Campus Pastor": 5,
   "Campus Admin": 5,
@@ -40,25 +43,49 @@ export function getLeadershipLevel(role: string): number {
   return LEADERSHIP_LEVEL[role] ?? 0;
 }
 
-// All spelling variants of "Sub-Group Pastor" that may be stored in the DB
-// or entered in leadership_targets.
-const SUBGROUP_PASTOR_VARIANTS = new Set([
-  "Sub-Group Pastor",
-  "Subgroup Pastor",
-  "Sub-group Pastor",
+// Sentinel values that mean "visible to all authenticated leaders"
+const ALL_LEADERS_TARGETS = new Set([
+  "All Leaders",
+  "All leaders",
+  "all leaders",
+  "All",
 ]);
 
-function normalizeRoleVariant(role: string): string {
-  return SUBGROUP_PASTOR_VARIANTS.has(role) ? "Sub-Group Pastor" : role;
+// Normalise any spelling variant of a role to a single canonical form so that
+// target matching works regardless of how the role was stored.
+function normalizeRoleForCourse(role: string): string {
+  // Sub-Group Pastor variants
+  if (role === "Sub-Group Pastor" || role === "Subgroup Pastor" || role === "Sub-group Pastor") {
+    return "Sub-Group Pastor";
+  }
+  // Cell Leader variants
+  if (role === "Cell Leader" || role === "Assistant HOD" || role === "Cell Leader / Assistant HOD") {
+    return "Cell Leader / Assistant HOD";
+  }
+  // Zonal Leader variants
+  if (role === "Zonal Leader" || role === "HOD" || role === "Zonal Leader / HOD") {
+    return "Zonal Leader / HOD";
+  }
+  // District Pastor variants
+  if (
+    role === "District Pastor" ||
+    role === "Pastoral Leader" ||
+    role === "District Pastor / Pastoral Leader"
+  ) {
+    return "District Pastor / Pastoral Leader";
+  }
+  return role;
 }
 
 export function canUserSeeCourse(userRole: string, targets: string[]): boolean {
   if (!targets || targets.length === 0) return true;
-  // Admin-level roles can always see all published courses
+  // Admin-level roles always see every published course
   if (["Platform Super Admin", "Super Admin", "Admin"].includes(userRole)) return true;
-  // Normalize both sides to handle all role spelling variants
-  const normalized = normalizeRoleVariant(userRole);
-  return targets.some((t) => normalizeRoleVariant(t) === normalized);
+  // "All Leaders" wildcard in targets — visible to every leader
+  if (targets.some((t) => ALL_LEADERS_TARGETS.has(t))) return true;
+  // Role match with full variant normalisation on both sides
+  const normalized = normalizeRoleForCourse(userRole);
+  return targets.some((t) => normalizeRoleForCourse(t) === normalized);
 }
 
 export async function getCurrentUserRole(): Promise<{ role: string; level: number }> {
@@ -186,10 +213,10 @@ export async function fetchCourseCatalog(): Promise<CatalogCourses> {
   );
 
   const required = visible.filter((c) => c.is_required);
-  const normalizedUserRole = normalizeRoleVariant(userRole);
+  const normalizedUserRole = normalizeRoleForCourse(userRole);
   const pathway = visible.filter(
     (c) => !c.is_required && (c.leadership_targets ?? []).some(
-      (t) => normalizeRoleVariant(t) === normalizedUserRole
+      (t) => normalizeRoleForCourse(t) === normalizedUserRole
     )
   );
 

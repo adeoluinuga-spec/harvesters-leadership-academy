@@ -537,7 +537,45 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
     updatePayload.campus_id = input.campus.id;
     if (input.campus.subgroupId) updatePayload.subgroup_id = input.campus.subgroupId;
     if (input.campus.groupId) updatePayload.group_id = input.campus.groupId;
+  } else {
+    // Fallback campus: the onboarding page couldn't fetch from Supabase (likely RLS).
+    // Try to resolve the real campus UUID by name at save time using the service call.
+    const { data: resolvedCampus } = await supabase
+      .from("campuses")
+      .select("id, subgroup_id, group_id")
+      .eq("name", input.campus.name)
+      .maybeSingle<{ id: string; subgroup_id: string | null; group_id: string | null }>();
+
+    if (resolvedCampus?.id) {
+      updatePayload.campus_id = resolvedCampus.id;
+      if (resolvedCampus.subgroup_id) updatePayload.subgroup_id = resolvedCampus.subgroup_id;
+      if (resolvedCampus.group_id) updatePayload.group_id = resolvedCampus.group_id;
+
+      // Also resolve organization_id from group
+      if (resolvedCampus.group_id) {
+        const { data: groupRow } = await supabase
+          .from("groups")
+          .select("organization_id")
+          .eq("id", resolvedCampus.group_id)
+          .maybeSingle<{ organization_id?: string | null }>();
+        if (groupRow?.organization_id) updatePayload.organization_id = groupRow.organization_id;
+      }
+    }
+
+    console.log("[saveOnboardingProfile] fallback campus resolve:", {
+      name: input.campus.name,
+      resolvedId: resolvedCampus?.id ?? null,
+    });
   }
+
+  console.log("[saveOnboardingProfile] payload campus fields:", {
+    userId: authData.user.id,
+    role: input.role,
+    campus_source: input.campus.source,
+    campus_id: updatePayload.campus_id ?? null,
+    subgroup_id: updatePayload.subgroup_id ?? null,
+    group_id: updatePayload.group_id ?? null,
+  });
 
   const userEmail = authData.user.email ?? input.email.trim();
 
@@ -551,14 +589,17 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
 
   if (existingRow?.id) {
     // Row exists by id: UPDATE only — cannot produce a duplicate-email error.
+    console.log("[saveOnboardingProfile] path: UPDATE by id", authData.user.id);
     const { error: updateError } = await supabase
       .from("users")
       .update(updatePayload)
       .eq("id", authData.user.id);
 
     if (updateError) {
+      console.error("[saveOnboardingProfile] UPDATE by id failed:", updateError.message);
       throw new Error(updateError.message);
     }
+    console.log("[saveOnboardingProfile] UPDATE by id succeeded");
     return;
   }
 
@@ -573,14 +614,17 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
 
   if (emailRow?.id) {
     // Row exists by email (different id): UPDATE by email.
+    console.log("[saveOnboardingProfile] path: UPDATE by email (different id)");
     const { error: updateError } = await supabase
       .from("users")
       .update(updatePayload)
       .eq("email", userEmail);
 
     if (updateError) {
+      console.error("[saveOnboardingProfile] UPDATE by email failed:", updateError.message);
       throw new Error(updateError.message);
     }
+    console.log("[saveOnboardingProfile] UPDATE by email succeeded");
     return;
   }
 

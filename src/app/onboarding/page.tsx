@@ -286,9 +286,35 @@ export default function OnboardingPage() {
         yearsInMinistry: null,
       });
 
+      // Re-fetch profile to verify save and obtain the authoritative DB role/campus
+      const supabase = createClient();
+      const refreshed = await getCurrentUserProfile();
+      const savedProfile = refreshed.profile;
+
+      console.log("[onboarding] auth.uid:", savedProfile?.id ?? "unknown");
+      console.log("[onboarding] role:", savedProfile?.role ?? "unknown");
+      console.log("[onboarding] campus_id:", savedProfile?.campusId ?? null);
+      console.log("[onboarding] subgroup_id:", savedProfile?.subgroupId ?? null);
+      console.log("[onboarding] group_id:", savedProfile?.groupId ?? null);
+
+      // Explicit campus name resolution for the log
+      let resolvedCampusName = savedProfile?.campus ?? "";
+      if (savedProfile?.campusId && !savedProfile?.campus) {
+        const { data: campusRow } = await supabase
+          .from("campuses")
+          .select("name")
+          .eq("id", savedProfile.campusId)
+          .maybeSingle<{ name: string | null }>();
+        resolvedCampusName = campusRow?.name ?? "";
+      }
+      console.log("[onboarding] resolved campus name:", resolvedCampusName || "(not resolved)");
+
+      const dashRoute = dashboardForAuthRole(savedProfile?.role ?? selectedRole);
+      console.log("[onboarding] final dashboard route:", dashRoute);
+
       setSuccessMessage("Profile saved. Routing you to your dashboard...");
       window.localStorage.setItem("harvesters_profile_incomplete", "false");
-      router.push(dashboardForAuthRole(selectedRole));
+      router.push(dashRoute);
     } catch (saveError) {
       setUploadingAvatar(false);
       setError(

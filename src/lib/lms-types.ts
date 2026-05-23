@@ -2,12 +2,16 @@ export type CourseStatus = "draft" | "published" | "archived";
 export type CourseDifficulty = "Foundational" | "Intermediate" | "Advanced" | "Executive";
 
 export const LEADERSHIP_CADRES = [
+  "All Leaders",
   "Cell Leader",
   "Assistant HOD",
+  "Cell Leader / Assistant HOD",
   "Zonal Leader",
   "HOD",
+  "Zonal Leader / HOD",
   "Community Leader",
   "Area Leader",
+  "District Pastor / Pastoral Leader",
   "Directional Leader",
   "Campus Pastor",
   "Subgroup Pastor",
