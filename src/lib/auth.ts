@@ -308,7 +308,7 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
       : Promise.resolve(null),
   ]);
 
-  const campusName = campusRow?.name ?? null;
+  const campusName = campusRow?.name ?? (data?.campus || null);
   const subgroupName = subgroupRow?.name ?? null;
   const groupName = groupRow?.name ?? null;
   const campusPastor = campusRow?.campus_pastor ?? campusRow?.pastor ?? null;
@@ -403,6 +403,29 @@ export async function fetchMinistryCampuses(): Promise<MinistryCampusOption[]> {
     .order("name");
 
   if (error || !data?.length) {
+    // Direct query failed (likely RLS blocks campus read for this role).
+    // Try the server-side API route which uses the service role key to bypass RLS.
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (token) {
+        const response = await fetch("/api/auth/campuses", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const json = (await response.json()) as {
+            campuses?: Array<Omit<MinistryCampusOption, "source">>;
+          };
+          if (json.campuses?.length) {
+            console.log("[fetchMinistryCampuses] resolved via API route:", json.campuses.length, "campuses");
+            return json.campuses.map((campus) => ({ ...campus, source: "supabase" as const }));
+          }
+        }
+      }
+    } catch (apiError) {
+      console.warn("[fetchMinistryCampuses] API route fallback failed:", apiError);
+    }
+
     return fallbackCampuses.map((campus) => ({
       id: campus.id,
       name: campus.name,
@@ -511,6 +534,7 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
     phone: input.phone,
     gender: input.gender,
     role: input.role,
+    campus: input.campus.name,
     current_leadership_role: input.currentLeadershipRole,
     aspirational_leadership_role: input.aspirationalLeadershipRole,
     years_in_ministry: input.yearsInMinistry,
