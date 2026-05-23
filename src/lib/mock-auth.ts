@@ -32,8 +32,15 @@ export type LeadershipAspiration =
   | "Cell Leader"
   | "Zonal Leader / HOD"
   | "Community Leader"
+  | "Area Leader"
+  | "District Pastor / Pastoral Leader"
   | "Pastoral Leadership"
-  | "Directional Leadership";
+  | "Directional Leadership"
+  | "Directional Leader"
+  | "Campus Pastor"
+  | "Sub-Group Pastor"
+  | "Group Pastor"
+  | "Higher Strategic Leadership";
 
 export type MockLeadershipProfile = {
   avatarUrl?: string;
@@ -110,12 +117,28 @@ export const currentLeadershipRoles: CurrentLeadershipRole[] = [
 ];
 
 export const leadershipAspirations: LeadershipAspiration[] = [
-  "Cell Leader",
   "Zonal Leader / HOD",
   "Community Leader",
-  "Pastoral Leadership",
-  "Directional Leadership",
+  "Area Leader",
+  "District Pastor / Pastoral Leader",
+  "Directional Leader",
+  "Campus Pastor",
+  "Sub-Group Pastor",
+  "Group Pastor",
+  "Higher Strategic Leadership",
 ];
+
+export const nextLeadershipRoleMap: Partial<Record<MockRole, LeadershipAspiration>> = {
+  "Cell Leader / Assistant HOD": "Zonal Leader / HOD",
+  "Zonal Leader / HOD": "Community Leader",
+  "Community Leader": "Area Leader",
+  "Area Leader": "District Pastor / Pastoral Leader",
+  "District Pastor / Pastoral Leader": "Directional Leader",
+  "Directional Leader": "Campus Pastor",
+  "Campus Pastor": "Sub-Group Pastor",
+  "Sub-Group Pastor": "Group Pastor",
+  "Group Pastor": "Higher Strategic Leadership",
+};
 
 export const defaultLeadershipProfile: MockLeadershipProfile = {
   campus: "Ilupeju Campus",

@@ -67,8 +67,8 @@ function buildHierarchyProfile(profile: AuthProfile): HierarchyProfile {
     role: profile.role ?? "",
     fullName: profile.fullName ?? "",
     firstName,
-    // Show "not assigned" ONLY when the ID is truly null — not when name lookup failed
-    campusName: profile.campus || (profile.campusId ? "Campus not assigned" : "Campus not assigned"),
+    // Show "not assigned" ONLY when campus_id is truly null — not when name lookup failed
+    campusName: profile.campus || (profile.campusId ? "" : "Campus not assigned"),
     subgroupName: profile.subgroup || "Subgroup not assigned",
     groupName: profile.group || "Group not assigned",
     campusPastor: profile.campusPastor || "",

@@ -137,7 +137,7 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
           {[
             ["Current leadership role", currentRole],
             ["Leadership aspiration", aspiration],
-            ["Learning context", profile?.campus || "Campus not assigned"],
+            ["Learning context", profile?.campus || (profile?.campusId ? "" : "Campus not assigned")],
           ].map(([label, value]) => (
             <div key={label} className="rounded-lg border border-zinc-100 bg-zinc-50 p-4">
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">

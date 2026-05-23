@@ -12,11 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { roles } from "@/lib/role-data";
 import {
-  currentLeadershipRoles,
-  leadershipAspirations,
   CurrentLeadershipRole,
+  leadershipAspirations,
   LeadershipAspiration,
   MockRole,
+  nextLeadershipRoleMap,
   selfOnboardingRoles,
 } from "@/lib/mock-auth";
 import {
@@ -31,21 +31,20 @@ import {
 } from "@/lib/auth";
 import { createClient } from "@/lib/client";
 
-const steps = ["Basic Information", "Ministry Information", "Leadership Profile", "Confirmation"];
+const steps = ["Basic Information", "Ministry Information", "Confirmation"];
+
+const leadershipRoleValues = new Set([
+  "Cell Leader / Assistant HOD", "Zonal Leader / HOD", "Community Leader",
+  "Area Leader", "District Pastor / Pastoral Leader", "Directional Leader",
+  "Campus Pastor", "Sub-Group Pastor", "Group Pastor",
+]);
+
+function derivedCurrentLeadershipRole(role: MockRole): CurrentLeadershipRole {
+  return leadershipRoleValues.has(role) ? (role as CurrentLeadershipRole) : "None";
+}
 const designationOptions = ["Pastor", "Dcns", "Dcn", "Minister", "Pst", "Bro", "Sis", "None"];
 const acceptedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxAvatarSize = 5 * 1024 * 1024;
-const pathway = [
-  "Cell Leader / Assistant HOD",
-  "Zonal Leader / HOD",
-  "Community Leader",
-  "Area Leader",
-  "District Pastor / Pastoral Leader",
-  "Directional Leader",
-  "Campus Pastor",
-  "Sub-Group Pastor",
-  "Group Pastor",
-];
 
 function campusOptionLabel(campus: MinistryCampusOption): string {
   const parts = [campus.name];
@@ -80,13 +79,10 @@ export default function OnboardingPage() {
   const [assignedRole, setAssignedRole] = useState<MockRole | null>(null);
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
-  const [yearsInMinistry, setYearsInMinistry] = useState("");
   const [campusOptions, setCampusOptions] = useState<MinistryCampusOption[]>([]);
   const [claimedCampusIds, setClaimedCampusIds] = useState<Set<string>>(new Set());
   const [roleOptions, setRoleOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedCampusId, setSelectedCampusId] = useState("");
-  const [currentLeadershipRole, setCurrentLeadershipRole] =
-    useState<CurrentLeadershipRole>("Cell Leader / Assistant HOD");
   const [leadershipAspiration, setLeadershipAspiration] =
     useState<LeadershipAspiration>("Zonal Leader / HOD");
 
@@ -185,6 +181,12 @@ export default function OnboardingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCampusPastor]);
 
+  // Auto-suggest the next leadership level whenever the selected role changes
+  useEffect(() => {
+    const suggested = nextLeadershipRoleMap[selectedRole];
+    if (suggested) setLeadershipAspiration(suggested);
+  }, [selectedRole]);
+
   function handleAvatarChange(file?: File) {
     setError("");
     setSuccessMessage("");
@@ -279,9 +281,9 @@ export default function OnboardingPage() {
         campus: selectedCampusRecord,
         roleId: selectedRoleOption?.id ?? null,
         role: selectedRole,
-        currentLeadershipRole,
+        currentLeadershipRole: derivedCurrentLeadershipRole(selectedRole),
         aspirationalLeadershipRole: leadershipAspiration,
-        yearsInMinistry: yearsInMinistry ? Number(yearsInMinistry) : null,
+        yearsInMinistry: null,
       });
 
       setSuccessMessage("Profile saved. Routing you to your dashboard...");
@@ -641,29 +643,13 @@ export default function OnboardingPage() {
                     })}
                   </div>
                 </div>
-              </div>
-            ) : null}
 
-            {/* ── Step 2: Leadership Profile ─────────────────────── */}
-            {step === 2 ? (
-              <div className="grid gap-4">
-                <label>
-                  <span className="mb-2 block text-sm font-medium text-zinc-700">Current Leadership Role</span>
-                  <select
-                    value={currentLeadershipRole}
-                    disabled={saving}
-                    onChange={(event) => setCurrentLeadershipRole(event.target.value as CurrentLeadershipRole)}
-                    className="h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-950 outline-none transition-all focus:border-zinc-300 focus:ring-3 focus:ring-zinc-300/40"
-                  >
-                    {currentLeadershipRoles.map((role) => (
-                      <option key={role} value={role}>{role}</option>
-                    ))}
-                  </select>
-                </label>
+                {/* Leadership growth question */}
                 <label>
                   <span className="mb-2 block text-sm font-medium text-zinc-700">
-                    What leadership level are you preparing for?
+                    What role are you preparing for?
                   </span>
+                  <p className="mb-2 text-xs text-zinc-500">Suggested based on your current role — adjust if needed.</p>
                   <select
                     value={leadershipAspiration}
                     disabled={saving}
@@ -675,44 +661,11 @@ export default function OnboardingPage() {
                     ))}
                   </select>
                 </label>
-                <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
-                  <p className="font-heading font-semibold text-zinc-950">Leadership pathway</p>
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {pathway.map((level, index) => (
-                      <div key={level} className="flex items-center gap-2">
-                        <span className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700">
-                          {level}
-                        </span>
-                        {index < pathway.length - 1 ? (
-                          <span className="text-xs text-zinc-400">-&gt;</span>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <label>
-                  <span className="mb-2 block text-sm font-medium text-zinc-700">Years in ministry</span>
-                  <Input
-                    className="h-11 rounded-lg border-zinc-200 bg-zinc-50"
-                    placeholder="Add years in ministry"
-                    type="number"
-                    min="0"
-                    value={yearsInMinistry}
-                    disabled={saving}
-                    onChange={(event) => setYearsInMinistry(event.target.value)}
-                  />
-                </label>
-                {["Leadership interests", "Ministry strengths", "Growth goals"].map((label) => (
-                  <label key={label}>
-                    <span className="mb-2 block text-sm font-medium text-zinc-700">{label}</span>
-                    <Input className="h-11 rounded-lg border-zinc-200 bg-zinc-50" placeholder={`Add ${label.toLowerCase()}`} disabled={saving} />
-                  </label>
-                ))}
               </div>
             ) : null}
 
-            {/* ── Step 3: Confirmation ───────────────────────────── */}
-            {step === 3 ? (
+            {/* ── Step 2: Confirmation ───────────────────────────── */}
+            {step === 2 ? (
               <div className="space-y-5">
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5">
                   <CheckCircle2 className="mb-4 size-7 text-emerald-700" />
@@ -745,7 +698,6 @@ export default function OnboardingPage() {
                           ["Campus Pastor", selectedCampusRecord?.campusPastor],
                           ["Sub-Group Pastor", selectedCampusRecord?.subgroupPastor],
                           ["Group Pastor", selectedCampusRecord?.groupPastor],
-                          ["Current Leadership Role", currentLeadershipRole],
                           ["Preparing For", leadershipAspiration],
                         ]
                       : []),
