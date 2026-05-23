@@ -503,190 +503,57 @@ export async function fetchLookupOptions(table: "roles"): Promise<MinistryLookup
     .filter((row) => row.id && row.name);
 }
 
-export async function saveOnboardingProfile(input: OnboardingProfileInput) {
-  if (!input.campus.id || !input.campus.name) {
+export async function saveOnboardingProfile(input: OnboardingProfileInput): Promise<void> {
+  if (!input.campus.name?.trim()) {
     throw new Error("Please select a valid campus before continuing.");
   }
 
   const supabase = createClient();
-  const { data: authData, error: authError } = await supabase.auth.getUser();
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
-  if (authError || !authData.user) {
+  if (sessionError || !sessionData.session?.access_token) {
     throw new Error("Your session has expired. Please sign in again before completing onboarding.");
   }
 
-  // Campus Pastor must claim a campus that is not already taken
-  if (input.role === "Campus Pastor" && input.campus.source === "supabase" && input.campus.id) {
-    const claimedIds = await fetchClaimedCampusIds(authData.user.id);
-    if (claimedIds.has(input.campus.id)) {
-      throw new Error(
-        "This campus is already claimed by another Campus Pastor. Please select a different campus or contact your Platform Super Admin."
-      );
-    }
-  }
+  const token = sessionData.session.access_token;
 
-  // Build the update payload — does NOT include id or created_at (immutable fields)
-  const updatePayload: Record<string, unknown> = {
-    email: input.email.trim(),
-    designation: normalizeDesignation(input.designation),
-    full_name: input.fullName.trim(),
-    avatar_url: input.avatarUrl,
-    phone: input.phone,
-    gender: input.gender,
-    role: input.role,
-    current_leadership_role: input.currentLeadershipRole,
-    aspirational_leadership_role: input.aspirationalLeadershipRole,
-    years_in_ministry: input.yearsInMinistry,
-    onboarding_completed: true,
-  };
-
-  if (input.campus.source === "supabase" && input.campus.groupId) {
-    const { data: groupRow } = await supabase
-      .from("groups")
-      .select("organization_id")
-      .eq("id", input.campus.groupId)
-      .maybeSingle<{ organization_id?: string | null }>();
-
-    if (groupRow?.organization_id) {
-      updatePayload.organization_id = groupRow.organization_id;
-    }
-  }
-
-  if (input.roleId) {
-    updatePayload.role_id = input.roleId;
-  }
-
-  if (input.campus.source === "supabase") {
-    updatePayload.campus_id = input.campus.id;
-    if (input.campus.subgroupId) updatePayload.subgroup_id = input.campus.subgroupId;
-    if (input.campus.groupId) updatePayload.group_id = input.campus.groupId;
-  } else {
-    // Fallback campus: the onboarding page couldn't fetch from Supabase (likely RLS).
-    // Try to resolve the real campus UUID by name at save time using the service call.
-    const { data: resolvedCampus } = await supabase
-      .from("campuses")
-      .select("id, subgroup_id, group_id")
-      .eq("name", input.campus.name)
-      .maybeSingle<{ id: string; subgroup_id: string | null; group_id: string | null }>();
-
-    if (resolvedCampus?.id) {
-      updatePayload.campus_id = resolvedCampus.id;
-      if (resolvedCampus.subgroup_id) updatePayload.subgroup_id = resolvedCampus.subgroup_id;
-      if (resolvedCampus.group_id) updatePayload.group_id = resolvedCampus.group_id;
-
-      // Also resolve organization_id from group
-      if (resolvedCampus.group_id) {
-        const { data: groupRow } = await supabase
-          .from("groups")
-          .select("organization_id")
-          .eq("id", resolvedCampus.group_id)
-          .maybeSingle<{ organization_id?: string | null }>();
-        if (groupRow?.organization_id) updatePayload.organization_id = groupRow.organization_id;
-      }
-    }
-
-    console.log("[saveOnboardingProfile] fallback campus resolve:", {
-      name: input.campus.name,
-      resolvedId: resolvedCampus?.id ?? null,
-    });
-  }
-
-  console.log("[saveOnboardingProfile] payload campus fields:", {
-    userId: authData.user.id,
-    role: input.role,
-    campus_source: input.campus.source,
-    campus_id: updatePayload.campus_id ?? null,
-    subgroup_id: updatePayload.subgroup_id ?? null,
-    group_id: updatePayload.group_id ?? null,
+  // Delegate all campus resolution and DB writes to the server-side API route.
+  // The route uses the service role key, which bypasses RLS on public.campuses
+  // so campus_id / subgroup_id / group_id are always resolved from real DB rows.
+  const response = await fetch("/api/auth/save-onboarding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      accessToken: token,
+      campusName: input.campus.name,
+      campusIdHint: input.campus.id,
+      role: input.role,
+      roleId: input.roleId ?? null,
+      designation: input.designation,
+      fullName: input.fullName,
+      email: input.email,
+      avatarUrl: input.avatarUrl,
+      phone: input.phone,
+      gender: input.gender,
+      currentLeadershipRole: input.currentLeadershipRole,
+      aspirationalLeadershipRole: input.aspirationalLeadershipRole,
+      yearsInMinistry: input.yearsInMinistry ?? null,
+    }),
   });
 
-  const userEmail = authData.user.email ?? input.email.trim();
-
-  // ── Step 1: check whether the public.users row already exists by auth uid ──
-  // UPDATE never triggers the email unique constraint (modifying an existing row).
-  const { data: existingRow } = await supabase
-    .from("users")
-    .select("id")
-    .eq("id", authData.user.id)
-    .maybeSingle<{ id: string }>();
-
-  if (existingRow?.id) {
-    // Row exists by id: UPDATE only — cannot produce a duplicate-email error.
-    console.log("[saveOnboardingProfile] path: UPDATE by id", authData.user.id);
-    const { error: updateError } = await supabase
-      .from("users")
-      .update(updatePayload)
-      .eq("id", authData.user.id);
-
-    if (updateError) {
-      console.error("[saveOnboardingProfile] UPDATE by id failed:", updateError.message);
-      throw new Error(updateError.message);
-    }
-    console.log("[saveOnboardingProfile] UPDATE by id succeeded");
-    return;
-  }
-
-  // ── Step 2: check by email (preseed case — row exists with a different id) ──
-  // Campus Pastors and other pre-seeded roles may have a public.users row created
-  // by an admin with a different UUID. Detect this before attempting an insert.
-  const { data: emailRow } = await supabase
-    .from("users")
-    .select("id")
-    .eq("email", userEmail)
-    .maybeSingle<{ id: string }>();
-
-  if (emailRow?.id) {
-    // Row exists by email (different id): UPDATE by email.
-    console.log("[saveOnboardingProfile] path: UPDATE by email (different id)");
-    const { error: updateError } = await supabase
-      .from("users")
-      .update(updatePayload)
-      .eq("email", userEmail);
-
-    if (updateError) {
-      console.error("[saveOnboardingProfile] UPDATE by email failed:", updateError.message);
-      throw new Error(updateError.message);
-    }
-    console.log("[saveOnboardingProfile] UPDATE by email succeeded");
-    return;
-  }
-
-  // ── Step 3: no row found by id or email — INSERT via upsert on id ──────────
-  // onConflict: "id" ensures a concurrent row creation is handled gracefully.
-  // We never use email as the conflict target.
-  const { error: upsertError } = await supabase
-    .from("users")
-    .upsert(
-      {
-        id: authData.user.id,
-        email: userEmail,
-        created_at: new Date().toISOString(),
-        ...updatePayload,
-      },
-      { onConflict: "id" }
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => ({ error: "Save failed." }));
+    throw new Error(
+      (errorJson as { error?: string }).error ?? "We could not save your ministry profile. Please try again."
     );
+  }
 
-  if (upsertError) {
-    // Final recovery: if email uniqueness was violated by a concurrent insert,
-    // fall back to updating by email.
-    const isEmailConflict =
-      upsertError.code === "23505" ||
-      upsertError.message.includes("users_email_key") ||
-      upsertError.message.includes("duplicate key");
+  const result = (await response.json()) as { ok: boolean; campus_id: string | null };
 
-    if (isEmailConflict) {
-      const { error: recoveryError } = await supabase
-        .from("users")
-        .update(updatePayload)
-        .eq("email", userEmail);
-
-      if (recoveryError) {
-        throw new Error(recoveryError.message);
-      }
-      return;
-    }
-
-    throw new Error(upsertError.message);
+  if (!result.campus_id) {
+    throw new Error(
+      "Campus assignment could not be completed. Please go back and re-select your campus."
+    );
   }
 }
 
