@@ -534,7 +534,6 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput) {
     phone: input.phone,
     gender: input.gender,
     role: input.role,
-    campus: input.campus.name,
     current_leadership_role: input.currentLeadershipRole,
     aspirational_leadership_role: input.aspirationalLeadershipRole,
     years_in_ministry: input.yearsInMinistry,
