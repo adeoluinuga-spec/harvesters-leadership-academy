@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/server";
 
+const ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];
+
 export async function POST(request: Request) {
   let body: { course_id?: string };
   try {
@@ -20,6 +22,16 @@ export async function POST(request: Request) {
 
   if (authError || !user) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (ADMIN_ROLES.includes(profile?.role ?? "")) {
+    return Response.json({ error: "Administrators do not enrol in courses." }, { status: 403 });
   }
 
   const { data: course } = await supabase

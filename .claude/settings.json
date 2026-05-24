@@ -15,10 +15,15 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\hp\\\\Desktop\\\\harvesters-academy\" -Recurse -ErrorAction SilentlyContinue)",
       "Bash(xargs grep -l \"campus\")",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(mkdir -p \"c:\\\\Users\\\\hp\\\\Desktop\\\\harvesters-academy\\\\src\\\\app\\\\dashboard\\\\admin\\\\courses\\\\[id]\\\\assessment\")",
+      "Bash(mkdir -p \"c:\\\\Users\\\\hp\\\\Desktop\\\\harvesters-academy\\\\src\\\\app\\\\verify\\\\[certNumber]\")",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\hp\\.claude\\projects\\c--Users-hp-Desktop-harvesters-academy\\memory"
+      "c:\\Users\\hp\\.claude\\projects\\c--Users-hp-Desktop-harvesters-academy\\memory",
+      "c:\\Users\\hp\\Desktop\\harvesters-academy\\src\\app\\dashboard\\admin\\courses\\[id]",
+      "c:\\Users\\hp\\Desktop\\harvesters-academy\\src\\app\\verify"
     ]
   }
 }

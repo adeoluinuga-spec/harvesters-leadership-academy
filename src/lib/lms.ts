@@ -227,7 +227,9 @@ export async function fetchCourseCatalog(): Promise<CatalogCourses> {
 // Simple course detail (MVP — no lessons/modules/assessments)
 // ============================================================
 
-export type SimpleCourseDetail = LMSCourse & { enrolled: boolean };
+const ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];
+
+export type SimpleCourseDetail = LMSCourse & { enrolled: boolean; isAdmin: boolean };
 
 export async function fetchSimpleCourseDetail(slug: string): Promise<SimpleCourseDetail | null> {
   const supabase = createClient();
@@ -242,14 +244,19 @@ export async function fetchSimpleCourseDetail(slug: string): Promise<SimpleCours
   if (error || !course) return null;
 
   let enrolled = false;
+  let isAdmin = false;
   if (user) {
-    const { data: enr } = await supabase
-      .from("enrollments")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("course_id", course.id)
-      .maybeSingle();
-    enrolled = Boolean(enr);
+    const [enrRes, profileRes] = await Promise.all([
+      supabase
+        .from("enrollments")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("course_id", course.id)
+        .maybeSingle(),
+      supabase.from("users").select("role").eq("id", user.id).maybeSingle(),
+    ]);
+    enrolled = Boolean(enrRes.data);
+    isAdmin = ADMIN_ROLES.includes(profileRes.data?.role ?? "");
   }
 
   return {
@@ -257,6 +264,7 @@ export async function fetchSimpleCourseDetail(slug: string): Promise<SimpleCours
     video_url: (course as Record<string, unknown>).video_url as string | null ?? null,
     leadership_targets: Array.isArray(course.leadership_targets) ? course.leadership_targets : [],
     enrolled,
+    isAdmin,
   };
 }
 

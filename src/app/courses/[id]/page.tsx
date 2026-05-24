@@ -97,6 +97,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
   }
 
   const isEnrolled = enrolled || course.enrolled;
+  const isAdmin = course.isAdmin;
   const instructorDisplay = [course.instructor_name, course.instructor_role ?? course.instructor_title]
     .filter(Boolean)
     .join(" · ");
@@ -155,13 +156,13 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
               )}
 
               <div className="mt-4 flex flex-wrap gap-3 sm:mt-7">
-                {isEnrolled ? (
+                {isEnrolled || isAdmin ? (
                   <a
                     href="#video"
                     className="inline-flex h-12 items-center gap-2 rounded-lg bg-white px-6 text-sm font-medium text-black transition-colors hover:bg-zinc-100 active:bg-zinc-200 sm:h-10 sm:px-5"
                   >
                     <PlayCircle className="size-4" />
-                    Start watching
+                    {isAdmin ? "Preview course" : "Start watching"}
                   </a>
                 ) : (
                   <button
@@ -206,7 +207,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
                 style={{ border: 0 }}
               />
             </div>
-            {!isEnrolled && (
+            {!isEnrolled && !isAdmin && (
               <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-3">
                 <p className="text-sm text-zinc-400">
                   Enrol to track your progress through this course
@@ -278,16 +279,18 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
             )}
 
             {/* Enrollment status */}
-            <div
-              className={cn(
-                "rounded-lg border p-3 text-center text-xs font-medium",
-                isEnrolled
-                  ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-                  : "border-zinc-100 bg-zinc-50 text-zinc-500"
-              )}
-            >
-              {isEnrolled ? "You are enrolled in this course" : "Not yet enrolled"}
-            </div>
+            {!isAdmin && (
+              <div
+                className={cn(
+                  "rounded-lg border p-3 text-center text-xs font-medium",
+                  isEnrolled
+                    ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                    : "border-zinc-100 bg-zinc-50 text-zinc-500"
+                )}
+              >
+                {isEnrolled ? "You are enrolled in this course" : "Not yet enrolled"}
+              </div>
+            )}
 
             {/* Leadership targets */}
             {(course.leadership_targets ?? []).length > 0 && (
@@ -306,7 +309,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
               </div>
             )}
 
-            {!isEnrolled && (
+            {!isEnrolled && !isAdmin && (
               <button
                 type="button"
                 onClick={handleEnroll}
