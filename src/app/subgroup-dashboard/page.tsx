@@ -70,16 +70,13 @@ export default function SubgroupDashboardPage() {
     let active = true;
     const supabase = createClient();
 
-    Promise.all([
-      supabase
+    (async () => {
+      // Step 1: campuses for this subgroup (authoritative list)
+      const campusResult = await supabase
         .from("campuses")
         .select("id, name, pastor, campus_pastor")
-        .eq("subgroup_id", subgroupId),
-      supabase
-        .from("users")
-        .select("id, full_name, role, current_leadership_role, onboarding_completed, campus_id")
-        .eq("subgroup_id", subgroupId),
-    ]).then(([campusResult, userResult]) => {
+        .eq("subgroup_id", subgroupId);
+
       if (!active) return;
 
       if (campusResult.error) {
@@ -88,24 +85,52 @@ export default function SubgroupDashboardPage() {
           error: campusResult.error.message,
         });
       }
-      if (userResult.error) {
-        console.error("[subgroup-dashboard] failed to load subgroup users", {
-          subgroupId,
-          error: userResult.error.message,
-        });
-      }
 
       const campuses = (campusResult.data ?? []) as RealCampus[];
       setRealCampuses(campuses);
-      setSubgroupUsers((userResult.data ?? []) as SubgroupUser[]);
-
-      // Auto-expand first campus if available
       if (campuses.length > 0) {
         setExpanded((prev) => prev || campuses[0].id);
       }
 
+      // Step 2: users via campus_id traversal + direct subgroup_id fallback (merged)
+      const campusIds = campuses.map((c) => c.id);
+      const userSelect = "id, full_name, role, current_leadership_role, onboarding_completed, campus_id";
+
+      const [campusUsersRes, directUsersRes] = await Promise.all([
+        campusIds.length > 0
+          ? supabase.from("users").select(userSelect).in("campus_id", campusIds)
+          : Promise.resolve({ data: [] as SubgroupUser[], error: null }),
+        supabase.from("users").select(userSelect).eq("subgroup_id", subgroupId),
+      ]);
+
+      if (!active) return;
+
+      if (campusUsersRes.error) {
+        console.error("[subgroup-dashboard] failed to load campus users", {
+          subgroupId,
+          error: campusUsersRes.error.message,
+        });
+      }
+      if (directUsersRes.error) {
+        console.error("[subgroup-dashboard] failed to load direct subgroup users", {
+          subgroupId,
+          error: directUsersRes.error.message,
+        });
+      }
+
+      const seenIds = new Set<string>();
+      const allUsers = [
+        ...((campusUsersRes.data ?? []) as SubgroupUser[]),
+        ...((directUsersRes.data ?? []) as SubgroupUser[]),
+      ].filter((u) => {
+        if (seenIds.has(u.id)) return false;
+        seenIds.add(u.id);
+        return true;
+      });
+
+      setSubgroupUsers(allUsers);
       setDataLoading(false);
-    });
+    })();
 
     return () => {
       active = false;

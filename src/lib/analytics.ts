@@ -549,22 +549,46 @@ export async function fetchGroupAnalyticsDetailed(groupId: string): Promise<Grou
 }
 
 export async function fetchSubgroupAnalytics(subgroupId: string): Promise<HierarchyAnalytics> {
-  return fetchHierarchyAnalytics("subgroup_id", subgroupId);
-}
-
-async function fetchHierarchyAnalytics(
-  field: "group_id" | "subgroup_id",
-  id: string
-): Promise<HierarchyAnalytics> {
   const supabase = createClient();
 
-  const { data: scopedUsers } = await supabase
-    .from("users")
-    .select("id, campus_id")
-    .eq(field, id)
-    .not("role", "in", '("Platform Super Admin","Super Admin","Admin")');
+  // ── 1. Resolve campuses via the campuses table (subgroup_id → campus rows) ──
+  // Do NOT rely on subgroup_id being set on every user — resolve through campuses.
+  const { data: campusRows } = await supabase
+    .from("campuses")
+    .select("id, name")
+    .eq("subgroup_id", subgroupId);
 
-  const userIds = (scopedUsers ?? []).map((u) => u.id);
+  const campusList = campusRows ?? [];
+  const campusIds = campusList.map((c) => c.id);
+  const campusNameById = new Map(campusList.map((c) => [c.id, c.name as string]));
+
+  // ── 2. Get all users in those campuses + users directly tagged with subgroup_id ──
+  const [campusUsersRes, directSubgroupUsersRes] = await Promise.all([
+    campusIds.length > 0
+      ? supabase
+          .from("users")
+          .select("id, campus_id")
+          .in("campus_id", campusIds)
+          .not("role", "in", '("Platform Super Admin","Super Admin","Admin")')
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from("users")
+      .select("id, campus_id")
+      .eq("subgroup_id", subgroupId)
+      .not("role", "in", '("Platform Super Admin","Super Admin","Admin")'),
+  ]);
+
+  const seenIds = new Set<string>();
+  const allUsers = [
+    ...(campusUsersRes.data ?? []),
+    ...(directSubgroupUsersRes.data ?? []),
+  ].filter((u) => {
+    if (seenIds.has(u.id)) return false;
+    seenIds.add(u.id);
+    return true;
+  });
+
+  const userIds = allUsers.map((u) => u.id);
   if (userIds.length === 0) {
     return {
       totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
@@ -572,16 +596,14 @@ async function fetchHierarchyAnalytics(
     };
   }
 
-  const [enrollRes, certRes, campusesRes] = await Promise.all([
+  // ── 3. LMS data ────────────────────────────────────────────────────────────
+  const [enrollRes, certRes] = await Promise.all([
     supabase.from("enrollments").select("id, user_id, course_id, created_at").in("user_id", userIds),
     supabase.from("certificates").select("id, user_id, course_id, issued_at").in("user_id", userIds),
-    supabase.from("campuses").select("id, name"),
   ]);
 
   const enrollments = enrollRes.data ?? [];
   const certs = certRes.data ?? [];
-  const campuses = campusesRes.data ?? [];
-
   const enrolledSet = new Set(enrollments.map((e) => e.user_id));
   const certSet = new Set(certs.map((c) => c.user_id));
 
@@ -589,8 +611,9 @@ async function fetchHierarchyAnalytics(
   const completedCount = userIds.filter((id) => certSet.has(id)).length;
   const rate = enrolledCount > 0 ? Math.round((completedCount / enrolledCount) * 100) : 0;
 
+  // ── 4. Per-campus summaries ────────────────────────────────────────────────
   const usersByCampus = new Map<string, string[]>();
-  for (const u of scopedUsers ?? []) {
+  for (const u of allUsers) {
     if (u.campus_id) {
       const arr = usersByCampus.get(u.campus_id) ?? [];
       arr.push(u.id);
@@ -598,8 +621,7 @@ async function fetchHierarchyAnalytics(
     }
   }
 
-  const campusSummaries: CampusSummary[] = campuses
-    .filter((c) => usersByCampus.has(c.id))
+  const campusSummaries: CampusSummary[] = campusList
     .map((campus) => {
       const ids = usersByCampus.get(campus.id) ?? [];
       const enr = ids.filter((id) => enrolledSet.has(id)).length;
@@ -608,7 +630,7 @@ async function fetchHierarchyAnalytics(
       const certCount = certs.filter((c) => campusIdSet.has(c.user_id)).length;
       return {
         campusId: campus.id,
-        campusName: campus.name,
+        campusName: campusNameById.get(campus.id) ?? campus.name,
         totalLeaders: ids.length,
         enrolledLeaders: enr,
         completedLeaders: comp,
