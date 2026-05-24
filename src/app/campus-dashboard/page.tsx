@@ -9,7 +9,9 @@ import {
   CheckCircle2,
   GraduationCap,
   HeartHandshake,
+  TrendingDown,
   TrendingUp,
+  UserCheck,
   Users,
 } from "lucide-react";
 
@@ -23,9 +25,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { WeeklyTrendChart, EnrollmentDonut } from "@/components/charts/metric-charts";
 import { createClient } from "@/lib/client";
-import { fetchCampusLearningAnalytics } from "@/lib/analytics";
-import type { CampusLearningAnalytics } from "@/lib/analytics";
+import {
+  fetchCampusLearningAnalytics,
+  fetchScopedCampusAnalytics,
+  type CampusLearningAnalytics,
+  type ScopedAnalytics,
+  type RoleCount,
+} from "@/lib/analytics";
+import { cn } from "@/lib/utils";
+import { getLeadershipScope, roleDisplayLabel } from "@/lib/scope-resolver";
 import { useHierarchy } from "@/hooks/use-hierarchy";
+import type { MockRole } from "@/lib/mock-auth";
 
 type CampusUser = {
   id: string;
@@ -40,12 +50,183 @@ function initials(name: string | null): string {
   return name.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 }
 
+function healthLabel(rate: number) {
+  if (rate >= 80) return "Thriving";
+  if (rate >= 60) return "Stable";
+  if (rate >= 40) return "Needs Attention";
+  return "Declining";
+}
+
+function healthClasses(rate: number) {
+  if (rate >= 80) return "bg-emerald-50 text-emerald-700 border-emerald-100";
+  if (rate >= 60) return "bg-zinc-100 text-zinc-700 border-zinc-200";
+  if (rate >= 40) return "bg-amber-50 text-amber-700 border-amber-100";
+  return "bg-rose-50 text-rose-700 border-rose-100";
+}
+
+function fmt(n: number) {
+  return n.toLocaleString();
+}
+
+function RoleBreakdown({ breakdown }: { breakdown: RoleCount[] }) {
+  if (breakdown.length === 0) return null;
+  return (
+    <motion.section variants={shellItem}>
+      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-zinc-100">
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
+            Leadership pipeline by tier
+          </CardTitle>
+          <p className="text-sm text-zinc-500">
+            Enrolment and completion breakdown across all leadership tiers in campus
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-1">
+          {breakdown.map((row) => (
+            <div key={row.role} className="rounded-lg border border-zinc-100 p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-black text-white">
+                    <Users className="size-4" />
+                  </div>
+                  <div>
+                    <p className="font-heading font-semibold text-zinc-950">
+                      {roleDisplayLabel(row.role as MockRole)}
+                    </p>
+                    <p className="text-sm text-zinc-500">{row.count} leaders</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+                  {[
+                    ["Leaders", fmt(row.count)],
+                    ["Enrolled", fmt(row.enrolled)],
+                    ["Completion", `${row.completionRate}%`],
+                    ["Certificates", fmt(row.certificates)],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs text-zinc-500">{label}</p>
+                      <p className="font-heading mt-1 font-semibold text-zinc-950">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <Badge
+                  className={cn(
+                    "rounded-md border hover:bg-inherit shrink-0",
+                    healthClasses(row.completionRate)
+                  )}
+                >
+                  {healthLabel(row.completionRate)}
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <div className="mb-1 flex justify-between text-xs text-zinc-500">
+                  <span>Completion progress</span>
+                  <span className="font-semibold text-zinc-950">{row.completionRate}%</span>
+                </div>
+                <Progress
+                  value={row.completionRate}
+                  className="h-1.5 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
+                />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+function CampusMinistryInsights({
+  scopedAnalytics,
+  campusName,
+}: {
+  scopedAnalytics: ScopedAnalytics;
+  campusName: string;
+}) {
+  const sorted = [...scopedAnalytics.roleBreakdown].sort(
+    (a, b) => b.completionRate - a.completionRate
+  );
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+  const needAttention = scopedAnalytics.roleBreakdown.filter(
+    (r) => r.completionRate < 60
+  ).length;
+
+  const insights = [
+    best && best.completionRate >= 70
+      ? {
+          title: `${roleDisplayLabel(best.role as MockRole)} leads with ${best.completionRate}% completion — strong tier performance.`,
+          icon: TrendingUp,
+        }
+      : {
+          title: `Campus average stands at ${scopedAnalytics.completionRate}% — keep driving academy engagement.`,
+          icon: TrendingUp,
+        },
+    worst && worst.completionRate < 60
+      ? {
+          title: `${roleDisplayLabel(worst.role as MockRole)} at ${worst.completionRate}% — pastoral follow-up recommended.`,
+          icon: TrendingDown,
+        }
+      : {
+          title: "All leadership tiers are above 60% — campus is on a stable trajectory.",
+          icon: UserCheck,
+        },
+    {
+      title: `${fmt(scopedAnalytics.certificates)} certificates issued across ${campusName}.`,
+      icon: Award,
+    },
+    needAttention > 0
+      ? {
+          title: `${needAttention} leadership tier${needAttention !== 1 ? "s" : ""} below 60% — schedule pastoral review.`,
+          icon: AlertCircle,
+        }
+      : {
+          title: `${fmt(scopedAnalytics.needsFollowUp)} leaders enrolled but not yet certified — follow-up will accelerate completions.`,
+          icon: AlertCircle,
+        },
+  ];
+
+  return (
+    <motion.section variants={shellItem}>
+      <Card className="rounded-xl border-zinc-200 bg-[#0b0b0b] text-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-heading text-lg font-semibold">
+            Campus pipeline insights
+          </CardTitle>
+          <p className="text-sm text-zinc-400">
+            Strategic signals across all leadership tiers in {campusName}
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2">
+          {insights.map((insight) => (
+            <div
+              key={insight.title}
+              className="rounded-lg border border-white/10 bg-white/[0.04] p-4"
+            >
+              <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-white/10">
+                <insight.icon className="size-4" />
+              </div>
+              <p className="font-heading text-sm font-semibold leading-6">{insight.title}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
 export default function CampusDashboardPage() {
   const hierarchy = useHierarchy();
-  const { campusName, campusId, subgroupName } = hierarchy;
+  const { campusName, campusId, subgroupName, role } = hierarchy;
+
+  const scope = useMemo(
+    () => getLeadershipScope((role || "Campus Pastor") as MockRole, campusId),
+    [role, campusId]
+  );
 
   const [campusUsers, setCampusUsers] = useState<CampusUser[]>([]);
   const [analytics, setAnalytics] = useState<CampusLearningAnalytics | null>(null);
+  const [scopedAnalytics, setScopedAnalytics] = useState<ScopedAnalytics | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
@@ -70,6 +251,11 @@ export default function CampusDashboardPage() {
 
     return () => { active = false; };
   }, [campusId, hierarchy.loading]);
+
+  useEffect(() => {
+    if (hierarchy.loading || !campusId || scope.childRoles.length === 0) return;
+    fetchScopedCampusAnalytics(campusId, scope.childRoles as string[]).then(setScopedAnalytics);
+  }, [campusId, scope.childRoles, hierarchy.loading]);
 
   const totalLeaders = campusUsers.length;
   const inactiveLeaders = useMemo(
@@ -352,6 +538,19 @@ export default function CampusDashboardPage() {
             dark
           />
         </motion.section>
+
+        {/* ── Leadership Pipeline by Tier ───────────────────────── */}
+        {scopedAnalytics && scopedAnalytics.roleBreakdown.length > 0 && (
+          <RoleBreakdown breakdown={scopedAnalytics.roleBreakdown} />
+        )}
+
+        {/* ── Campus Pipeline Insights ──────────────────────────── */}
+        {scopedAnalytics && scopedAnalytics.roleBreakdown.length > 0 && (
+          <CampusMinistryInsights
+            scopedAnalytics={scopedAnalytics}
+            campusName={campusName || "Campus"}
+          />
+        )}
 
         {/* ── Inactive Alerts ────────────────────────────────────── */}
         {inactiveLeaders.length > 0 && (
