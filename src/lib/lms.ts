@@ -110,21 +110,27 @@ export type CatalogCourses = {
   pathway: CourseWithProgress[];
   all: CourseWithProgress[];
   userRole: string;
+  isAdmin: boolean;
 };
 
 // ============================================================
 // Course catalog
 // ============================================================
 
-async function fetchAllCoursesWithProgress(userId: string | null): Promise<CourseWithProgress[]> {
+async function fetchAllCoursesWithProgress(userId: string | null, showAll = false): Promise<CourseWithProgress[]> {
   const supabase = createClient();
 
-  const { data: courses, error } = await supabase
+  let query = supabase
     .from("courses")
     .select("*")
-    .or("status.eq.published,is_published.eq.true")
     .order("is_featured", { ascending: false })
     .order("created_at", { ascending: false });
+
+  if (!showAll) {
+    query = query.or("status.eq.published,is_published.eq.true") as typeof query;
+  }
+
+  const { data: courses, error } = await query;
 
   if (error || !courses?.length) return [];
 
@@ -192,21 +198,22 @@ export async function fetchCoursesWithProgress(): Promise<CourseWithProgress[]> 
   return fetchAllCoursesWithProgress(user?.id ?? null);
 }
 
+const CATALOG_ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];
+
 export async function fetchCourseCatalog(): Promise<CatalogCourses> {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [all, userInfo] = await Promise.all([
-    fetchAllCoursesWithProgress(user?.id ?? null),
-    user
-      ? supabase.from("users").select("role").eq("id", user.id).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const userInfoRes = user
+    ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
 
-  const userRole = (userInfo as { data: { role?: string } | null })?.data?.role ?? "";
-  const userLevel = getLeadershipLevel(userRole);
+  const userRole = (userInfoRes as { data: { role?: string } | null })?.data?.role ?? "";
+  const isAdmin = CATALOG_ADMIN_ROLES.includes(userRole);
+
+  const all = await fetchAllCoursesWithProgress(user?.id ?? null, isAdmin);
 
   const visible = all.filter((c) =>
     canUserSeeCourse(userRole, c.leadership_targets ?? [])
@@ -220,7 +227,7 @@ export async function fetchCourseCatalog(): Promise<CatalogCourses> {
     )
   );
 
-  return { required, pathway, all: visible, userRole };
+  return { required, pathway, all: visible, userRole, isAdmin };
 }
 
 // ============================================================
