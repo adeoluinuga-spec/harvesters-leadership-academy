@@ -9,7 +9,10 @@ export type CourseFormData = {
   thumbnail_url: string;
   video_url: string;
   instructor_name: string;
+  instructor_title: string;
+  instructor_role: string;
   category: string;
+  difficulty_level: string;
   leadership_targets: string[];
   duration_minutes: number;
   is_required: boolean;
@@ -120,7 +123,10 @@ export async function createCourse(data: CourseFormData): Promise<{ course: LMSC
       thumbnail_url: data.thumbnail_url.trim() || null,
       video_url: data.video_url?.trim() ? normalizeVimeoUrl(data.video_url.trim()) : null,
       category: data.category,
+      difficulty_level: data.difficulty_level || "Foundational",
       instructor_name: data.instructor_name.trim(),
+      instructor_title: data.instructor_title?.trim() || null,
+      instructor_role: data.instructor_role?.trim() || null,
       duration_minutes: data.duration_minutes || 0,
       leadership_targets: data.leadership_targets,
       is_required: data.is_required,
@@ -146,6 +152,9 @@ export async function updateCourse(id: string, data: Partial<CourseFormData>): P
   if (data.video_url !== undefined) payload.video_url = data.video_url?.trim() ? normalizeVimeoUrl(data.video_url.trim()) : null;
   if (data.category !== undefined) payload.category = data.category;
   if (data.instructor_name !== undefined) payload.instructor_name = data.instructor_name.trim();
+  if (data.instructor_title !== undefined) payload.instructor_title = data.instructor_title.trim() || null;
+  if (data.instructor_role !== undefined) payload.instructor_role = data.instructor_role.trim() || null;
+  if (data.difficulty_level !== undefined) payload.difficulty_level = data.difficulty_level || null;
   if (data.duration_minutes !== undefined) payload.duration_minutes = data.duration_minutes;
   if (data.leadership_targets !== undefined) payload.leadership_targets = data.leadership_targets;
   if (data.is_required !== undefined) payload.is_required = data.is_required;
