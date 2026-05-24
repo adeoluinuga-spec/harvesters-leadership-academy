@@ -362,16 +362,15 @@ export type GroupAnalyticsDetailed = {
 export async function fetchGroupAnalyticsDetailed(groupId: string): Promise<GroupAnalyticsDetailed> {
   const supabase = createClient();
 
-  const { data: scopedUsers } = await supabase
-    .from("users")
-    .select("id, campus_id, subgroup_id, subgroup, full_name, role")
-    .eq("group_id", groupId)
-    .not("role", "in", '("Platform Super Admin","Super Admin","Admin")');
+  // ── 1. Resolve subgroups via the subgroups table (group_id → subgroup rows) ──
+  // This is the authoritative link; do NOT rely on group_id being set on every user.
+  const { data: subgroupRows } = await supabase
+    .from("subgroups")
+    .select("id, name")
+    .eq("group_id", groupId);
 
-  const users = scopedUsers ?? [];
-  const userIds = users.map((u) => u.id);
-
-  if (userIds.length === 0) {
+  const subgroupList = subgroupRows ?? [];
+  if (subgroupList.length === 0) {
     return {
       totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
       overallCompletionRate: 0, totalCampuses: 0, totalSubgroups: 0,
@@ -379,24 +378,81 @@ export async function fetchGroupAnalyticsDetailed(groupId: string): Promise<Grou
     };
   }
 
-  const [enrollRes, certRes, campusRes] = await Promise.all([
+  const subgroupIds = subgroupList.map((s) => s.id);
+  const subgroupNameById = new Map(subgroupList.map((s) => [s.id, s.name as string]));
+
+  // ── 2. Get all campuses in those subgroups ──────────────────────────────────
+  const { data: campusRows } = await supabase
+    .from("campuses")
+    .select("id, name, subgroup_id")
+    .in("subgroup_id", subgroupIds);
+
+  const campusList = campusRows ?? [];
+  const campusIds = campusList.map((c) => c.id);
+  const campusNameById = new Map(campusList.map((c) => [c.id, c.name as string]));
+  const campusSubgroupById = new Map(
+    campusList.map((c) => [c.id, c.subgroup_id as string])
+  );
+
+  // ── 3. Get all users in those campuses ─────────────────────────────────────
+  // Query by campus_id — does NOT require group_id to be set on user records.
+  // Also pull users directly tagged with group_id (e.g. Sub-Group Pastors without a campus).
+  const [campusUsersRes, directGroupUsersRes] = await Promise.all([
+    campusIds.length > 0
+      ? supabase
+          .from("users")
+          .select("id, campus_id, subgroup_id, full_name, role")
+          .in("campus_id", campusIds)
+          .not("role", "in", '("Platform Super Admin","Super Admin","Admin")')
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from("users")
+      .select("id, campus_id, subgroup_id, full_name, role")
+      .eq("group_id", groupId)
+      .not("role", "in", '("Platform Super Admin","Super Admin","Admin")'),
+  ]);
+
+  // Merge + deduplicate
+  const seenIds = new Set<string>();
+  const allUsers = [
+    ...(campusUsersRes.data ?? []),
+    ...(directGroupUsersRes.data ?? []),
+  ].filter((u) => {
+    if (seenIds.has(u.id)) return false;
+    seenIds.add(u.id);
+    return true;
+  });
+
+  const userIds = allUsers.map((u) => u.id);
+  if (userIds.length === 0) {
+    return {
+      totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
+      overallCompletionRate: 0, totalCampuses: campusIds.length,
+      totalSubgroups: subgroupIds.length,
+      subgroups: subgroupList.map((s) => ({
+        subgroupId: s.id, subgroupName: s.name as string, pastorName: "",
+        totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0,
+        certificates: 0, completionRate: 0, campusSummaries: [],
+      })),
+      weeklyTrend: [],
+    };
+  }
+
+  // ── 4. LMS data for all resolved users ────────────────────────────────────
+  const [enrollRes, certRes] = await Promise.all([
     supabase.from("enrollments").select("id, user_id, course_id, created_at").in("user_id", userIds),
     supabase.from("certificates").select("id, user_id, course_id, issued_at").in("user_id", userIds),
-    supabase.from("campuses").select("id, name"),
   ]);
 
   const enrollments = enrollRes.data ?? [];
   const certs = certRes.data ?? [];
-  const allCampuses = campusRes.data ?? [];
-
   const enrolledSet = new Set(enrollments.map((e) => e.user_id));
   const certSet = new Set(certs.map((c) => c.user_id));
-  const campusNameById = new Map(allCampuses.map((c) => [c.id, c.name as string]));
 
-  // Identify subgroup pastors by role
+  // ── 5. Identify subgroup pastors ───────────────────────────────────────────
   const SUBGROUP_PASTOR_ROLES = ["Sub-Group Pastor", "Subgroup Pastor"];
   const pastorBySubgroup = new Map<string, string>();
-  for (const u of users) {
+  for (const u of allUsers) {
     if (u.subgroup_id && SUBGROUP_PASTOR_ROLES.includes(u.role ?? "")) {
       if (!pastorBySubgroup.has(u.subgroup_id)) {
         pastorBySubgroup.set(u.subgroup_id, u.full_name ?? "");
@@ -404,46 +460,52 @@ export async function fetchGroupAnalyticsDetailed(groupId: string): Promise<Grou
     }
   }
 
-  // Group users by subgroup
-  const usersBySubgroup = new Map<string, typeof users>();
-  for (const u of users) {
-    if (u.subgroup_id) {
-      const arr = usersBySubgroup.get(u.subgroup_id) ?? [];
-      arr.push(u);
-      usersBySubgroup.set(u.subgroup_id, arr);
+  // ── 6. Build campus → user index ─────────────────────────────────────────
+  const usersByCampus = new Map<string, string[]>();
+  for (const u of allUsers) {
+    if (u.campus_id) {
+      const arr = usersByCampus.get(u.campus_id) ?? [];
+      arr.push(u.id);
+      usersByCampus.set(u.campus_id, arr);
     }
   }
 
-  // Build subgroup summaries with nested campus summaries
-  const subgroups: SubgroupSummary[] = [];
-  for (const [subgroupId, subgroupUsers] of usersBySubgroup.entries()) {
-    const subgroupName = subgroupUsers[0]?.subgroup || "Unknown Subgroup";
-    const pastorName = pastorBySubgroup.get(subgroupId) ?? "";
-    const subgroupUserIdSet = new Set(subgroupUsers.map((u) => u.id));
-
-    const subgroupEnrolled = subgroupUsers.filter((u) => enrolledSet.has(u.id)).length;
-    const subgroupCompleted = subgroupUsers.filter((u) => certSet.has(u.id)).length;
-    const subgroupCerts = certs.filter((c) => subgroupUserIdSet.has(c.user_id)).length;
-    const subgroupRate =
-      subgroupEnrolled > 0 ? Math.round((subgroupCompleted / subgroupEnrolled) * 100) : 0;
-
-    // Group by campus within this subgroup
-    const usersByCampus = new Map<string, string[]>();
-    for (const u of subgroupUsers) {
-      if (u.campus_id) {
-        const arr = usersByCampus.get(u.campus_id) ?? [];
-        arr.push(u.id);
-        usersByCampus.set(u.campus_id, arr);
-      }
+  // Campuses grouped by subgroup (from the campuses table, not users)
+  const campusesBySubgroup = new Map<string, string[]>();
+  for (const campus of campusList) {
+    if (campus.subgroup_id) {
+      const arr = campusesBySubgroup.get(campus.subgroup_id) ?? [];
+      arr.push(campus.id);
+      campusesBySubgroup.set(campus.subgroup_id, arr);
     }
+  }
 
-    const campusSummaries: CampusSummary[] = [];
-    for (const [campusId, campusUserIds] of usersByCampus.entries()) {
+  // ── 7. Build subgroup summaries ────────────────────────────────────────────
+  const subgroups: SubgroupSummary[] = subgroupList.map((sg) => {
+    const sgCampusIds = campusesBySubgroup.get(sg.id) ?? [];
+
+    // Collect user IDs from campuses + users directly tagged with this subgroup_id
+    const sgUserIdSet = new Set<string>();
+    for (const campusId of sgCampusIds) {
+      for (const uid of usersByCampus.get(campusId) ?? []) sgUserIdSet.add(uid);
+    }
+    for (const u of allUsers) {
+      if (u.subgroup_id === sg.id) sgUserIdSet.add(u.id);
+    }
+    const sgUserIds = [...sgUserIdSet];
+
+    const sgEnrolled = sgUserIds.filter((id) => enrolledSet.has(id)).length;
+    const sgCompleted = sgUserIds.filter((id) => certSet.has(id)).length;
+    const sgCerts = certs.filter((c) => sgUserIdSet.has(c.user_id)).length;
+    const sgRate = sgEnrolled > 0 ? Math.round((sgCompleted / sgEnrolled) * 100) : 0;
+
+    const campusSummaries: CampusSummary[] = sgCampusIds.map((campusId) => {
+      const campusUserIds = usersByCampus.get(campusId) ?? [];
       const campusUserIdSet = new Set(campusUserIds);
       const enr = campusUserIds.filter((id) => enrolledSet.has(id)).length;
       const comp = campusUserIds.filter((id) => certSet.has(id)).length;
       const certCount = certs.filter((c) => campusUserIdSet.has(c.user_id)).length;
-      campusSummaries.push({
+      return {
         campusId,
         campusName: campusNameById.get(campusId) ?? "Unknown Campus",
         totalLeaders: campusUserIds.length,
@@ -452,29 +514,26 @@ export async function fetchGroupAnalyticsDetailed(groupId: string): Promise<Grou
         certificates: certCount,
         completionRate: enr > 0 ? Math.round((comp / enr) * 100) : 0,
         assessmentPassRate: 0,
-      });
-    }
+      };
+    }).sort((a, b) => b.totalLeaders - a.totalLeaders);
 
-    subgroups.push({
-      subgroupId,
-      subgroupName,
-      pastorName,
-      totalLeaders: subgroupUsers.length,
-      enrolledLeaders: subgroupEnrolled,
-      completedLeaders: subgroupCompleted,
-      certificates: subgroupCerts,
-      completionRate: subgroupRate,
-      campusSummaries: campusSummaries.sort((a, b) => b.totalLeaders - a.totalLeaders),
-    });
-  }
-
-  subgroups.sort((a, b) => b.totalLeaders - a.totalLeaders);
+    return {
+      subgroupId: sg.id,
+      subgroupName: subgroupNameById.get(sg.id) ?? (sg.name as string),
+      pastorName: pastorBySubgroup.get(sg.id) ?? "",
+      totalLeaders: sgUserIds.length,
+      enrolledLeaders: sgEnrolled,
+      completedLeaders: sgCompleted,
+      certificates: sgCerts,
+      completionRate: sgRate,
+      campusSummaries,
+    };
+  }).sort((a, b) => b.totalLeaders - a.totalLeaders);
 
   const totalEnrolled = userIds.filter((id) => enrolledSet.has(id)).length;
   const totalCompleted = userIds.filter((id) => certSet.has(id)).length;
   const overallRate = totalEnrolled > 0 ? Math.round((totalCompleted / totalEnrolled) * 100) : 0;
   const weeklyTrend = buildWeeklyTrend(enrollments, certs);
-  const totalCampuses = subgroups.reduce((s, sg) => s + sg.campusSummaries.length, 0);
 
   return {
     totalLeaders: userIds.length,
@@ -482,8 +541,8 @@ export async function fetchGroupAnalyticsDetailed(groupId: string): Promise<Grou
     completedLeaders: totalCompleted,
     certificates: certs.length,
     overallCompletionRate: overallRate,
-    totalCampuses,
-    totalSubgroups: subgroups.length,
+    totalCampuses: campusIds.length,
+    totalSubgroups: subgroupIds.length,
     subgroups,
     weeklyTrend,
   };
