@@ -11,8 +11,9 @@ import { IntelligencePanel } from "@/components/hierarchy/hierarchy-cards";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { subgroupInsights, activityItems } from "@/lib/hierarchy-data";
+import { subgroupInsights } from "@/lib/hierarchy-data";
 import { createClient } from "@/lib/client";
+import { fetchSubgroupAnalytics, type HierarchyAnalytics } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { useHierarchy } from "@/hooks/use-hierarchy";
 
@@ -56,6 +57,7 @@ export default function SubgroupDashboardPage() {
   const [subgroupUsers, setSubgroupUsers] = useState<SubgroupUser[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [expanded, setExpanded] = useState<string>("");
+  const [lmsAnalytics, setLmsAnalytics] = useState<HierarchyAnalytics | null>(null);
 
   useEffect(() => {
     if (hierarchy.loading) return;
@@ -110,6 +112,11 @@ export default function SubgroupDashboardPage() {
     };
   }, [subgroupId, hierarchy.loading]);
 
+  useEffect(() => {
+    if (hierarchy.loading || !subgroupId) return;
+    fetchSubgroupAnalytics(subgroupId).then(setLmsAnalytics);
+  }, [subgroupId, hierarchy.loading]);
+
   // Per-campus user counts for real data
   const usersByCampus = useMemo(() => {
     const map = new Map<string, SubgroupUser[]>();
@@ -123,12 +130,15 @@ export default function SubgroupDashboardPage() {
   }, [subgroupUsers]);
 
   const totalLeaders = subgroupUsers.length;
-  const activeLeaders = subgroupUsers.filter((u) => u.onboarding_completed === true).length;
-  const participationPct = totalLeaders > 0 ? Math.round((activeLeaders / totalLeaders) * 100) : 0;
   const followUps = useMemo(
     () => subgroupUsers.filter((u) => !u.onboarding_completed),
     [subgroupUsers]
   );
+
+  const enrolledLeaders = lmsAnalytics?.enrolledLeaders ?? null;
+  const certificates = lmsAnalytics?.certificates ?? null;
+  const needsFollowUp =
+    lmsAnalytics ? Math.max(0, lmsAnalytics.enrolledLeaders - lmsAnalytics.completedLeaders) : null;
 
   const kpis = [
     {
@@ -144,21 +154,21 @@ export default function SubgroupDashboardPage() {
       icon: Users,
     },
     {
-      label: "Course Participation",
-      value: dataLoading ? "…" : (totalLeaders ? `${participationPct}%` : "–"),
-      detail: "Active academy learners",
+      label: "Enrolled Leaders",
+      value: enrolledLeaders === null ? "…" : enrolledLeaders > 0 ? enrolledLeaders.toLocaleString() : "–",
+      detail: "Current academy cohort",
       icon: GraduationCap,
     },
     {
       label: "Certificates",
-      value: "—",
-      detail: "Issued this quarter",
+      value: certificates === null ? "…" : certificates > 0 ? certificates.toLocaleString() : "–",
+      detail: "Issued to date",
       icon: Award,
     },
     {
-      label: "Follow-ups",
-      value: dataLoading ? "…" : String(followUps.length),
-      detail: "Open leader actions",
+      label: "Needs Follow-Up",
+      value: needsFollowUp === null ? "…" : String(needsFollowUp),
+      detail: "Enrolled but not yet certified",
       icon: AlertCircle,
     },
   ];
@@ -400,18 +410,33 @@ export default function SubgroupDashboardPage() {
         />
       </motion.section>
 
-      {/* ── Activity Feed ─────────────────────────────────────── */}
+      {/* ── Activity Summary ──────────────────────────────────── */}
       <motion.section variants={shellItem}>
         <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
           <CardHeader>
-            <CardTitle className="font-heading text-lg font-semibold">Recent activity feed</CardTitle>
+            <CardTitle className="font-heading text-lg font-semibold">Subgroup summary</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {activityItems.map((item) => (
-              <div key={item} className="rounded-lg border border-zinc-100 p-4 text-sm leading-6 text-zinc-600">
-                {item}
-              </div>
-            ))}
+            {lmsAnalytics ? (
+              <>
+                <div className="rounded-lg border border-zinc-100 p-4 text-sm leading-6 text-zinc-600">
+                  {lmsAnalytics.enrolledLeaders.toLocaleString()} leaders enrolled in the academy across {subgroupName}.
+                </div>
+                <div className="rounded-lg border border-zinc-100 p-4 text-sm leading-6 text-zinc-600">
+                  {lmsAnalytics.certificates.toLocaleString()} certificates issued within this subgroup.
+                </div>
+                <div className="rounded-lg border border-zinc-100 p-4 text-sm leading-6 text-zinc-600">
+                  {Math.max(0, lmsAnalytics.enrolledLeaders - lmsAnalytics.completedLeaders)} leaders enrolled but not yet certified — follow-up recommended.
+                </div>
+                <div className="rounded-lg border border-zinc-100 p-4 text-sm leading-6 text-zinc-600">
+                  {lmsAnalytics.campusSummaries.length} campus{lmsAnalytics.campusSummaries.length !== 1 ? "es" : ""} reporting academy activity.
+                </div>
+              </>
+            ) : (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="h-16 animate-pulse rounded-lg bg-zinc-100" />
+              ))
+            )}
           </CardContent>
         </Card>
       </motion.section>
