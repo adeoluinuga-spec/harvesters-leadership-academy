@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Award,
   BookOpenCheck,
-  LineChart,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -14,6 +15,8 @@ import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHierarchy } from "@/hooks/use-hierarchy";
+import { fetchPersonalLearningAnalytics, type PersonalLearningAnalytics } from "@/lib/analytics";
+import { createClient } from "@/lib/client";
 
 type LeaderMetric = {
   label: string;
@@ -23,13 +26,41 @@ type LeaderMetric = {
 
 export default function LeaderDashboardPage() {
   const hierarchy = useHierarchy();
-  const metrics: LeaderMetric[] = [
-    { label: "Course progress", value: "62%", icon: BookOpenCheck },
-    { label: "Certificates", value: "3", icon: Award },
-    { label: "Engagement", value: "88%", icon: LineChart },
-  ];
-
   const firstName = hierarchy.firstName || "Leader";
+
+  const [personal, setPersonal] = useState<PersonalLearningAnalytics | null>(null);
+
+  useEffect(() => {
+    if (hierarchy.loading) return;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        fetchPersonalLearningAnalytics(data.user.id).then(setPersonal);
+      }
+    });
+  }, [hierarchy.loading]);
+
+  const metrics: LeaderMetric[] = [
+    {
+      label: "Course progress",
+      value: personal ? `${personal.completionRate}%` : "…",
+      icon: BookOpenCheck,
+    },
+    {
+      label: "Certificates",
+      value: personal ? String(personal.certificates || "—") : "…",
+      icon: Award,
+    },
+    {
+      label: "Assessment pass rate",
+      value: personal
+        ? personal.assessmentAttempts > 0
+          ? `${personal.assessmentPassRate}%`
+          : "—"
+        : "…",
+      icon: ClipboardCheck,
+    },
+  ];
 
   return (
     <ProtectedRoute allowedRoles={["Cell Leader / Assistant HOD", "Zonal Leader / HOD", "Community Leader", "Area Leader", "Directional Leader", "District Pastor / Pastoral Leader", "Leader", "Super Admin", "Admin"]}>

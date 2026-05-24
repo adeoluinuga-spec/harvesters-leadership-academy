@@ -22,7 +22,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useHierarchy } from "@/hooks/use-hierarchy";
-import { fetchPlatformAnalytics, type PlatformAnalytics, type CampusSummary } from "@/lib/analytics";
+import {
+  fetchPlatformAnalytics,
+  fetchScopedCampusAnalytics,
+  type PlatformAnalytics,
+  type CampusSummary,
+  type RoleCount,
+} from "@/lib/analytics";
+import { getLeadershipScope, roleDisplayLabel } from "@/lib/scope-resolver";
+import type { MockRole } from "@/lib/mock-auth";
 
 function healthLabel(rate: number) {
   if (rate >= 80) return "Thriving";
@@ -350,6 +358,75 @@ function InsightsAndActivity({ analytics }: { analytics: PlatformAnalytics | nul
   );
 }
 
+function RolePipeline({ breakdown }: { breakdown: RoleCount[] }) {
+  if (breakdown.length === 0) return null;
+
+  return (
+    <motion.section variants={shellItem}>
+      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-zinc-100">
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
+            Leadership pipeline
+          </CardTitle>
+          <p className="text-sm text-zinc-500">
+            Enrolment and completion by leadership tier within your oversight scope
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-1">
+          {breakdown.map((row) => (
+            <div key={row.role} className="rounded-lg border border-zinc-100 p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-black text-white">
+                    <Users className="size-4" />
+                  </div>
+                  <div>
+                    <p className="font-heading font-semibold text-zinc-950">
+                      {roleDisplayLabel(row.role as MockRole)}
+                    </p>
+                    <p className="text-sm text-zinc-500">{fmt(row.count)} leaders</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+                  {[
+                    ["Leaders", fmt(row.count)],
+                    ["Enrolled", fmt(row.enrolled)],
+                    ["Completion", `${row.completionRate}%`],
+                    ["Certificates", fmt(row.certificates)],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-lg bg-zinc-50 p-3">
+                      <p className="text-xs text-zinc-500">{label}</p>
+                      <p className="font-heading mt-1 font-semibold text-zinc-950">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <Badge
+                  className={cn(
+                    "rounded-md border hover:bg-inherit shrink-0",
+                    healthClasses(row.completionRate)
+                  )}
+                >
+                  {healthLabel(row.completionRate)}
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <div className="mb-1 flex justify-between text-xs text-zinc-500">
+                  <span>Completion progress</span>
+                  <span className="font-semibold text-zinc-950">{row.completionRate}%</span>
+                </div>
+                <Progress
+                  value={row.completionRate}
+                  className="h-1.5 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
+                />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
 function CampusesNeedingAttention({ campusSummaries }: { campusSummaries: CampusSummary[] }) {
   const lowCampuses = campusSummaries
     .filter((c) => c.completionRate < 70)
@@ -405,12 +482,26 @@ function CampusesNeedingAttention({ campusSummaries }: { campusSummaries: Campus
 export default function DirectionalDashboardPage() {
   const hierarchy = useHierarchy();
   const firstName = hierarchy.firstName || "Leader";
+  const { campusId, role } = hierarchy;
+
+  const scope = getLeadershipScope(
+    (role || "Directional Leader") as MockRole,
+    campusId
+  );
 
   const [analytics, setAnalytics] = useState<PlatformAnalytics | null>(null);
+  const [roleBreakdown, setRoleBreakdown] = useState<RoleCount[]>([]);
 
   useEffect(() => {
     fetchPlatformAnalytics().then(setAnalytics);
   }, []);
+
+  useEffect(() => {
+    if (hierarchy.loading || !campusId || scope.childRoles.length === 0) return;
+    fetchScopedCampusAnalytics(campusId, scope.childRoles as string[]).then((data) => {
+      setRoleBreakdown(data.roleBreakdown);
+    });
+  }, [campusId, scope.childRoles, hierarchy.loading]);
 
   return (
     <ProtectedRoute
@@ -419,7 +510,7 @@ export default function DirectionalDashboardPage() {
       <DashboardShell searchPlaceholder="Search campuses, leaders..." showDate>
         <Hero firstName={firstName} analytics={analytics} />
         <PersonalLearningLayer
-          role={(hierarchy.role || "Directional Leader") as import("@/lib/mock-auth").MockRole}
+          role={(role || "Directional Leader") as MockRole}
         />
         <OversightLayerIntro
           title="District oversight intelligence"
@@ -433,6 +524,7 @@ export default function DirectionalDashboardPage() {
         />
         <KpiGrid analytics={analytics} />
         <CampusPerformance campusSummaries={analytics?.campusSummaries ?? []} />
+        {roleBreakdown.length > 0 && <RolePipeline breakdown={roleBreakdown} />}
         <InsightsAndActivity analytics={analytics} />
         <CampusesNeedingAttention campusSummaries={analytics?.campusSummaries ?? []} />
       </DashboardShell>

@@ -655,6 +655,164 @@ export async function fetchSubgroupAnalytics(subgroupId: string): Promise<Hierar
 }
 
 // ============================================================
+// Scoped Campus Analytics (mid-tier leaders: Directional → Cell)
+// Queries users in a campus filtered to the caller's child roles,
+// then fetches their LMS data. Falls back to empty if no scope.
+// ============================================================
+
+export type RoleCount = {
+  role: string;
+  count: number;
+  enrolled: number;
+  completed: number;
+  certificates: number;
+  completionRate: number;
+};
+
+export type ScopedAnalytics = {
+  totalLeaders: number;
+  enrolledLeaders: number;
+  completedLeaders: number;
+  certificates: number;
+  inactiveLeaders: number;
+  assessmentPassRate: number;
+  needsFollowUp: number;
+  completionRate: number;
+  roleBreakdown: RoleCount[];
+  weeklyTrend: { week: string; enrollments: number; certificates: number }[];
+};
+
+export async function fetchScopedCampusAnalytics(
+  campusId: string,
+  childRoles: string[]
+): Promise<ScopedAnalytics> {
+  const empty: ScopedAnalytics = {
+    totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
+    inactiveLeaders: 0, assessmentPassRate: 0, needsFollowUp: 0, completionRate: 0,
+    roleBreakdown: [], weeklyTrend: [],
+  };
+
+  if (!campusId || childRoles.length === 0) return empty;
+
+  const supabase = createClient();
+
+  const { data: usersData } = await supabase
+    .from("users")
+    .select("id, role, onboarding_completed")
+    .eq("campus_id", campusId)
+    .in("role", childRoles);
+
+  const users = usersData ?? [];
+  const userIds = users.map((u) => u.id);
+
+  if (userIds.length === 0) {
+    return {
+      ...empty,
+      roleBreakdown: childRoles.map((r) => ({
+        role: r, count: 0, enrolled: 0, completed: 0, certificates: 0, completionRate: 0,
+      })),
+    };
+  }
+
+  const [enrollRes, certRes, attemptsRes] = await Promise.all([
+    supabase.from("enrollments").select("id, user_id, created_at").in("user_id", userIds),
+    supabase.from("certificates").select("id, user_id, issued_at").in("user_id", userIds),
+    supabase.from("assessment_attempts").select("id, user_id, passed").in("user_id", userIds),
+  ]);
+
+  const enrollments = enrollRes.data ?? [];
+  const certs = certRes.data ?? [];
+  const attempts = attemptsRes.data ?? [];
+
+  const enrolledSet = new Set(enrollments.map((e) => e.user_id));
+  const certSet = new Set(certs.map((c) => c.user_id));
+
+  const enrolledCount = userIds.filter((id) => enrolledSet.has(id)).length;
+  const completedCount = userIds.filter((id) => certSet.has(id)).length;
+  const inactiveCount = users.filter((u) => !u.onboarding_completed).length;
+  const needsFollowUp = userIds.filter((id) => enrolledSet.has(id) && !certSet.has(id)).length;
+
+  const passedAttempts = attempts.filter((a) => a.passed).length;
+  const passRate = attempts.length > 0 ? Math.round((passedAttempts / attempts.length) * 100) : 0;
+  const completionRate = enrolledCount > 0 ? Math.round((completedCount / enrolledCount) * 100) : 0;
+
+  const roleBreakdown: RoleCount[] = childRoles
+    .map((role) => {
+      const roleUsers = users.filter((u) => u.role === role);
+      const roleUserIds = new Set(roleUsers.map((u) => u.id));
+      const roleEnrolled = [...roleUserIds].filter((id) => enrolledSet.has(id)).length;
+      const roleCompleted = [...roleUserIds].filter((id) => certSet.has(id)).length;
+      const roleCerts = certs.filter((c) => roleUserIds.has(c.user_id)).length;
+      return {
+        role,
+        count: roleUsers.length,
+        enrolled: roleEnrolled,
+        completed: roleCompleted,
+        certificates: roleCerts,
+        completionRate: roleEnrolled > 0 ? Math.round((roleCompleted / roleEnrolled) * 100) : 0,
+      };
+    })
+    .filter((r) => r.count > 0);
+
+  return {
+    totalLeaders: users.length,
+    enrolledLeaders: enrolledCount,
+    completedLeaders: completedCount,
+    certificates: certs.length,
+    inactiveLeaders: inactiveCount,
+    assessmentPassRate: passRate,
+    needsFollowUp,
+    completionRate,
+    roleBreakdown,
+    weeklyTrend: buildWeeklyTrend(enrollments, certs),
+  };
+}
+
+// ============================================================
+// Personal Learning Analytics (Cell Leader / leader-level)
+// Fetches the logged-in user's own LMS data for real metrics.
+// ============================================================
+
+export type PersonalLearningAnalytics = {
+  enrolledCourses: number;
+  completedCourses: number;
+  certificates: number;
+  assessmentAttempts: number;
+  assessmentPassRate: number;
+  completionRate: number;
+};
+
+export async function fetchPersonalLearningAnalytics(
+  userId: string
+): Promise<PersonalLearningAnalytics> {
+  const supabase = createClient();
+
+  const [enrollRes, certRes, attemptsRes] = await Promise.all([
+    supabase.from("enrollments").select("id, course_id").eq("user_id", userId),
+    supabase.from("certificates").select("id, course_id").eq("user_id", userId),
+    supabase.from("assessment_attempts").select("id, passed").eq("user_id", userId),
+  ]);
+
+  const enrollments = enrollRes.data ?? [];
+  const certs = certRes.data ?? [];
+  const attempts = attemptsRes.data ?? [];
+
+  const passedAttempts = attempts.filter((a) => a.passed).length;
+  const passRate = attempts.length > 0 ? Math.round((passedAttempts / attempts.length) * 100) : 0;
+  const completionRate =
+    enrollments.length > 0 ? Math.round((certs.length / enrollments.length) * 100) : 0;
+
+  return {
+    enrolledCourses: enrollments.length,
+    completedCourses: certs.length,
+    certificates: certs.length,
+    assessmentAttempts: attempts.length,
+    assessmentPassRate: passRate,
+    completionRate,
+  };
+}
+
+// ============================================================
 // Notifications
 // ============================================================
 
