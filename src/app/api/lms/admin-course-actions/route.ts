@@ -46,7 +46,7 @@ export async function PATCH(request: Request) {
     const newStatus = course.status === "published" ? "draft" : "published";
     const { error } = await supabase
       .from("courses")
-      .update({ status: newStatus, is_published: newStatus === "published", updated_at: new Date().toISOString() })
+      .update({ status: newStatus, is_published: newStatus === "published" })
       .eq("id", body.course_id);
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ status: newStatus });
@@ -58,7 +58,7 @@ export async function PATCH(request: Request) {
     }
     const { error } = await supabase
       .from("courses")
-      .update({ leadership_targets: body.leadership_targets, updated_at: new Date().toISOString() })
+      .update({ leadership_targets: body.leadership_targets })
       .eq("id", body.course_id);
     if (error) return Response.json({ error: error.message }, { status: 500 });
     return Response.json({ ok: true });

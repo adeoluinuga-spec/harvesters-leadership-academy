@@ -144,7 +144,7 @@ export async function createCourse(data: CourseFormData): Promise<{ course: LMSC
 export async function updateCourse(id: string, data: Partial<CourseFormData>): Promise<{ error: string | null }> {
   const supabase = createClient();
 
-  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const payload: Record<string, unknown> = {};
   if (data.title !== undefined) payload.title = data.title.trim();
   if (data.description !== undefined) payload.description = data.description.trim() || null;
   if (data.overview !== undefined) payload.overview = data.overview.trim() || null;
