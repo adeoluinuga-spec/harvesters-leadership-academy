@@ -4,16 +4,22 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
+  AlertCircle,
   Award,
   BookOpenCheck,
   Building2,
-  ChevronRight,
   CircleCheck,
   GraduationCap,
+  Layers,
+  Network,
   Plus,
+  ShieldAlert,
   TrendingUp,
+  UserCheck,
+  UserMinus,
   Users,
-  AlertCircle,
+  UserX,
 } from "lucide-react";
 
 import {
@@ -30,6 +36,7 @@ import { Progress } from "@/components/ui/progress";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 import { fetchPlatformAnalytics } from "@/lib/analytics";
 import type { PlatformAnalytics } from "@/lib/analytics";
+import { cn } from "@/lib/utils";
 import {
   WeeklyTrendChart,
   CampusCompletionChart,
@@ -457,6 +464,121 @@ function AlertsSection({ data }: { data: PlatformAnalytics }) {
   );
 }
 
+type OperationalStats = {
+  totalUsers: number;
+  pendingOnboarding: number;
+  inactiveUsers: number;
+  newUsersThisWeek: number;
+  activityThisWeek: number;
+  adminChangesThisWeek: number;
+  enrollmentsThisWeek: number;
+  certificatesThisWeek: number;
+};
+
+function OperationalCards({ stats, loading }: { stats: OperationalStats | null; loading: boolean }) {
+  const cards = [
+    {
+      label: "Total Users",
+      value: stats?.totalUsers ?? 0,
+      icon: Users,
+      desc: "Registered leaders",
+      highlight: false,
+    },
+    {
+      label: "Pending Onboarding",
+      value: stats?.pendingOnboarding ?? 0,
+      icon: UserCheck,
+      desc: "Haven't completed onboarding",
+      highlight: (stats?.pendingOnboarding ?? 0) > 0,
+      highlightClass: "border-amber-100 bg-amber-50",
+      valueClass: "text-amber-700",
+    },
+    {
+      label: "Inactive Users",
+      value: stats?.inactiveUsers ?? 0,
+      icon: UserX,
+      desc: "Deactivated accounts",
+      highlight: (stats?.inactiveUsers ?? 0) > 0,
+      highlightClass: "border-rose-100 bg-rose-50",
+      valueClass: "text-rose-700",
+    },
+    {
+      label: "New This Week",
+      value: stats?.newUsersThisWeek ?? 0,
+      icon: UserMinus,
+      desc: "Leaders registered (7d)",
+      highlight: false,
+    },
+    {
+      label: "Platform Activity",
+      value: stats?.activityThisWeek ?? 0,
+      icon: Activity,
+      desc: "Events this week",
+      highlight: false,
+    },
+    {
+      label: "Admin Changes",
+      value: stats?.adminChangesThisWeek ?? 0,
+      icon: ShieldAlert,
+      desc: "Admin actions (7d)",
+      highlight: false,
+    },
+    {
+      label: "Enrollments (7d)",
+      value: stats?.enrollmentsThisWeek ?? 0,
+      icon: GraduationCap,
+      desc: "New course enrolments",
+      highlight: false,
+    },
+    {
+      label: "Certificates (7d)",
+      value: stats?.certificatesThisWeek ?? 0,
+      icon: Award,
+      desc: "Issued this week",
+      highlight: (stats?.certificatesThisWeek ?? 0) > 0,
+      highlightClass: "border-emerald-100 bg-emerald-50",
+      valueClass: "text-emerald-700",
+    },
+  ];
+
+  return (
+    <motion.section variants={shellItem}>
+      <div className="mb-3 flex items-center gap-2">
+        <Network className="size-4 text-zinc-400" />
+        <h2 className="font-heading text-sm font-semibold uppercase tracking-[0.18em] text-zinc-400">
+          Operational overview
+        </h2>
+      </div>
+      <motion.div variants={shellContainer} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => (
+          <motion.div key={card.label} variants={shellItem}>
+            <Card className={cn(
+              "rounded-xl border shadow-sm",
+              card.highlight && card.highlightClass ? card.highlightClass : "border-zinc-200 bg-white"
+            )}>
+              <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+                <p className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
+                  {card.label}
+                </p>
+                <card.icon className="size-4 text-zinc-400" />
+              </CardHeader>
+              <CardContent>
+                <p className={cn(
+                  "font-heading text-3xl font-semibold",
+                  card.highlight && card.valueClass ? card.valueClass : "text-zinc-950"
+                )}>
+                  {loading ? "…" : card.value.toLocaleString()}
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">{card.desc}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </motion.div>
+    </motion.section>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <motion.section variants={shellContainer} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -481,7 +603,9 @@ function LoadingSkeleton() {
 export default function AdminDashboardPage() {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [analytics, setAnalytics] = useState<PlatformAnalytics | null>(null);
+  const [operationalStats, setOperationalStats] = useState<OperationalStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -497,7 +621,22 @@ export default function AdminDashboardPage() {
       setLoading(false);
     }
 
+    async function loadStats() {
+      try {
+        const res = await fetch("/api/admin/stats");
+        if (res.ok) {
+          const json = await res.json() as OperationalStats;
+          if (active) setOperationalStats(json);
+        }
+      } catch {
+        // best-effort
+      } finally {
+        if (active) setStatsLoading(false);
+      }
+    }
+
     load();
+    loadStats();
     return () => { active = false; };
   }, []);
 
@@ -519,6 +658,7 @@ export default function AdminDashboardPage() {
             "Certificate milestones",
           ]}
         />
+        <OperationalCards stats={operationalStats} loading={statsLoading} />
         {loading || !analytics ? (
           <LoadingSkeleton />
         ) : (

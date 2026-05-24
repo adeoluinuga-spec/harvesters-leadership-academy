@@ -10,9 +10,12 @@ import {
   Bell,
   BookOpenCheck,
   Brain,
+  Building2,
   ClipboardCheck,
   GraduationCap,
   LayoutDashboard,
+  Layers,
+  Network,
   Settings,
   Sparkles,
   Users,
@@ -62,9 +65,19 @@ function ManageCoursesLink({ pathname }: { pathname: string }) {
   );
 }
 
+const ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];
+
+const adminNavItems = [
+  { label: "Campuses", href: "/dashboard/admin/campuses", icon: Building2 },
+  { label: "Subgroups", href: "/dashboard/admin/subgroups", icon: Layers },
+  { label: "Groups", href: "/dashboard/admin/groups", icon: Network },
+  { label: "Activity Log", href: "/dashboard/admin/activity", icon: Activity },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const [canManageCourses, setCanManageCourses] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [dashboardHref, setDashboardHref] = useState("/dashboard/leader");
 
   useEffect(() => {
@@ -76,6 +89,7 @@ export function Sidebar() {
         const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
         const role = data?.role ?? "";
         setCanManageCourses(ADMIN_COURSE_ROLES.includes(role));
+        setIsAdmin(ADMIN_ROLES.includes(role));
         const route = dashboardForRole(normalizeStoredRole(role));
         if (route) setDashboardHref(route);
       } catch {
@@ -123,6 +137,31 @@ export function Sidebar() {
 
         {canManageCourses && (
           <ManageCoursesLink pathname={pathname} />
+        )}
+
+        {isAdmin && (
+          <>
+            <div className="my-2 border-t border-white/10" />
+            <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-600 lg:block hidden">
+              Admin Tools
+            </p>
+            {adminNavItems.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={cn(
+                    "group flex h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition-all hover:bg-white/8 hover:text-white lg:justify-start",
+                    active && "bg-white text-black shadow-sm hover:bg-white hover:text-black"
+                  )}
+                >
+                  <item.icon className="size-4 shrink-0" />
+                  <span className="hidden lg:inline">{item.label}</span>
+                </Link>
+              );
+            })}
+          </>
         )}
       </nav>
 
