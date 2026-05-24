@@ -23,7 +23,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useHierarchy } from "@/hooks/use-hierarchy";
-import { fetchGroupAnalytics, type HierarchyAnalytics, type CampusSummary } from "@/lib/analytics";
+import {
+  fetchGroupAnalyticsDetailed,
+  type GroupAnalyticsDetailed,
+  type SubgroupSummary,
+  type CampusSummary,
+} from "@/lib/analytics";
 
 function healthLabel(rate: number) {
   if (rate >= 80) return "Thriving";
@@ -43,11 +48,13 @@ function fmt(n: number) {
   return n.toLocaleString();
 }
 
-function Hero({ groupName, analytics }: { groupName: string; analytics: HierarchyAnalytics | null }) {
+// ── Hero ──────────────────────────────────────────────────────────────────────
+
+function Hero({ groupName, analytics }: { groupName: string; analytics: GroupAnalyticsDetailed | null }) {
   const heroStats = [
-    { label: "Total campuses", value: analytics ? String(analytics.campusSummaries.length) : "…" },
+    { label: "Subgroups", value: analytics ? String(analytics.totalSubgroups) : "…" },
+    { label: "Total campuses", value: analytics ? String(analytics.totalCampuses) : "…" },
     { label: "Total leaders", value: analytics ? fmt(analytics.totalLeaders) : "…" },
-    { label: "Enrolled leaders", value: analytics ? fmt(analytics.enrolledLeaders) : "…" },
     { label: "Completion rate", value: analytics ? `${analytics.overallCompletionRate}%` : "…" },
   ];
 
@@ -62,7 +69,7 @@ function Hero({ groupName, analytics }: { groupName: string; analytics: Hierarch
             {groupName} Leadership Intelligence
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
-            Your personal leadership growth continues alongside strategic ministry intelligence across {groupName}.
+            Full oversight across all subgroups, campuses, and leaders within {groupName}.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -78,16 +85,48 @@ function Hero({ groupName, analytics }: { groupName: string; analytics: Hierarch
   );
 }
 
-function KpiGrid({ groupName, analytics }: { groupName: string; analytics: HierarchyAnalytics | null }) {
+// ── KPI Grid ──────────────────────────────────────────────────────────────────
+
+function KpiGrid({ groupName, analytics }: { groupName: string; analytics: GroupAnalyticsDetailed | null }) {
   const followUp = analytics ? Math.max(0, analytics.enrolledLeaders - analytics.completedLeaders) : 0;
 
   const kpis = [
-    { label: "Total Leaders", value: analytics ? fmt(analytics.totalLeaders) : "…", detail: `Across ${groupName}`, icon: Users },
-    { label: "Active Campuses", value: analytics ? String(analytics.campusSummaries.length) : "…", detail: "In your group", icon: Building2 },
-    { label: "Enrolled Leaders", value: analytics ? fmt(analytics.enrolledLeaders) : "…", detail: "Current academy cohort", icon: GraduationCap },
-    { label: "Completion Rate", value: analytics ? `${analytics.overallCompletionRate}%` : "…", detail: "Group average", icon: CheckCircle2 },
-    { label: "Certificates Issued", value: analytics ? fmt(analytics.certificates) : "…", detail: "Verified completions", icon: Award },
-    { label: "Needs Follow-Up", value: analytics ? fmt(followUp) : "…", detail: "Enrolled but not yet certified", icon: AlertCircle },
+    {
+      label: "Total Leaders",
+      value: analytics ? fmt(analytics.totalLeaders) : "…",
+      detail: `Across ${groupName}`,
+      icon: Users,
+    },
+    {
+      label: "Subgroups",
+      value: analytics ? String(analytics.totalSubgroups) : "…",
+      detail: "Under your oversight",
+      icon: Users,
+    },
+    {
+      label: "Active Campuses",
+      value: analytics ? String(analytics.totalCampuses) : "…",
+      detail: "Across all subgroups",
+      icon: Building2,
+    },
+    {
+      label: "Enrolled Leaders",
+      value: analytics ? fmt(analytics.enrolledLeaders) : "…",
+      detail: "Current academy cohort",
+      icon: GraduationCap,
+    },
+    {
+      label: "Certificates Issued",
+      value: analytics ? fmt(analytics.certificates) : "…",
+      detail: "Verified completions",
+      icon: Award,
+    },
+    {
+      label: "Needs Follow-Up",
+      value: analytics ? fmt(followUp) : "…",
+      detail: "Enrolled but not yet certified",
+      icon: AlertCircle,
+    },
   ];
 
   return (
@@ -116,19 +155,69 @@ function KpiGrid({ groupName, analytics }: { groupName: string; analytics: Hiera
   );
 }
 
-function CampusPerformance({ campusSummaries }: { campusSummaries: CampusSummary[] }) {
-  const [expanded, setExpanded] = useState("");
+// ── Campus card (inside expanded subgroup) ─────────────────────────────────
 
-  if (campusSummaries.length === 0) {
+function CampusCard({ campus }: { campus: CampusSummary }) {
+  const enrollmentPct =
+    campus.totalLeaders > 0 ? Math.round((campus.enrolledLeaders / campus.totalLeaders) * 100) : 0;
+
+  return (
+    <div className="rounded-lg border border-zinc-100 p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="font-medium text-zinc-950">{campus.campusName}</p>
+          <p className="mt-0.5 text-xs text-zinc-400">{campus.totalLeaders} leaders</p>
+        </div>
+        <Badge className={cn("rounded-md border hover:bg-inherit text-xs", healthClasses(campus.completionRate))}>
+          {healthLabel(campus.completionRate)}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="rounded bg-zinc-50 p-2">
+          <p className="text-zinc-400">Leaders</p>
+          <p className="mt-0.5 font-semibold text-zinc-950">{fmt(campus.totalLeaders)}</p>
+        </div>
+        <div className="rounded bg-zinc-50 p-2">
+          <p className="text-zinc-400">Enrolled</p>
+          <p className="mt-0.5 font-semibold text-zinc-950">{fmt(campus.enrolledLeaders)}</p>
+        </div>
+        <div className="rounded bg-zinc-50 p-2">
+          <p className="text-zinc-400">Certified</p>
+          <p className="mt-0.5 font-semibold text-zinc-950">{fmt(campus.certificates)}</p>
+        </div>
+      </div>
+      <div className="mt-3">
+        <div className="mb-1 flex justify-between text-xs text-zinc-400">
+          <span>Completion</span>
+          <span className="font-medium text-zinc-700">{campus.completionRate}%</span>
+        </div>
+        <Progress value={campus.completionRate} className="h-1.5 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black" />
+      </div>
+      {campus.enrolledLeaders - campus.completedLeaders > 0 && (
+        <p className="mt-2 text-xs text-zinc-400">
+          {Math.max(0, campus.enrolledLeaders - campus.completedLeaders)} enrolled — not yet certified
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Subgroup Performance Accordion ────────────────────────────────────────────
+
+function SubgroupPerformance({ subgroups }: { subgroups: SubgroupSummary[] }) {
+  const [expanded, setExpanded] = useState(subgroups[0]?.subgroupId ?? "");
+
+  if (subgroups.length === 0) {
     return (
       <motion.section variants={shellItem}>
         <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
           <CardHeader className="border-b border-zinc-100">
-            <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Campus performance</CardTitle>
-            <p className="text-sm text-zinc-500">Leadership academy health across campuses in your group</p>
+            <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Subgroup performance</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="py-8 text-center text-sm text-zinc-400">No campus data available for this group</p>
+            <p className="py-8 text-center text-sm text-zinc-400">
+              No subgroup data found for this group. Ensure users have the correct group_id assigned.
+            </p>
           </CardContent>
         </Card>
       </motion.section>
@@ -139,47 +228,67 @@ function CampusPerformance({ campusSummaries }: { campusSummaries: CampusSummary
     <motion.section variants={shellItem}>
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
         <CardHeader className="border-b border-zinc-100">
-          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Campus performance</CardTitle>
-          <p className="text-sm text-zinc-500">Leadership academy health across campuses in your group</p>
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Subgroup performance</CardTitle>
+          <p className="text-sm text-zinc-500">
+            Multi-campus leadership health by subgroup — click a subgroup to see its campuses
+          </p>
         </CardHeader>
         <CardContent className="space-y-3 pt-1">
-          {campusSummaries.map((campus) => {
-            const isOpen = expanded === campus.campusId;
+          {subgroups.map((subgroup) => {
+            const isOpen = expanded === subgroup.subgroupId;
             return (
-              <div key={campus.campusId} className="rounded-lg border border-zinc-100 bg-white">
+              <div key={subgroup.subgroupId} className="rounded-lg border border-zinc-100 bg-white">
+                {/* Subgroup header row */}
                 <button
-                  onClick={() => setExpanded(isOpen ? "" : campus.campusId)}
+                  onClick={() => setExpanded(isOpen ? "" : subgroup.subgroupId)}
                   className="flex w-full flex-col gap-4 p-4 text-left lg:flex-row lg:items-center lg:justify-between"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex size-10 items-center justify-center rounded-lg bg-black text-white">
-                      <Building2 className="size-4" />
+                      <Users className="size-4" />
                     </div>
                     <div>
-                      <p className="font-heading font-semibold text-zinc-950">{campus.campusName}</p>
-                      <p className="text-sm text-zinc-500">{campus.totalLeaders} leaders</p>
+                      <p className="font-heading font-semibold text-zinc-950">{subgroup.subgroupName}</p>
+                      <p className="text-sm text-zinc-500">
+                        {subgroup.pastorName
+                          ? subgroup.pastorName
+                          : `${subgroup.campusSummaries.length} campus${subgroup.campusSummaries.length !== 1 ? "es" : ""}`}
+                      </p>
                     </div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+
+                  {/* Stats row */}
+                  <div className="grid gap-3 sm:grid-cols-5 lg:min-w-[720px]">
                     {[
-                      ["Leaders", fmt(campus.totalLeaders)],
-                      ["Enrolled", fmt(campus.enrolledLeaders)],
-                      ["Completion", `${campus.completionRate}%`],
-                      ["Certificates", fmt(campus.certificates)],
+                      ["Campuses", subgroup.campusSummaries.length],
+                      ["Leaders", fmt(subgroup.totalLeaders)],
+                      ["Enrolled", fmt(subgroup.enrolledLeaders)],
+                      ["Completion", `${subgroup.completionRate}%`],
+                      ["Certificates", fmt(subgroup.certificates)],
                     ].map(([label, value]) => (
-                      <div key={label} className="rounded-lg bg-zinc-50 p-3">
+                      <div key={String(label)} className="rounded-lg bg-zinc-50 p-3">
                         <p className="text-xs text-zinc-500">{label}</p>
                         <p className="font-heading mt-1 font-semibold text-zinc-950">{value}</p>
                       </div>
                     ))}
                   </div>
+
                   <div className="flex items-center gap-3">
-                    <Badge className={cn("rounded-md border hover:bg-inherit shrink-0", healthClasses(campus.completionRate))}>
-                      {healthLabel(campus.completionRate)}
+                    <Badge
+                      className={cn(
+                        "rounded-md border hover:bg-inherit shrink-0",
+                        healthClasses(subgroup.completionRate)
+                      )}
+                    >
+                      {healthLabel(subgroup.completionRate)}
                     </Badge>
-                    <ChevronDown className={cn("size-5 text-zinc-400 transition-transform", isOpen && "rotate-180")} />
+                    <ChevronDown
+                      className={cn("size-5 text-zinc-400 transition-transform", isOpen && "rotate-180")}
+                    />
                   </div>
                 </button>
+
+                {/* Campus breakdown (expanded) */}
                 <AnimatePresence initial={false}>
                   {isOpen && (
                     <motion.div
@@ -189,44 +298,33 @@ function CampusPerformance({ campusSummaries }: { campusSummaries: CampusSummary
                       transition={{ duration: 0.22 }}
                       className="overflow-hidden"
                     >
-                      <div className="grid gap-4 border-t border-zinc-100 p-4 md:grid-cols-3">
-                        <div className="rounded-lg border border-zinc-100 p-4">
-                          <p className="font-medium text-zinc-950">Enrollment coverage</p>
-                          <p className="font-heading mt-2 text-2xl font-semibold text-zinc-950">
-                            {campus.totalLeaders > 0
-                              ? `${Math.round((campus.enrolledLeaders / campus.totalLeaders) * 100)}%`
-                              : "—"}
-                          </p>
-                          <p className="mt-1 text-sm text-zinc-500">
-                            {campus.enrolledLeaders} of {campus.totalLeaders} enrolled
-                          </p>
+                      <div className="border-t border-zinc-100 p-4">
+                        {/* Subgroup summary bar */}
+                        <div className="mb-4 rounded-lg border border-zinc-100 bg-zinc-50 p-3">
+                          <div className="mb-1.5 flex items-center justify-between text-xs">
+                            <span className="text-zinc-500">Subgroup completion progress</span>
+                            <span className="font-semibold text-zinc-950">{subgroup.completionRate}%</span>
+                          </div>
                           <Progress
-                            value={
-                              campus.totalLeaders > 0
-                                ? Math.round((campus.enrolledLeaders / campus.totalLeaders) * 100)
-                                : 0
-                            }
-                            className="mt-3 h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
+                            value={subgroup.completionRate}
+                            className="h-2 bg-zinc-200 [&_[data-slot=progress-indicator]]:bg-black"
                           />
-                        </div>
-                        <div className="rounded-lg border border-zinc-100 p-4">
-                          <p className="font-medium text-zinc-950">Completion rate</p>
-                          <p className="font-heading mt-2 text-2xl font-semibold text-zinc-950">
-                            {campus.completionRate}%
+                          <p className="mt-2 text-xs text-zinc-400">
+                            {Math.max(0, subgroup.enrolledLeaders - subgroup.completedLeaders)} enrolled leaders still
+                            working toward their certificate
                           </p>
-                          <p className="mt-1 text-sm text-zinc-500">{campus.completedLeaders} certified</p>
-                          <Progress
-                            value={campus.completionRate}
-                            className="mt-3 h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
-                          />
                         </div>
-                        <div className="rounded-lg border border-zinc-100 p-4">
-                          <p className="font-medium text-zinc-950">Needs follow-up</p>
-                          <p className="font-heading mt-2 text-2xl font-semibold text-zinc-950">
-                            {Math.max(0, campus.enrolledLeaders - campus.completedLeaders)}
-                          </p>
-                          <p className="mt-1 text-sm text-zinc-500">Enrolled but not yet certified</p>
-                        </div>
+
+                        {/* Campus cards grid */}
+                        {subgroup.campusSummaries.length === 0 ? (
+                          <p className="py-4 text-center text-sm text-zinc-400">No campus data for this subgroup</p>
+                        ) : (
+                          <div className="grid gap-3 lg:grid-cols-3 md:grid-cols-2">
+                            {subgroup.campusSummaries.map((campus) => (
+                              <CampusCard key={campus.campusId} campus={campus} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   )}
@@ -240,22 +338,19 @@ function CampusPerformance({ campusSummaries }: { campusSummaries: CampusSummary
   );
 }
 
-function CampusHealthAndInsights({
-  groupName,
-  campusSummaries,
-}: {
-  groupName: string;
-  campusSummaries: CampusSummary[];
-}) {
-  const sorted = [...campusSummaries].sort((a, b) => b.completionRate - a.completionRate);
+// ── Health Intelligence + Insights ───────────────────────────────────────────
+
+function HealthAndInsights({ groupName, analytics }: { groupName: string; analytics: GroupAnalyticsDetailed }) {
+  // Flatten all campuses across subgroups for health signals
+  const allCampuses = analytics.subgroups.flatMap((sg) => sg.campusSummaries);
+  const sorted = [...allCampuses].sort((a, b) => b.completionRate - a.completionRate);
   const spotlight = [...sorted.slice(0, 2), ...sorted.slice(-2).reverse()].slice(0, 4);
   const best = sorted[0];
   const worst = sorted[sorted.length - 1];
-  const needAttention = campusSummaries.filter((c) => c.completionRate < 60).length;
-  const totalCerts = campusSummaries.reduce((s, c) => s + c.certificates, 0);
+  const needAttention = allCampuses.filter((c) => c.completionRate < 60).length;
   const avgRate =
-    campusSummaries.length > 0
-      ? Math.round(campusSummaries.reduce((s, c) => s + c.completionRate, 0) / campusSummaries.length)
+    allCampuses.length > 0
+      ? Math.round(allCampuses.reduce((s, c) => s + c.completionRate, 0) / allCampuses.length)
       : 0;
 
   const insights = [
@@ -264,21 +359,15 @@ function CampusHealthAndInsights({
           title: `${best.campusName} leads with ${best.completionRate}% completion — a strong ministry benchmark.`,
           icon: TrendingUp,
         }
-      : {
-          title: `Group average stands at ${avgRate}% completion — keep driving momentum.`,
-          icon: TrendingUp,
-        },
+      : { title: `Group average stands at ${avgRate}% completion — keep driving momentum.`, icon: TrendingUp },
     worst && worst.completionRate < 60
       ? {
           title: `${worst.campusName} is at ${worst.completionRate}% — pastoral follow-up recommended.`,
           icon: TrendingDown,
         }
-      : {
-          title: "All campuses are above the 60% completion threshold — group is stable.",
-          icon: UserCheck,
-        },
+      : { title: "All campuses are above the 60% completion threshold — group is stable.", icon: UserCheck },
     {
-      title: `${fmt(totalCerts)} certificates issued across ${groupName}.`,
+      title: `${fmt(analytics.certificates)} certificates issued across ${groupName}.`,
       icon: Award,
     },
     needAttention > 0
@@ -286,18 +375,17 @@ function CampusHealthAndInsights({
           title: `${needAttention} campus${needAttention !== 1 ? "es" : ""} require follow-up attention.`,
           icon: AlertCircle,
         }
-      : {
-          title: "No campuses currently below critical thresholds — group is on track.",
-          icon: UserCheck,
-        },
+      : { title: "No campuses currently below critical thresholds — group is on track.", icon: UserCheck },
   ];
 
   return (
     <motion.section variants={shellItem} className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
         <CardHeader className="border-b border-zinc-100">
-          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Campus health intelligence</CardTitle>
-          <p className="text-sm text-zinc-500">Completion signals and follow-up priorities</p>
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
+            Campus health intelligence
+          </CardTitle>
+          <p className="text-sm text-zinc-500">Top and bottom performing campuses across all subgroups</p>
         </CardHeader>
         <CardContent className="space-y-3 pt-1">
           {spotlight.length === 0 ? (
@@ -346,8 +434,13 @@ function CampusHealthAndInsights({
   );
 }
 
-function CampusAttentionSummary({ campusSummaries }: { campusSummaries: CampusSummary[] }) {
-  const lowCampuses = campusSummaries
+// ── Campuses Needing Attention ─────────────────────────────────────────────
+
+function AttentionSection({ analytics }: { analytics: GroupAnalyticsDetailed }) {
+  const allCampuses = analytics.subgroups.flatMap((sg) =>
+    sg.campusSummaries.map((c) => ({ ...c, subgroupName: sg.subgroupName }))
+  );
+  const lowCampuses = allCampuses
     .filter((c) => c.completionRate < 70)
     .sort((a, b) => a.completionRate - b.completionRate)
     .slice(0, 4);
@@ -372,7 +465,7 @@ function CampusAttentionSummary({ campusSummaries }: { campusSummaries: CampusSu
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium text-zinc-950">{campus.campusName}</p>
-                    <p className="text-sm text-zinc-500">{campus.totalLeaders} leaders</p>
+                    <p className="text-xs text-zinc-400">{campus.subgroupName}</p>
                   </div>
                   <Badge className={cn("rounded-md border hover:bg-inherit", healthClasses(campus.completionRate))}>
                     {campus.completionRate}%
@@ -383,8 +476,7 @@ function CampusAttentionSummary({ campusSummaries }: { campusSummaries: CampusSu
                   className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
                 />
                 <p className="mt-2 text-xs text-zinc-500">
-                  {Math.max(0, campus.enrolledLeaders - campus.completedLeaders)} enrolled leaders yet to earn a
-                  certificate
+                  {Math.max(0, campus.enrolledLeaders - campus.completedLeaders)} enrolled but not yet certified
                 </p>
               </div>
             ))
@@ -394,22 +486,25 @@ function CampusAttentionSummary({ campusSummaries }: { campusSummaries: CampusSu
 
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
         <CardHeader className="border-b border-zinc-100">
-          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Group summary</CardTitle>
-          <p className="text-sm text-zinc-500">Completion progress at a glance</p>
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Subgroup summary</CardTitle>
+          <p className="text-sm text-zinc-500">Completion at a glance</p>
         </CardHeader>
         <CardContent className="space-y-3 pt-1">
-          {campusSummaries.slice(0, 5).map((campus) => (
-            <div key={campus.campusId} className="rounded-lg border border-zinc-100 p-3">
+          {analytics.subgroups.map((sg) => (
+            <div key={sg.subgroupId} className="rounded-lg border border-zinc-100 p-3">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="text-sm font-medium text-zinc-950">
-                  {campus.campusName.replace(/^Harvesters\s+/i, "").replace(/\s+Campus$/i, "")}
+                  {sg.subgroupName.replace(/\s+Subgroup$/i, "")}
                 </p>
-                <span className="text-xs text-zinc-400">{campus.certificates} certs</span>
+                <span className="text-xs text-zinc-400">{fmt(sg.certificates)} certs</span>
               </div>
               <Progress
-                value={campus.completionRate}
+                value={sg.completionRate}
                 className="h-1.5 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
               />
+              <p className="mt-1 text-[11px] text-zinc-400">
+                {sg.completionRate}% · {sg.campusSummaries.length} campuses · {fmt(sg.totalLeaders)} leaders
+              </p>
             </div>
           ))}
         </CardContent>
@@ -418,12 +513,14 @@ function CampusAttentionSummary({ campusSummaries }: { campusSummaries: CampusSu
   );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function GroupDashboardPage() {
   const hierarchy = useHierarchy();
   const groupName = hierarchy.groupName || "…";
   const groupId = hierarchy.groupId;
 
-  const [analytics, setAnalytics] = useState<HierarchyAnalytics | null>(null);
+  const [analytics, setAnalytics] = useState<GroupAnalyticsDetailed | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   useEffect(() => {
@@ -432,32 +529,31 @@ export default function GroupDashboardPage() {
       setAnalyticsLoading(false);
       return;
     }
-    fetchGroupAnalytics(groupId).then((data) => {
+    fetchGroupAnalyticsDetailed(groupId).then((data) => {
       setAnalytics(data);
       setAnalyticsLoading(false);
     });
   }, [groupId, hierarchy.loading]);
 
-  const campusSummaries = analytics?.campusSummaries ?? [];
-
   return (
     <ProtectedRoute allowedRoles={["Group Pastor", "Super Admin", "Admin"]}>
-      <DashboardShell searchPlaceholder="Search campuses, leaders..." showDate>
+      <DashboardShell searchPlaceholder="Search subgroups, campuses, leaders..." showDate>
         <Hero groupName={groupName} analytics={analytics} />
         <PersonalLearningLayer
           role={(hierarchy.role || "Group Pastor") as import("@/lib/mock-auth").MockRole}
         />
         <OversightLayerIntro
           title="Group oversight intelligence"
-          description={`Role-aware intelligence for ${groupName} ministry health, campus analytics, leadership pipeline visibility, and growth signals.`}
+          description={`Full hierarchy visibility for ${groupName} — subgroups, campuses, enrollment, certificates, and leadership health signals.`}
           modules={[
-            "Strategic ministry intelligence",
-            "Campus analytics",
+            "Subgroup analytics",
+            "Campus performance",
             "Leadership pipeline visibility",
-            "Campus growth intelligence",
+            "Campus health signals",
           ]}
         />
         <KpiGrid groupName={groupName} analytics={analytics} />
+
         {!analyticsLoading && !groupId && (
           <motion.section variants={shellItem}>
             <div className="rounded-xl border border-dashed border-zinc-200 bg-white py-14 text-center">
@@ -469,11 +565,12 @@ export default function GroupDashboardPage() {
             </div>
           </motion.section>
         )}
-        {!analyticsLoading && groupId && (
+
+        {!analyticsLoading && analytics && (
           <>
-            <CampusPerformance campusSummaries={campusSummaries} />
-            <CampusHealthAndInsights groupName={groupName} campusSummaries={campusSummaries} />
-            <CampusAttentionSummary campusSummaries={campusSummaries} />
+            <SubgroupPerformance subgroups={analytics.subgroups} />
+            <HealthAndInsights groupName={groupName} analytics={analytics} />
+            <AttentionSection analytics={analytics} />
           </>
         )}
       </DashboardShell>
