@@ -58,5 +58,13 @@ export async function POST(request: Request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  // Fire analytics event (non-blocking)
+  void supabase.from("activity_events").insert({
+    user_id: user.id,
+    role: profile?.role ?? null,
+    event_type: "course_enroll",
+    event_payload: { course_id: body.course_id, course_title: course.title },
+  });
+
   return Response.json({ enrollment: data });
 }

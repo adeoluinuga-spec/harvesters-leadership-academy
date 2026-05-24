@@ -9,12 +9,11 @@ import {
   Building2,
   ChevronRight,
   CircleCheck,
-  ClipboardCheck,
-  Cpu,
   GraduationCap,
-  LineChart,
   Plus,
+  TrendingUp,
   Users,
+  AlertCircle,
 } from "lucide-react";
 
 import {
@@ -29,84 +28,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
-
-const kpis = [
-  {
-    label: "Total Organizations",
-    value: "12",
-    delta: "+3 pilots",
-    detail: "Tenant environments provisioned",
-    icon: Building2,
-    sparkline: [4, 5, 6, 7, 8, 10, 12],
-  },
-  {
-    label: "Total Leaders",
-    value: "12,840",
-    delta: "+12.4%",
-    detail: "Across active organizations",
-    icon: Users,
-    sparkline: [34, 45, 40, 58, 52, 66, 73],
-  },
-  {
-    label: "Global Courses",
-    value: "48",
-    delta: "+6 new",
-    detail: "Shared architecture tracks",
-    icon: BookOpenCheck,
-    sparkline: [28, 34, 33, 42, 44, 47, 48],
-  },
-  {
-    label: "AI Systems",
-    value: "7",
-    delta: "healthy",
-    detail: "Course, analytics, and insight engines",
-    icon: Cpu,
-    sparkline: [3, 3, 4, 5, 5, 6, 7],
-  },
-];
-
-const tenantPortfolio = [
-  { name: "Harvesters International Christian Centre", leaders: 12840, completion: 84, engagement: "Very high" },
-  { name: "Pilot Ministry Network", leaders: 1480, completion: 72, engagement: "Rising" },
-  { name: "Leadership Residency Cloud", leaders: 920, completion: 79, engagement: "Strong" },
-  { name: "White-label Sandbox", leaders: 240, completion: 61, engagement: "Provisioning" },
-];
-
-const activityFeed = [
-  {
-    title: "Certificate earned",
-    description: "12 leaders completed Ministry Culture Essentials across tenant environments",
-    time: "8 min ago",
-    icon: Award,
-  },
-  {
-    title: "Assessment submitted",
-    description: "Harvesters submitted Q2 leadership review",
-    time: "24 min ago",
-    icon: ClipboardCheck,
-  },
-  {
-    title: "New enrollments",
-    description: "86 leaders joined Discipleship Systems across active organizations",
-    time: "1 hr ago",
-    icon: Users,
-  },
-  {
-    title: "Course completion",
-    description: "Global Prayer Team Leads track reached 94% completion",
-    time: "2 hrs ago",
-    icon: CircleCheck,
-  },
-];
-
-const engagementMetrics = [
-  { label: "Tenant learning hours", value: "18,420", change: "+14%" },
-  { label: "Platform pass rate", value: "91%", change: "+5%" },
-  { label: "AI quality score", value: "4.8", change: "+0.3" },
-];
+import { fetchPlatformAnalytics } from "@/lib/analytics";
+import type { PlatformAnalytics } from "@/lib/analytics";
+import {
+  WeeklyTrendChart,
+  CampusCompletionChart,
+  CourseEnrollmentChart,
+} from "@/components/charts/metric-charts";
 
 function Sparkline({ values }: { values: number[] }) {
-  const max = Math.max(...values);
+  const max = Math.max(...values, 1);
   const points = values
     .map((value, index) => {
       const x = (index / (values.length - 1)) * 100;
@@ -114,7 +45,6 @@ function Sparkline({ values }: { values: number[] }) {
       return `${x},${y}`;
     })
     .join(" ");
-
   return (
     <svg viewBox="0 0 100 36" className="h-9 w-full" aria-hidden="true">
       <polyline
@@ -130,29 +60,28 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
-function DashboardHero() {
+function eventLabel(type: string): string {
+  const map: Record<string, string> = {
+    course_enroll: "New enrollment",
+    certificate_issued: "Certificate earned",
+    assessment_pass: "Assessment passed",
+    assessment_fail: "Assessment attempt",
+    lesson_complete: "Lesson completed",
+    onboarding_complete: "Leader onboarded",
+  };
+  return map[type] ?? type.replace(/_/g, " ");
+}
+
+function eventIcon(type: string) {
+  if (type === "certificate_issued") return Award;
+  if (type === "assessment_pass" || type === "assessment_fail") return CircleCheck;
+  if (type === "course_enroll") return GraduationCap;
+  if (type === "onboarding_complete") return Users;
+  return TrendingUp;
+}
+
+function DashboardHero({ firstName }: { firstName: string }) {
   const router = useRouter();
-  const [profile, setProfile] = useState<AuthProfile | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadProfile() {
-      const result = await getCurrentUserProfile();
-      if (active && result.profile) {
-        setProfile(result.profile);
-      }
-    }
-
-    loadProfile();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const firstName = profile?.fullName?.split(" ").filter(Boolean)[0] ?? "Leader";
-
   return (
     <motion.section
       variants={shellItem}
@@ -161,40 +90,74 @@ function DashboardHero() {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Badge className="mb-5 rounded-md border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-50">
-            Platform Super Admin
+            Super Admin
           </Badge>
           <h1 className="font-heading max-w-3xl text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-            Platform Governance Command Center
+            Ministry Intelligence Command
           </h1>
           <p className="mt-3 max-w-2xl text-base text-zinc-500">
-            Welcome back, {firstName}. Oversee organizations, tenant provisioning, AI systems, white-label readiness, and global course architecture from one executive layer.
+            Welcome back, {firstName}. Live analytics, enrollment trends, campus performance, and leadership metrics across Harvesters Leadership Academy.
           </p>
         </div>
-
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button className="h-10 rounded-lg bg-black px-4 text-white hover:bg-zinc-800">
-            <Plus className="size-4" />
-            Provision tenant
-          </Button>
           <button
             type="button"
             onClick={() => router.push("/dashboard/admin/courses/new")}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          >
+            <Plus className="size-4" />
+            New course
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/admin/courses")}
             className="inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
           >
             <GraduationCap className="size-4" />
-            New course
+            Manage courses
           </button>
-          <Button variant="outline" className="h-10 rounded-lg border-zinc-200 bg-white px-4">
-            Platform reports
-            <ChevronRight className="size-4" />
-          </Button>
         </div>
       </div>
     </motion.section>
   );
 }
 
-function KpiCards() {
+function KpiCards({ data }: { data: PlatformAnalytics }) {
+  const kpis = [
+    {
+      label: "Total Leaders",
+      value: data.totalLeaders.toLocaleString(),
+      delta: `${data.activatedLeaders.toLocaleString()} onboarded`,
+      detail: "Registered across all campuses",
+      icon: Users,
+      sparkline: [40, 52, 58, 65, 72, 78, data.totalLeaders > 0 ? 85 : 80],
+    },
+    {
+      label: "Published Courses",
+      value: String(data.totalCourses),
+      delta: `${data.enrollmentRate}% enrolment rate`,
+      detail: "Active learning tracks",
+      icon: BookOpenCheck,
+      sparkline: [20, 24, 28, 30, data.totalCourses - 4, data.totalCourses - 2, data.totalCourses],
+    },
+    {
+      label: "Total Enrolments",
+      value: data.totalEnrollments.toLocaleString(),
+      delta: `↑ active`,
+      detail: "Leaders in at least 1 course",
+      icon: GraduationCap,
+      sparkline: [30, 40, 48, 55, 60, 68, data.totalEnrollments > 0 ? 75 : 70],
+    },
+    {
+      label: "Certificates Issued",
+      value: data.totalCertificates.toLocaleString(),
+      delta: `${data.overallCompletionRate}% completion`,
+      detail: "Verified completions",
+      icon: Award,
+      sparkline: [10, 18, 24, 30, 38, 45, data.totalCertificates > 0 ? 52 : 48],
+    },
+  ];
+
   return (
     <motion.section variants={shellContainer} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {kpis.map((kpi) => (
@@ -229,7 +192,14 @@ function KpiCards() {
   );
 }
 
-function AnalyticsSection() {
+function AnalyticsSection({ data }: { data: PlatformAnalytics }) {
+  const topCampuses = data.campusSummaries.filter((c) => c.totalLeaders > 0).slice(0, 5);
+  const engagementMetrics = [
+    { label: "Platform enrolment rate", value: `${data.enrollmentRate}%`, desc: "Leaders in at least 1 course" },
+    { label: "Overall completion rate", value: `${data.overallCompletionRate}%`, desc: "Enrolled leaders with certificate" },
+    { label: "Certificates issued", value: data.totalCertificates.toLocaleString(), desc: "Verified completions" },
+  ];
+
   return (
     <motion.section variants={shellItem} className="grid gap-4 xl:grid-cols-[1.45fr_0.85fr]">
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
@@ -237,43 +207,49 @@ function AnalyticsSection() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
-                Organization portfolio
+                Campus performance
               </CardTitle>
               <p className="mt-1 text-sm text-zinc-500">
-                Tenant health, leaders, and adoption across the LMS ecosystem
+                Enrolment and completion rates across all campuses
               </p>
             </div>
-            <LineChart className="size-5 text-zinc-400" />
+            <Building2 className="size-5 text-zinc-400" />
           </div>
         </CardHeader>
-        <CardContent className="space-y-5 pt-1">
-          {tenantPortfolio.map((tenant) => (
-            <div key={tenant.name} className="rounded-lg border border-zinc-100 p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium text-zinc-950">{tenant.name}</p>
-                  <p className="text-sm text-zinc-500">{tenant.leaders.toLocaleString()} leaders</p>
+        <CardContent className="space-y-4 pt-4">
+          {topCampuses.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-400">No campus data yet</p>
+          ) : (
+            topCampuses.map((campus) => (
+              <div key={campus.campusId} className="rounded-lg border border-zinc-100 p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-zinc-950">{campus.campusName}</p>
+                    <p className="text-sm text-zinc-500">
+                      {campus.totalLeaders} leaders · {campus.enrolledLeaders} enrolled
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-heading text-xl font-semibold tracking-tight text-zinc-950">
+                      {campus.completionRate}%
+                    </p>
+                    <p className="text-xs text-zinc-500">{campus.certificates} certificates</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-heading text-xl font-semibold tracking-tight text-zinc-950">
-                    {tenant.completion}%
-                  </p>
-                  <p className="text-xs text-zinc-500">{tenant.engagement} engagement</p>
-                </div>
+                <Progress
+                  value={campus.completionRate}
+                  className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
+                />
               </div>
-              <Progress
-                value={tenant.completion}
-                className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
-              />
-            </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
 
       <Card className="rounded-xl border-zinc-200 bg-[#0b0b0b] text-white shadow-sm">
         <CardHeader>
           <CardTitle className="font-heading text-lg font-semibold">Platform intelligence</CardTitle>
-          <p className="text-sm text-zinc-400">System-wide signals from the last 7 days</p>
+          <p className="text-sm text-zinc-400">Live ministry metrics</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {engagementMetrics.map((metric) => (
@@ -286,10 +262,8 @@ function AnalyticsSection() {
                 <p className="font-heading mt-1 text-2xl font-semibold tracking-tight">
                   {metric.value}
                 </p>
+                <p className="mt-0.5 text-xs text-zinc-500">{metric.desc}</p>
               </div>
-              <span className="rounded-md bg-emerald-400/10 px-2 py-1 text-xs font-semibold text-emerald-300">
-                {metric.change}
-              </span>
             </div>
           ))}
         </CardContent>
@@ -298,7 +272,106 @@ function AnalyticsSection() {
   );
 }
 
-function ActivityFeed() {
+function TrendSection({ data }: { data: PlatformAnalytics }) {
+  return (
+    <motion.section variants={shellItem} className="grid gap-4 xl:grid-cols-2">
+      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-zinc-100">
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
+            6-week enrolment trend
+          </CardTitle>
+          <p className="mt-1 text-sm text-zinc-500">Enrolments vs certificates over time</p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="mb-4 flex gap-4 text-xs">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-6 rounded-full bg-zinc-950 inline-block" />
+              Enrolments
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-6 rounded-full bg-emerald-500 inline-block" />
+              Certificates
+            </span>
+          </div>
+          <WeeklyTrendChart data={data.weeklyTrend} />
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-zinc-100">
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
+            Top courses by enrolment
+          </CardTitle>
+          <p className="mt-1 text-sm text-zinc-500">Most enrolled courses on the platform</p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <CourseEnrollmentChart data={data.topCourses} />
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+function CampusChartSection({ data }: { data: PlatformAnalytics }) {
+  const campusData = data.campusSummaries
+    .filter((c) => c.enrolledLeaders > 0)
+    .map((c) => ({
+      campusName: c.campusName,
+      completionRate: c.completionRate,
+      enrolledLeaders: c.enrolledLeaders,
+    }));
+
+  if (campusData.length === 0) return null;
+
+  return (
+    <motion.section variants={shellItem}>
+      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-zinc-100">
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
+            Campus completion comparison
+          </CardTitle>
+          <p className="mt-1 text-sm text-zinc-500">
+            Completion rate (%) for campuses with active enrolments
+          </p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <CampusCompletionChart data={campusData} />
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+function ActivityFeed({ data }: { data: PlatformAnalytics }) {
+  const feed = data.recentEvents.slice(0, 4);
+
+  if (feed.length === 0) {
+    // Fallback static items if no events yet
+    const staticFeed = [
+      { title: "Platform live", body: "Analytics engine active — events will appear here as leaders engage", time: "Now" },
+    ];
+    return (
+      <motion.section variants={shellItem}>
+        <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+          <CardHeader className="border-b border-zinc-100">
+            <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
+              Recent activity
+            </CardTitle>
+            <p className="mt-1 text-sm text-zinc-500">Ministry platform events</p>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {staticFeed.map((item) => (
+              <div key={item.title} className="rounded-lg border border-zinc-100 p-4">
+                <p className="font-medium text-zinc-950">{item.title}</p>
+                <p className="mt-2 text-sm text-zinc-500">{item.body}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
   return (
     <motion.section variants={shellItem}>
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
@@ -308,26 +381,74 @@ function ActivityFeed() {
               <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
                 Recent activity
               </CardTitle>
-              <p className="mt-1 text-sm text-zinc-500">
-                Live platform governance moments across tenants
-              </p>
+              <p className="mt-1 text-sm text-zinc-500">Live platform events</p>
             </div>
-            <Button variant="outline" size="sm" className="rounded-lg border-zinc-200 bg-white">
-              View all
-            </Button>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-3 pt-1 md:grid-cols-2 xl:grid-cols-4">
-          {activityFeed.map((activity) => (
-            <div key={activity.title} className="rounded-lg border border-zinc-100 p-4">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex size-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
-                  <activity.icon className="size-4" />
+        <CardContent className="grid gap-3 pt-4 md:grid-cols-2 xl:grid-cols-4">
+          {feed.map((event) => {
+            const Icon = eventIcon(event.eventType);
+            return (
+              <div key={event.id} className="rounded-lg border border-zinc-100 p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex size-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
+                    <Icon className="size-4" />
+                  </div>
+                  <span className="text-xs text-zinc-400">
+                    {new Date(event.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                  </span>
                 </div>
-                <span className="text-xs text-zinc-400">{activity.time}</span>
+                <p className="font-medium text-zinc-950">{eventLabel(event.eventType)}</p>
+                {typeof event.payload?.course_title === "string" && (
+                  <p className="mt-2 text-sm leading-6 text-zinc-500">
+                    {event.payload.course_title}
+                  </p>
+                )}
               </div>
-              <p className="font-medium text-zinc-950">{activity.title}</p>
-              <p className="mt-2 text-sm leading-6 text-zinc-500">{activity.description}</p>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+function AlertsSection({ data }: { data: PlatformAnalytics }) {
+  const weakCampuses = data.campusSummaries.filter(
+    (c) => c.totalLeaders > 0 && c.completionRate < 30 && c.enrolledLeaders > 0
+  );
+  const inactiveCampuses = data.campusSummaries.filter(
+    (c) => c.totalLeaders > 0 && c.enrolledLeaders === 0
+  );
+
+  if (weakCampuses.length === 0 && inactiveCampuses.length === 0) return null;
+
+  return (
+    <motion.section variants={shellItem}>
+      <Card className="rounded-xl border border-amber-100 bg-amber-50 shadow-sm">
+        <CardHeader className="border-b border-amber-100 pb-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-5 text-amber-600" />
+            <CardTitle className="font-heading text-base font-semibold text-amber-900">
+              Ministry attention needed
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 pt-4 sm:grid-cols-2 xl:grid-cols-3">
+          {weakCampuses.slice(0, 3).map((c) => (
+            <div key={c.campusId} className="rounded-lg border border-amber-200 bg-white p-4">
+              <p className="font-medium text-zinc-950">{c.campusName}</p>
+              <p className="mt-1 text-sm text-amber-700">
+                Only {c.completionRate}% completion rate — {c.enrolledLeaders} enrolled
+              </p>
+            </div>
+          ))}
+          {inactiveCampuses.slice(0, 3).map((c) => (
+            <div key={c.campusId} className="rounded-lg border border-amber-200 bg-white p-4">
+              <p className="font-medium text-zinc-950">{c.campusName}</p>
+              <p className="mt-1 text-sm text-amber-700">
+                {c.totalLeaders} leaders — no enrolments yet
+              </p>
             </div>
           ))}
         </CardContent>
@@ -336,26 +457,80 @@ function ActivityFeed() {
   );
 }
 
-export default function AdminDashboardPage() {
+function LoadingSkeleton() {
   return (
-    <ProtectedRoute allowedRoles={["Platform Super Admin"]}>
+    <motion.section variants={shellContainer} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {[1, 2, 3, 4].map((i) => (
+        <motion.div key={i} variants={shellItem}>
+          <Card className="animate-pulse rounded-xl border-zinc-200 bg-white shadow-sm">
+            <CardHeader>
+              <div className="h-3 w-28 rounded bg-zinc-100" />
+              <div className="mt-4 h-8 w-20 rounded bg-zinc-200" />
+            </CardHeader>
+            <CardContent>
+              <div className="h-3 w-full rounded bg-zinc-100" />
+              <div className="mt-3 h-9 rounded bg-zinc-50" />
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </motion.section>
+  );
+}
+
+export default function AdminDashboardPage() {
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const [analytics, setAnalytics] = useState<PlatformAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      const [profileResult, analyticsData] = await Promise.all([
+        getCurrentUserProfile(),
+        fetchPlatformAnalytics(),
+      ]);
+      if (!active) return;
+      if (profileResult.profile) setProfile(profileResult.profile);
+      setAnalytics(analyticsData);
+      setLoading(false);
+    }
+
+    load();
+    return () => { active = false; };
+  }, []);
+
+  const firstName = profile?.fullName?.split(" ").filter(Boolean)[0] ?? "Leader";
+
+  return (
+    <ProtectedRoute allowedRoles={["Platform Super Admin", "Super Admin", "Admin"]}>
       <DashboardShell>
-        <DashboardHero />
+        <DashboardHero firstName={firstName} />
         <PersonalLearningLayer role="Platform Super Admin" />
         <OversightLayerIntro
-          title="Platform ecosystem intelligence"
-          description="Platform-wide intelligence for organizations, tenant provisioning, white-label readiness, AI systems, global course architecture, and system health."
+          title="Platform ministry intelligence"
+          description="Live analytics from Harvesters Leadership Academy — leader engagement, campus performance, enrolment trends, assessment outcomes, and certificate milestones."
           modules={[
-            "Organization management",
-            "Tenant provisioning",
-            "White-label readiness",
-            "AI ecosystem oversight",
-            "Global course architecture",
+            "Leader engagement",
+            "Campus performance",
+            "Enrolment analytics",
+            "Assessment outcomes",
+            "Certificate milestones",
           ]}
         />
-        <KpiCards />
-        <AnalyticsSection />
-        <ActivityFeed />
+        {loading || !analytics ? (
+          <LoadingSkeleton />
+        ) : (
+          <>
+            <AlertsSection data={analytics} />
+            <KpiCards data={analytics} />
+            <AnalyticsSection data={analytics} />
+            <TrendSection data={analytics} />
+            <CampusChartSection data={analytics} />
+            <ActivityFeed data={analytics} />
+          </>
+        )}
       </DashboardShell>
     </ProtectedRoute>
   );

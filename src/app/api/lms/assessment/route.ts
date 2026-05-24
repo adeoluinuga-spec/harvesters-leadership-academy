@@ -108,6 +108,13 @@ export async function POST(request: Request) {
     return Response.json({ error: attemptError.message }, { status: 500 });
   }
 
+  // Fire analytics event for the attempt (non-blocking)
+  void supabase.from("activity_events").insert({
+    user_id: user.id,
+    event_type: passed ? "assessment_pass" : "assessment_fail",
+    event_payload: { assessment_id: body.assessment_id, course_id: body.course_id, score, passed },
+  });
+
   if (!passed) {
     return Response.json({
       attempt,
@@ -159,6 +166,13 @@ export async function POST(request: Request) {
     .insert({ user_id: user.id, course_id: body.course_id, certificate_number: certNumber })
     .select("*")
     .single();
+
+  // Fire certificate_issued event (non-blocking)
+  void supabase.from("activity_events").insert({
+    user_id: user.id,
+    event_type: "certificate_issued",
+    event_payload: { course_id: body.course_id, certificate_number: certNumber },
+  });
 
   return Response.json({ attempt, score, passed, certificate: cert, certificate_issued: true });
 }

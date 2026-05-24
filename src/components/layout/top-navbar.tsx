@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, LogOut, Search } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NotificationsBell } from "@/components/dashboard/notifications-bell";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
 
@@ -102,16 +103,7 @@ export function TopNavbar({
               {currentDate}
             </p>
           ) : null}
-          <Button
-            asChild
-            variant="outline"
-            size="icon-lg"
-            className="rounded-lg border-zinc-200 bg-white"
-          >
-            <Link href="/notifications" aria-label="Open notifications">
-              <Bell className="size-4" />
-            </Link>
-          </Button>
+          <NotificationsBell />
           <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-2 py-1.5">
             <Avatar>
               {profile?.avatarUrl ? <AvatarImage src={profile.avatarUrl} alt="" /> : null}
