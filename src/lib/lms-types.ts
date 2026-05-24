@@ -124,11 +124,16 @@ export type LMSLessonProgress = {
   watch_seconds: number;
 };
 
+export type QuestionType = "mcq" | "true_false" | "short_answer";
+
 export type LMSAssessment = {
   id: string;
   course_id: string;
   title: string;
   passing_score: number;
+  duration_minutes: number | null;
+  max_attempts: number | null;
+  instructions: string | null;
   is_required: boolean;
   questions?: LMSQuestion[];
 };
@@ -137,6 +142,7 @@ export type LMSQuestion = {
   id: string;
   assessment_id: string;
   question: string;
+  question_type: QuestionType;
   options: string[];
   correct_option: number;
   explanation: string | null;
@@ -150,7 +156,9 @@ export type LMSAttempt = {
   course_id: string;
   score: number;
   passed: boolean;
-  answers: Record<string, number>;
+  answers: Record<string, number | string>;
+  started_at: string | null;
+  time_taken_seconds: number | null;
   attempted_at: string;
 };
 

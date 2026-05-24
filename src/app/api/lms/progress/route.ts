@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const certNumber = generateCertNumber(user.id, body.course_id);
+  const certNumber = await generateCertNumber(supabase);
   const { data: cert } = await supabase
     .from("certificates")
     .insert({ user_id: user.id, course_id: body.course_id, certificate_number: certNumber })
@@ -124,9 +124,15 @@ export async function POST(request: Request) {
   });
 }
 
-function generateCertNumber(userId: string, courseId: string): string {
-  const ts = Date.now().toString(36).toUpperCase();
-  const u = userId.replace(/-/g, "").slice(0, 4).toUpperCase();
-  const c = courseId.replace(/-/g, "").slice(0, 4).toUpperCase();
-  return `HLA-${u}-${c}-${ts}`;
+async function generateCertNumber(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string> {
+  const year = new Date().getFullYear();
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("generate_certificate_number");
+  if (!rpcError && rpcResult) return rpcResult as string;
+  const { count } = await supabase
+    .from("certificates")
+    .select("id", { count: "exact", head: true });
+  const seq = String((count ?? 0) + 1).padStart(6, "0");
+  return `HLA-${year}-${seq}`;
 }

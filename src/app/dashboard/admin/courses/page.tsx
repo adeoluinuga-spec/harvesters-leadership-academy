@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
+  ClipboardCheck,
   Eye,
   EyeOff,
   GraduationCap,
@@ -188,6 +189,13 @@ function CourseCard({ course, onStatusChange, onDelete }: {
           >
             <BookOpen className="size-3.5" />
             Lessons
+          </Link>
+          <Link
+            href={`/dashboard/admin/courses/${course.id}/assessment`}
+            className="inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            <ClipboardCheck className="size-3.5" />
+            Assessment
           </Link>
 
           <div className="relative">

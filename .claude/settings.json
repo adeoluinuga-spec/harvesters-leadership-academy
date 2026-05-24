@@ -14,7 +14,8 @@
       "Bash(dir /b /ad)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\hp\\\\Desktop\\\\harvesters-academy\" -Recurse -ErrorAction SilentlyContinue)",
       "Bash(xargs grep -l \"campus\")",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\hp\\.claude\\projects\\c--Users-hp-Desktop-harvesters-academy\\memory"

@@ -1,6 +1,7 @@
 "use client";
 
-import { Award, CheckCircle2, Download, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Award, CheckCircle2, Download, ExternalLink, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { LMSCertificate } from "@/lib/lms-types";
@@ -31,14 +32,24 @@ export function CertificateView({ certificate, recipientName }: CertificateViewP
             {course?.title ?? "Course"}
           </p>
         </div>
-        <Button
-          onClick={handlePrint}
-          variant="outline"
-          className="gap-2 rounded-lg border-zinc-200 bg-white print:hidden"
-        >
-          <Download className="size-4" />
-          Download
-        </Button>
+        <div className="flex items-center gap-2 print:hidden">
+          <Link
+            href={`/verify/${encodeURIComponent(certificate.certificate_number)}`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <ExternalLink className="size-4" />
+            Verify
+          </Link>
+          <Button
+            onClick={handlePrint}
+            variant="outline"
+            className="gap-2 rounded-lg border-zinc-200 bg-white"
+          >
+            <Download className="size-4" />
+            Download PDF
+          </Button>
+        </div>
       </div>
 
       {/* The printable certificate */}

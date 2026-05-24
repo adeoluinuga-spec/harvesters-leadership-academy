@@ -316,12 +316,16 @@ export async function fetchCourseWithLessons(slug: string): Promise<CourseWithLe
       course_id: raw.course_id as string,
       title: raw.title as string,
       passing_score: raw.passing_score as number,
+      duration_minutes: (raw.duration_minutes as number | null) ?? null,
+      max_attempts: (raw.max_attempts as number | null) ?? null,
+      instructions: (raw.instructions as string | null) ?? null,
       is_required: raw.is_required as boolean,
       questions: questions
         .map((q: Record<string, unknown>) => ({
           id: q.id as string,
           assessment_id: q.assessment_id as string,
           question: q.question as string,
+          question_type: ((q.question_type as string) ?? "mcq") as import("@/lib/lms-types").QuestionType,
           options: Array.isArray(q.options) ? (q.options as string[]) : [],
           correct_option: q.correct_option as number,
           explanation: (q.explanation as string | null) ?? null,
@@ -491,6 +495,62 @@ export async function saveNote(lessonId: string, content: string): Promise<LMSNo
     .single();
 
   return (data as LMSNote | null) ?? null;
+}
+
+// ============================================================
+// Admin assessment management
+// ============================================================
+
+export async function fetchAdminAssessment(courseId: string): Promise<LMSAssessment | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("assessments")
+    .select("*, assessment_questions(*)")
+    .eq("course_id", courseId)
+    .maybeSingle();
+
+  if (!data) return null;
+  const raw = data as Record<string, unknown>;
+  const rawQuestions = Array.isArray(raw.assessment_questions)
+    ? (raw.assessment_questions as Array<Record<string, unknown>>)
+    : [];
+
+  const questions: LMSAssessment["questions"] = rawQuestions
+    .sort((a, b) => (a.order_index as number) - (b.order_index as number))
+    .map((q) => ({
+      id: q.id as string,
+      assessment_id: q.assessment_id as string,
+      question: q.question as string,
+      question_type: ((q.question_type as string) ?? "mcq") as import("@/lib/lms-types").QuestionType,
+      options: Array.isArray(q.options) ? (q.options as string[]) : [],
+      correct_option: q.correct_option as number,
+      explanation: (q.explanation as string | null) ?? null,
+      order_index: q.order_index as number,
+    }));
+
+  return {
+    id: raw.id as string,
+    course_id: raw.course_id as string,
+    title: raw.title as string,
+    passing_score: raw.passing_score as number,
+    duration_minutes: (raw.duration_minutes as number | null) ?? null,
+    max_attempts: (raw.max_attempts as number | null) ?? null,
+    instructions: (raw.instructions as string | null) ?? null,
+    is_required: raw.is_required as boolean,
+    questions,
+  };
+}
+
+export async function fetchUserAttemptCount(assessmentId: string): Promise<number> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+  const { count } = await supabase
+    .from("assessment_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("assessment_id", assessmentId);
+  return count ?? 0;
 }
 
 // ============================================================
