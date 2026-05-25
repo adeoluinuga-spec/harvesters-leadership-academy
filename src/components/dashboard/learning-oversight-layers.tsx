@@ -20,12 +20,13 @@ import { shellItem } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { recommendedCourses, recentlyWatched } from "@/lib/course-data";
+import { recentlyWatched } from "@/lib/course-data";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
 import { MockRole } from "@/lib/mock-auth";
 import { fetchCoursesWithProgress } from "@/lib/lms";
 import type { CourseWithProgress } from "@/lib/lms-types";
+import { formatDuration } from "@/lib/lms-types";
 import { motion } from "framer-motion";
 
 type LearningMetric = {
@@ -83,6 +84,7 @@ const roleContext: Record<MockRole, string> = {
 
 export function PersonalLearningLayer({ role }: { role: MockRole }) {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const [allCourses, setAllCourses] = useState<CourseWithProgress[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<CourseWithProgress[]>([]);
 
   useEffect(() => {
@@ -114,7 +116,10 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
         if (active) setProfile(resolved);
       }
 
-      if (active) setEnrolledCourses(courses.filter((c) => c.enrolled));
+      if (active) {
+        setAllCourses(courses);
+        setEnrolledCourses(courses.filter((c) => c.enrolled));
+      }
     }
 
     load();
@@ -125,6 +130,16 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
   }, []);
 
   const activeCourse = enrolledCourses[0] ?? null;
+
+  // Live recommended: published courses not yet enrolled, required → featured → rest
+  const recommendedLive = allCourses
+    .filter((c) => !c.enrolled)
+    .sort((a, b) => {
+      if (a.is_required !== b.is_required) return b.is_required ? 1 : -1;
+      if (a.is_featured !== b.is_featured) return b.is_featured ? 1 : -1;
+      return 0;
+    })
+    .slice(0, 3);
 
   const effectiveRole = profile?.role ?? role;
   const currentRole = profile?.currentLeadershipRole ?? effectiveRole;
@@ -232,19 +247,40 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
             <p className="text-sm text-zinc-500">Personalized next steps</p>
           </CardHeader>
           <CardContent className="space-y-3 pt-1">
-            {recommendedCourses.map((course) => (
-              <div key={course.title} className="flex items-start gap-3 rounded-lg border border-zinc-100 p-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
-                  <Sparkles className="size-4" />
-                </div>
-                <div>
-                  <p className="font-medium text-zinc-950">{course.title}</p>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    {course.category} - {course.duration}
-                  </p>
-                </div>
+            {recommendedLive.length === 0 ? (
+              <div className="py-8 text-center">
+                <Sparkles className="mx-auto size-6 text-zinc-300" />
+                <p className="mt-2 text-sm text-zinc-400">
+                  {allCourses.length === 0
+                    ? "No courses published yet"
+                    : "You're enrolled in all available courses"}
+                </p>
               </div>
-            ))}
+            ) : (
+              recommendedLive.map((course) => (
+                <Link
+                  key={course.id}
+                  href={`/courses/${course.slug}`}
+                  className="flex items-start gap-3 rounded-lg border border-zinc-100 p-3 transition-colors hover:border-zinc-200 hover:bg-zinc-50/60"
+                >
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
+                    {course.is_required ? <Target className="size-4" /> : <Sparkles className="size-4" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-zinc-950 line-clamp-1">{course.title}</p>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      {course.category}
+                      {course.duration_minutes > 0 ? ` · ${formatDuration(course.duration_minutes)}` : ""}
+                    </p>
+                    {course.is_required && (
+                      <span className="mt-1 inline-block text-xs font-medium text-amber-600">
+                        Required
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
