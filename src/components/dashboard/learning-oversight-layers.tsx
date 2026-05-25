@@ -24,7 +24,7 @@ import { recentlyWatched } from "@/lib/course-data";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
 import { MockRole } from "@/lib/mock-auth";
-import { fetchCoursesWithProgress } from "@/lib/lms";
+import { fetchCoursesWithProgress, canUserSeeCourse } from "@/lib/lms";
 import type { CourseWithProgress } from "@/lib/lms-types";
 import { formatDuration } from "@/lib/lms-types";
 import { motion } from "framer-motion";
@@ -131,14 +131,15 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
 
   const activeCourse = enrolledCourses[0] ?? null;
 
-  // Live recommended: published courses not yet enrolled, required → featured → rest
+  // Recommended: required courses targeted at this user's cadre or "All Leaders", not yet enrolled
   const recommendedLive = allCourses
-    .filter((c) => !c.enrolled)
-    .sort((a, b) => {
-      if (a.is_required !== b.is_required) return b.is_required ? 1 : -1;
-      if (a.is_featured !== b.is_featured) return b.is_featured ? 1 : -1;
-      return 0;
-    })
+    .filter(
+      (c) =>
+        !c.enrolled &&
+        c.is_required &&
+        canUserSeeCourse(effectiveRole, c.leadership_targets ?? [])
+    )
+    .sort((a, b) => (b.is_featured ? 1 : 0) - (a.is_featured ? 1 : 0))
     .slice(0, 3);
 
   const effectiveRole = profile?.role ?? role;
@@ -253,7 +254,7 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
                 <p className="mt-2 text-sm text-zinc-400">
                   {allCourses.length === 0
                     ? "No courses published yet"
-                    : "You're enrolled in all available courses"}
+                    : "No required courses assigned to your role yet"}
                 </p>
               </div>
             ) : (
