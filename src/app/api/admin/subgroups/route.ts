@@ -5,7 +5,7 @@ export async function GET() {
   const ctx = await requireAdmin();
   if (!ctx) return unauthorized();
 
-  const { data, error } = await ctx.db
+  const { data, error } = await ctx.adminDb
     .from("subgroups")
     .select(`
       id, name, group_id,
@@ -21,14 +21,14 @@ export async function GET() {
   const leaderCounts: Record<string, number> = {};
 
   if (subgroupIds.length > 0) {
-    const { data: campuses } = await ctx.db
+    const { data: campuses } = await ctx.adminDb
       .from("campuses")
       .select("id, subgroup_id")
       .in("subgroup_id", subgroupIds);
 
     const campusIds = (campuses ?? []).map((c) => c.id);
     if (campusIds.length > 0) {
-      const { data: users } = await ctx.db
+      const { data: users } = await ctx.adminDb
         .from("users")
         .select("campus_id")
         .in("campus_id", campusIds);

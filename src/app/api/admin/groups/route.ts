@@ -5,7 +5,7 @@ export async function GET() {
   const ctx = await requireAdmin();
   if (!ctx) return unauthorized();
 
-  const { data, error } = await ctx.db
+  const { data, error } = await ctx.adminDb
     .from("groups")
     .select(`
       id, name,
@@ -30,7 +30,7 @@ export async function GET() {
 
   const leadersByGroup: Record<string, number> = {};
   if (allCampusIds.length > 0) {
-    const { data: users } = await ctx.db
+    const { data: users } = await ctx.adminDb
       .from("users")
       .select("campus_id")
       .in("campus_id", allCampusIds);
@@ -45,7 +45,7 @@ export async function GET() {
   const groupIds = (data ?? []).map((g) => g.id);
   const pastorsByGroup: Record<string, string> = {};
   if (groupIds.length > 0) {
-    const { data: pastors } = await ctx.db
+    const { data: pastors } = await ctx.adminDb
       .from("users")
       .select("full_name, group_id")
       .in("group_id", groupIds)
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
   if (!body.name?.trim()) return badRequest("Group name is required.");
 
   // Resolve default organization
-  const { data: org } = await ctx.db
+  const { data: org } = await ctx.adminDb
     .from("organizations")
     .select("id")
     .limit(1)

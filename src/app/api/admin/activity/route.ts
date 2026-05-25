@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 200);
   const offset = (page - 1) * limit;
 
-  let query = ctx.db
+  let query = ctx.adminDb
     .from("activity_events")
     .select("*", { count: "exact" })
     .order("created_at", { ascending: false })
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 
   const actorNames: Record<string, string> = {};
   if (actorIds.length > 0) {
-    const { data: actors } = await ctx.db
+    const { data: actors } = await ctx.adminDb
       .from("users")
       .select("id, full_name, email")
       .in("id", actorIds);

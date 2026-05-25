@@ -5,7 +5,7 @@ export async function GET() {
   const ctx = await requireAdmin();
   if (!ctx) return unauthorized();
 
-  const { data, error } = await ctx.db
+  const { data, error } = await ctx.adminDb
     .from("campuses")
     .select(`
       id, name, is_active,
@@ -21,7 +21,7 @@ export async function GET() {
   const leaderCounts: Record<string, number> = {};
 
   if (campusIds.length > 0) {
-    const { data: users } = await ctx.db
+    const { data: users } = await ctx.adminDb
       .from("users")
       .select("campus_id")
       .in("campus_id", campusIds);

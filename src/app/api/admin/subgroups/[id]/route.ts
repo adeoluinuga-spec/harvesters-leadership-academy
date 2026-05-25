@@ -18,7 +18,7 @@ export async function PATCH(
     return badRequest("Invalid JSON.");
   }
 
-  const { data: current } = await ctx.db
+  const { data: current } = await ctx.adminDb
     .from("subgroups")
     .select("name, group_id")
     .eq("id", id)

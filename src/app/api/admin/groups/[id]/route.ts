@@ -20,7 +20,7 @@ export async function PATCH(
 
   if (!body.name?.trim()) return badRequest("Group name is required.");
 
-  const { data: current } = await ctx.db
+  const { data: current } = await ctx.adminDb
     .from("groups")
     .select("name")
     .eq("id", id)
