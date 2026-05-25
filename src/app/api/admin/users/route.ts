@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 200);
   const offset = (page - 1) * limit;
 
-  let query = ctx.db
+  let query = ctx.adminDb
     .from("users")
     .select(
       `id, full_name, email, role, designation,
@@ -32,9 +32,7 @@ export async function GET(request: Request) {
     .range(offset, offset + limit - 1);
 
   if (search) {
-    query = query.or(
-      `full_name.ilike.%${search}%,email.ilike.%${search}%`
-    );
+    query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
   }
   if (roleFilter) query = query.eq("role", roleFilter);
   if (campusFilter) query = query.eq("campus_id", campusFilter);

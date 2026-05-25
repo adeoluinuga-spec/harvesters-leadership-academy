@@ -27,7 +27,7 @@ export async function PATCH(
   }
 
   // Fetch current state for audit diff
-  const { data: current } = await ctx.db
+  const { data: current } = await ctx.adminDb
     .from("users")
     .select("role, campus_id, subgroup_id, group_id, is_active, full_name, onboarding_completed")
     .eq("id", id)

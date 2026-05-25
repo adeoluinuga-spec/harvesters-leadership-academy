@@ -9,7 +9,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export type ServiceDb = ReturnType<typeof createServiceClient>;
 
-export async function getHierarchyDb(): Promise<{ db: ServiceDb } | null> {
+export async function getHierarchyDb(): Promise<{ db: ServiceDb; userId: string } | null> {
   const authClient = await createClient();
   const {
     data: { user },
@@ -26,7 +26,7 @@ export async function getHierarchyDb(): Promise<{ db: ServiceDb } | null> {
       })
     : (authClient as unknown as ServiceDb);
 
-  return { db };
+  return { db, userId: user.id };
 }
 
 export function buildWeeklyTrend(

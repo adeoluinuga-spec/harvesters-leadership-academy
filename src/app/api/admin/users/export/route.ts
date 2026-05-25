@@ -4,7 +4,7 @@ export async function GET() {
   const ctx = await requireAdmin();
   if (!ctx) return unauthorized();
 
-  const { data, error } = await ctx.db
+  const { data, error } = await ctx.adminDb
     .from("users")
     .select(`
       id, full_name, email, role, designation,
