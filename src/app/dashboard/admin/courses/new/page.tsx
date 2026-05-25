@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, Lock, Loader2, Video } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, CheckCircle2, Lock, Loader2, Video } from "lucide-react";
 
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -170,6 +170,7 @@ export default function NewCoursePage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createdCourseId, setCreatedCourseId] = useState<string | null>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -202,7 +203,7 @@ export default function NewCoursePage() {
     setSaving(true);
     setError(null);
 
-    const { error: saveError } = await createCourse({
+    const { course, error: saveError } = await createCourse({
       title,
       description,
       overview,
@@ -227,7 +228,12 @@ export default function NewCoursePage() {
       return;
     }
 
-    router.push("/dashboard/admin/courses");
+    if (course?.id) {
+      setCreatedCourseId(course.id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      router.push("/dashboard/admin/courses");
+    }
   }
 
   // Show access-denied state after auth check completes and user is not authorized
@@ -262,6 +268,47 @@ export default function NewCoursePage() {
           >
             Back to courses
           </button>
+        </motion.div>
+      </DashboardShell>
+    );
+  }
+
+  if (createdCourseId) {
+    return (
+      <DashboardShell showDate={false}>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 py-20 px-8 text-center"
+        >
+          <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-emerald-100">
+            <CheckCircle2 className="size-7 text-emerald-600" />
+          </div>
+          <h2 className="font-heading text-xl font-semibold text-emerald-900">Course created!</h2>
+          <p className="mt-2 max-w-sm text-sm text-emerald-700">
+            Your course has been saved. Would you like to add an assessment before publishing?
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href={`/dashboard/admin/courses/${createdCourseId}/assessment`}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-zinc-950 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+            >
+              <ClipboardCheck className="size-4" />
+              Add assessment (optional)
+            </Link>
+            <Link
+              href={`/dashboard/admin/courses/${createdCourseId}/lessons`}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-white px-5 text-sm font-medium text-emerald-800 transition-colors hover:bg-emerald-50"
+            >
+              Add lessons
+            </Link>
+            <Link
+              href="/dashboard/admin/courses"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+            >
+              Back to courses
+            </Link>
+          </div>
         </motion.div>
       </DashboardShell>
     );

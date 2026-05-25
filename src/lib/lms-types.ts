@@ -201,6 +201,54 @@ export type CourseWithLessons = LMSCourse & {
   best_attempt: LMSAttempt | null;
 };
 
+// ============================================================
+// AI Course Ingestion types
+// ============================================================
+
+export type AISourceType = "youtube" | "vimeo" | "transcript_text" | "transcript_file";
+
+export type AIGeneratedModule = {
+  module_title: string;
+  timestamp_start: string;
+  timestamp_end: string;
+  module_summary: string;
+  learning_objectives: string[];
+  key_takeaways: string[];
+  reflection_questions: string[];
+};
+
+export type AIGeneratedQuestion = {
+  question: string;
+  question_type: "mcq" | "true_false" | "reflection";
+  options: string[];
+  correct_answer: string;
+  explanation: string;
+};
+
+export type AIGeneratedCourse = {
+  course_title: string;
+  course_description: string;
+  course_category: string;
+  target_audience: string;
+  total_estimated_duration: string;
+  difficulty_level: CourseDifficulty;
+  modules: AIGeneratedModule[];
+  assessments: AIGeneratedQuestion[];
+  suggested_tags: string[];
+  certificate_title: string;
+  thumbnail_prompt: string;
+};
+
+export type AICourseGeneration = {
+  id: string;
+  source_type: AISourceType;
+  source_url?: string | null;
+  transcript?: string | null;
+  generated_payload: AIGeneratedCourse;
+  created_by: string | null;
+  created_at: string;
+};
+
 export function formatDuration(minutes: number): string {
   if (!minutes) return "0m";
   const h = Math.floor(minutes / 60);

@@ -19,6 +19,7 @@ import {
   Settings,
   Sparkles,
   Users,
+  Wand2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -68,6 +69,7 @@ function ManageCoursesLink({ pathname }: { pathname: string }) {
 const ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];
 
 const adminNavItems = [
+  { label: "AI Course Builder", href: "/dashboard/admin/ai-course-builder", icon: Wand2 },
   { label: "Campuses", href: "/dashboard/admin/campuses", icon: Building2 },
   { label: "Subgroups", href: "/dashboard/admin/subgroups", icon: Layers },
   { label: "Groups", href: "/dashboard/admin/groups", icon: Network },

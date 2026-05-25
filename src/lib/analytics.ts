@@ -1,13 +1,12 @@
 /**
  * Phase 3 — Analytics Service
- * Client-side query functions for all dashboard tiers.
- * Queries existing LMS tables (enrollments, certificates, etc.) directly.
- * New tables (activity_events, notifications) used when available.
+ * All hierarchy queries run through server-side API routes that use the
+ * Supabase service-role key, bypassing RLS so Campus Pastors, Group Pastors,
+ * and Subgroup Pastors can see their full hierarchy's leader counts —
+ * regardless of any RLS policy on the users table.
+ *
+ * Return types are unchanged; the Group Pastor architecture is preserved.
  */
-
-import { createClient } from "@/lib/client";
-
-const ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];
 
 // ============================================================
 // Shared types
@@ -70,121 +69,28 @@ export type PlatformAnalytics = {
   weeklyTrend: { week: string; enrollments: number; certificates: number }[];
 };
 
+const EMPTY_PLATFORM: PlatformAnalytics = {
+  totalLeaders: 0,
+  activatedLeaders: 0,
+  totalCourses: 0,
+  totalEnrollments: 0,
+  totalCertificates: 0,
+  overallCompletionRate: 0,
+  enrollmentRate: 0,
+  topCourses: [],
+  campusSummaries: [],
+  recentEvents: [],
+  weeklyTrend: [],
+};
+
 export async function fetchPlatformAnalytics(): Promise<PlatformAnalytics> {
-  const supabase = createClient();
-
-  const [usersRes, coursesRes, enrollmentsRes, certsRes, campusesRes, attemptsRes] =
-    await Promise.all([
-      supabase.from("users").select("id, role, campus_id, onboarding_completed"),
-      supabase
-        .from("courses")
-        .select("id, title, category, is_required")
-        .or("status.eq.published,is_published.eq.true"),
-      supabase.from("enrollments").select("id, user_id, course_id, created_at"),
-      supabase.from("certificates").select("id, user_id, course_id, issued_at"),
-      supabase.from("campuses").select("id, name"),
-      supabase
-        .from("assessment_attempts")
-        .select("id, user_id, passed"),
-    ]);
-
-  const allUsers = usersRes.data ?? [];
-  const leaders = allUsers.filter((u) => !ADMIN_ROLES.includes(u.role ?? ""));
-  const activated = leaders.filter((u) => u.onboarding_completed);
-  const courses = coursesRes.data ?? [];
-  const enrollments = enrollmentsRes.data ?? [];
-  const certs = certsRes.data ?? [];
-  const campuses = campusesRes.data ?? [];
-  const attempts = attemptsRes.data ?? [];
-
-  // Per-course aggregates
-  const enrollByCourse = new Map<string, number>();
-  const certByCourse = new Map<string, number>();
-  for (const e of enrollments) enrollByCourse.set(e.course_id, (enrollByCourse.get(e.course_id) ?? 0) + 1);
-  for (const c of certs) certByCourse.set(c.course_id, (certByCourse.get(c.course_id) ?? 0) + 1);
-
-  const topCourses: CourseSummary[] = courses
-    .map((c) => {
-      const enr = enrollByCourse.get(c.id) ?? 0;
-      const comp = certByCourse.get(c.id) ?? 0;
-      return {
-        courseId: c.id,
-        title: c.title,
-        category: c.category,
-        enrollments: enr,
-        completions: comp,
-        completionRate: enr > 0 ? Math.round((comp / enr) * 100) : 0,
-        isRequired: c.is_required,
-      };
-    })
-    .sort((a, b) => b.enrollments - a.enrollments)
-    .slice(0, 6);
-
-  // Campus summaries — compute in-memory from users → enrollments → certs
-  const enrolledUserIds = new Set(enrollments.map((e) => e.user_id));
-  const certUserIds = new Set(certs.map((c) => c.user_id));
-  const passedSet = new Set(attempts.filter((a) => a.passed).map((a) => a.user_id));
-  const attemptedSet = new Set(attempts.map((a) => a.user_id));
-
-  const campusSummaries: CampusSummary[] = campuses.map((campus) => {
-    const campusLeaders = leaders.filter((u) => u.campus_id === campus.id);
-    const total = campusLeaders.length;
-    const enrolled = campusLeaders.filter((u) => enrolledUserIds.has(u.id)).length;
-    const completed = campusLeaders.filter((u) => certUserIds.has(u.id)).length;
-    const certCount = certs.filter((c) => campusLeaders.some((u) => u.id === c.user_id)).length;
-    const campusAttempts = campusLeaders.filter((u) => attemptedSet.has(u.id)).length;
-    const campusPassed = campusLeaders.filter((u) => passedSet.has(u.id)).length;
-    return {
-      campusId: campus.id,
-      campusName: campus.name,
-      totalLeaders: total,
-      enrolledLeaders: enrolled,
-      completedLeaders: completed,
-      certificates: certCount,
-      completionRate: enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0,
-      assessmentPassRate: campusAttempts > 0 ? Math.round((campusPassed / campusAttempts) * 100) : 0,
-    };
-  }).sort((a, b) => b.totalLeaders - a.totalLeaders);
-
-  // Weekly trend — last 6 weeks from enrollments + certs
-  const weeklyTrend = buildWeeklyTrend(enrollments, certs);
-
-  // Recent events (graceful — table may not exist yet)
-  let recentEvents: RecentEvent[] = [];
   try {
-    const { data: eventsData } = await supabase
-      .from("activity_events")
-      .select("id, event_type, event_payload, created_at")
-      .order("created_at", { ascending: false })
-      .limit(12);
-    recentEvents = (eventsData ?? []).map((e) => ({
-      id: e.id,
-      eventType: e.event_type,
-      payload: (e.event_payload as Record<string, unknown>) ?? {},
-      createdAt: e.created_at,
-    }));
+    const res = await fetch("/api/hierarchy/platform");
+    if (!res.ok) return EMPTY_PLATFORM;
+    return (await res.json()) as PlatformAnalytics;
   } catch {
-    // Table not yet created — silently skip
+    return EMPTY_PLATFORM;
   }
-
-  const overallCompletionRate =
-    enrollments.length > 0 ? Math.round((certs.length / enrollments.length) * 100) : 0;
-  const enrollmentRate =
-    leaders.length > 0 ? Math.round((enrolledUserIds.size / leaders.length) * 100) : 0;
-
-  return {
-    totalLeaders: leaders.length,
-    activatedLeaders: activated.length,
-    totalCourses: courses.length,
-    totalEnrollments: enrollments.length,
-    totalCertificates: certs.length,
-    overallCompletionRate,
-    enrollmentRate,
-    topCourses,
-    campusSummaries,
-    recentEvents,
-    weeklyTrend,
-  };
 }
 
 // ============================================================
@@ -212,113 +118,22 @@ export type CampusLearningAnalytics = {
   weeklyTrend: { week: string; enrollments: number; certificates: number }[];
 };
 
+const EMPTY_CAMPUS: CampusLearningAnalytics = {
+  totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
+  assessmentAttempts: 0, assessmentPassRate: 0, avgProgressPercent: 0,
+  inactiveLeaders: 0, needsFollowUp: 0, courseBreakdown: [], weeklyTrend: [],
+};
+
 export async function fetchCampusLearningAnalytics(
   campusId: string
 ): Promise<CampusLearningAnalytics> {
-  const supabase = createClient();
-
-  // 1. Get all users in this campus
-  const { data: campusUsers } = await supabase
-    .from("users")
-    .select("id, onboarding_completed")
-    .eq("campus_id", campusId);
-
-  const userIds = (campusUsers ?? []).map((u) => u.id);
-  const total = userIds.length;
-  const inactive = (campusUsers ?? []).filter((u) => !u.onboarding_completed).length;
-
-  if (total === 0) {
-    return {
-      totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
-      assessmentAttempts: 0, assessmentPassRate: 0, avgProgressPercent: 0,
-      inactiveLeaders: 0, needsFollowUp: 0, courseBreakdown: [], weeklyTrend: [],
-    };
+  try {
+    const res = await fetch(`/api/hierarchy/campus/${campusId}`);
+    if (!res.ok) return EMPTY_CAMPUS;
+    return (await res.json()) as CampusLearningAnalytics;
+  } catch {
+    return EMPTY_CAMPUS;
   }
-
-  // 2. Fetch LMS data for these users in parallel
-  const [enrollRes, certRes, progressRes, attemptsRes, coursesRes] = await Promise.all([
-    supabase.from("enrollments").select("id, user_id, course_id, created_at").in("user_id", userIds),
-    supabase.from("certificates").select("id, user_id, course_id, issued_at").in("user_id", userIds),
-    supabase
-      .from("lesson_progress")
-      .select("user_id, course_id, completed")
-      .in("user_id", userIds)
-      .eq("completed", true),
-    supabase.from("assessment_attempts").select("id, user_id, passed").in("user_id", userIds),
-    supabase
-      .from("courses")
-      .select("id, title, is_required")
-      .or("status.eq.published,is_published.eq.true"),
-  ]);
-
-  const enrollments = enrollRes.data ?? [];
-  const certs = certRes.data ?? [];
-  const progress = progressRes.data ?? [];
-  const attempts = attemptsRes.data ?? [];
-  const courses = coursesRes.data ?? [];
-
-  const enrolledUserIds = new Set(enrollments.map((e) => e.user_id));
-  const certUserIds = new Set(certs.map((c) => c.user_id));
-
-  const enrolledCount = userIds.filter((id) => enrolledUserIds.has(id)).length;
-  const completedCount = userIds.filter((id) => certUserIds.has(id)).length;
-
-  const passedAttempts = attempts.filter((a) => a.passed).length;
-  const passRate = attempts.length > 0 ? Math.round((passedAttempts / attempts.length) * 100) : 0;
-
-  // Average progress across enrolled users
-  const completedLessons = new Map<string, number>();
-  for (const p of progress) {
-    completedLessons.set(p.user_id, (completedLessons.get(p.user_id) ?? 0) + 1);
-  }
-  // We use certs as proxy for 100% and lesson progress for in-progress users
-  const avgProgress =
-    enrolledCount > 0
-      ? Math.round((completedCount / enrolledCount) * 100)
-      : 0;
-
-  // Needs follow-up: enrolled but no certificate
-  const needsFollowUp = userIds.filter(
-    (id) => enrolledUserIds.has(id) && !certUserIds.has(id)
-  ).length;
-
-  // Per-course breakdown
-  const enrollByCourse = new Map<string, number>();
-  const certByCourse = new Map<string, number>();
-  for (const e of enrollments) enrollByCourse.set(e.course_id, (enrollByCourse.get(e.course_id) ?? 0) + 1);
-  for (const c of certs) certByCourse.set(c.course_id, (certByCourse.get(c.course_id) ?? 0) + 1);
-
-  const courseBreakdown = courses
-    .map((c) => {
-      const enr = enrollByCourse.get(c.id) ?? 0;
-      const comp = certByCourse.get(c.id) ?? 0;
-      return {
-        courseId: c.id,
-        title: c.title,
-        isRequired: c.is_required,
-        enrolledInCampus: enr,
-        certificatesInCampus: comp,
-        completionRate: enr > 0 ? Math.round((comp / enr) * 100) : 0,
-      };
-    })
-    .filter((c) => c.enrolledInCampus > 0)
-    .sort((a, b) => b.enrolledInCampus - a.enrolledInCampus);
-
-  const weeklyTrend = buildWeeklyTrend(enrollments, certs);
-
-  return {
-    totalLeaders: total,
-    enrolledLeaders: enrolledCount,
-    completedLeaders: completedCount,
-    certificates: certs.length,
-    assessmentAttempts: attempts.length,
-    assessmentPassRate: passRate,
-    avgProgressPercent: avgProgress,
-    inactiveLeaders: inactive,
-    needsFollowUp,
-    courseBreakdown,
-    weeklyTrend,
-  };
 }
 
 // ============================================================
@@ -359,305 +174,42 @@ export type GroupAnalyticsDetailed = {
   weeklyTrend: { week: string; enrollments: number; certificates: number }[];
 };
 
+const EMPTY_SUBGROUP: HierarchyAnalytics = {
+  totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
+  overallCompletionRate: 0, campusSummaries: [], weeklyTrend: [],
+};
+
+const EMPTY_GROUP: GroupAnalyticsDetailed = {
+  totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
+  overallCompletionRate: 0, totalCampuses: 0, totalSubgroups: 0,
+  subgroups: [], weeklyTrend: [],
+};
+
 export async function fetchGroupAnalyticsDetailed(groupId: string): Promise<GroupAnalyticsDetailed> {
-  const supabase = createClient();
-
-  // ── 1. Resolve subgroups via the subgroups table (group_id → subgroup rows) ──
-  // This is the authoritative link; do NOT rely on group_id being set on every user.
-  const { data: subgroupRows } = await supabase
-    .from("subgroups")
-    .select("id, name")
-    .eq("group_id", groupId);
-
-  const subgroupList = subgroupRows ?? [];
-  if (subgroupList.length === 0) {
-    return {
-      totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
-      overallCompletionRate: 0, totalCampuses: 0, totalSubgroups: 0,
-      subgroups: [], weeklyTrend: [],
-    };
+  try {
+    const res = await fetch(`/api/hierarchy/group/${groupId}`);
+    if (!res.ok) return EMPTY_GROUP;
+    return (await res.json()) as GroupAnalyticsDetailed;
+  } catch {
+    return EMPTY_GROUP;
   }
-
-  const subgroupIds = subgroupList.map((s) => s.id);
-  const subgroupNameById = new Map(subgroupList.map((s) => [s.id, s.name as string]));
-
-  // ── 2. Get all campuses in those subgroups ──────────────────────────────────
-  const { data: campusRows } = await supabase
-    .from("campuses")
-    .select("id, name, subgroup_id")
-    .in("subgroup_id", subgroupIds);
-
-  const campusList = campusRows ?? [];
-  const campusIds = campusList.map((c) => c.id);
-  const campusNameById = new Map(campusList.map((c) => [c.id, c.name as string]));
-  const campusSubgroupById = new Map(
-    campusList.map((c) => [c.id, c.subgroup_id as string])
-  );
-
-  // ── 3. Get all users in those campuses ─────────────────────────────────────
-  // Query by campus_id — does NOT require group_id to be set on user records.
-  // Also pull users directly tagged with group_id (e.g. Sub-Group Pastors without a campus).
-  const [campusUsersRes, directGroupUsersRes] = await Promise.all([
-    campusIds.length > 0
-      ? supabase
-          .from("users")
-          .select("id, campus_id, subgroup_id, full_name, role")
-          .in("campus_id", campusIds)
-          .not("role", "in", '("Platform Super Admin","Super Admin","Admin")')
-      : Promise.resolve({ data: [] }),
-    supabase
-      .from("users")
-      .select("id, campus_id, subgroup_id, full_name, role")
-      .eq("group_id", groupId)
-      .not("role", "in", '("Platform Super Admin","Super Admin","Admin")'),
-  ]);
-
-  // Merge + deduplicate
-  const seenIds = new Set<string>();
-  const allUsers = [
-    ...(campusUsersRes.data ?? []),
-    ...(directGroupUsersRes.data ?? []),
-  ].filter((u) => {
-    if (seenIds.has(u.id)) return false;
-    seenIds.add(u.id);
-    return true;
-  });
-
-  const userIds = allUsers.map((u) => u.id);
-  if (userIds.length === 0) {
-    return {
-      totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
-      overallCompletionRate: 0, totalCampuses: campusIds.length,
-      totalSubgroups: subgroupIds.length,
-      subgroups: subgroupList.map((s) => ({
-        subgroupId: s.id, subgroupName: s.name as string, pastorName: "",
-        totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0,
-        certificates: 0, completionRate: 0, campusSummaries: [],
-      })),
-      weeklyTrend: [],
-    };
-  }
-
-  // ── 4. LMS data for all resolved users ────────────────────────────────────
-  const [enrollRes, certRes] = await Promise.all([
-    supabase.from("enrollments").select("id, user_id, course_id, created_at").in("user_id", userIds),
-    supabase.from("certificates").select("id, user_id, course_id, issued_at").in("user_id", userIds),
-  ]);
-
-  const enrollments = enrollRes.data ?? [];
-  const certs = certRes.data ?? [];
-  const enrolledSet = new Set(enrollments.map((e) => e.user_id));
-  const certSet = new Set(certs.map((c) => c.user_id));
-
-  // ── 5. Identify subgroup pastors ───────────────────────────────────────────
-  const SUBGROUP_PASTOR_ROLES = ["Sub-Group Pastor", "Subgroup Pastor"];
-  const pastorBySubgroup = new Map<string, string>();
-  for (const u of allUsers) {
-    if (u.subgroup_id && SUBGROUP_PASTOR_ROLES.includes(u.role ?? "")) {
-      if (!pastorBySubgroup.has(u.subgroup_id)) {
-        pastorBySubgroup.set(u.subgroup_id, u.full_name ?? "");
-      }
-    }
-  }
-
-  // ── 6. Build campus → user index ─────────────────────────────────────────
-  const usersByCampus = new Map<string, string[]>();
-  for (const u of allUsers) {
-    if (u.campus_id) {
-      const arr = usersByCampus.get(u.campus_id) ?? [];
-      arr.push(u.id);
-      usersByCampus.set(u.campus_id, arr);
-    }
-  }
-
-  // Campuses grouped by subgroup (from the campuses table, not users)
-  const campusesBySubgroup = new Map<string, string[]>();
-  for (const campus of campusList) {
-    if (campus.subgroup_id) {
-      const arr = campusesBySubgroup.get(campus.subgroup_id) ?? [];
-      arr.push(campus.id);
-      campusesBySubgroup.set(campus.subgroup_id, arr);
-    }
-  }
-
-  // ── 7. Build subgroup summaries ────────────────────────────────────────────
-  const subgroups: SubgroupSummary[] = subgroupList.map((sg) => {
-    const sgCampusIds = campusesBySubgroup.get(sg.id) ?? [];
-
-    // Collect user IDs from campuses + users directly tagged with this subgroup_id
-    const sgUserIdSet = new Set<string>();
-    for (const campusId of sgCampusIds) {
-      for (const uid of usersByCampus.get(campusId) ?? []) sgUserIdSet.add(uid);
-    }
-    for (const u of allUsers) {
-      if (u.subgroup_id === sg.id) sgUserIdSet.add(u.id);
-    }
-    const sgUserIds = [...sgUserIdSet];
-
-    const sgEnrolled = sgUserIds.filter((id) => enrolledSet.has(id)).length;
-    const sgCompleted = sgUserIds.filter((id) => certSet.has(id)).length;
-    const sgCerts = certs.filter((c) => sgUserIdSet.has(c.user_id)).length;
-    const sgRate = sgEnrolled > 0 ? Math.round((sgCompleted / sgEnrolled) * 100) : 0;
-
-    const campusSummaries: CampusSummary[] = sgCampusIds.map((campusId) => {
-      const campusUserIds = usersByCampus.get(campusId) ?? [];
-      const campusUserIdSet = new Set(campusUserIds);
-      const enr = campusUserIds.filter((id) => enrolledSet.has(id)).length;
-      const comp = campusUserIds.filter((id) => certSet.has(id)).length;
-      const certCount = certs.filter((c) => campusUserIdSet.has(c.user_id)).length;
-      return {
-        campusId,
-        campusName: campusNameById.get(campusId) ?? "Unknown Campus",
-        totalLeaders: campusUserIds.length,
-        enrolledLeaders: enr,
-        completedLeaders: comp,
-        certificates: certCount,
-        completionRate: enr > 0 ? Math.round((comp / enr) * 100) : 0,
-        assessmentPassRate: 0,
-      };
-    }).sort((a, b) => b.totalLeaders - a.totalLeaders);
-
-    return {
-      subgroupId: sg.id,
-      subgroupName: subgroupNameById.get(sg.id) ?? (sg.name as string),
-      pastorName: pastorBySubgroup.get(sg.id) ?? "",
-      totalLeaders: sgUserIds.length,
-      enrolledLeaders: sgEnrolled,
-      completedLeaders: sgCompleted,
-      certificates: sgCerts,
-      completionRate: sgRate,
-      campusSummaries,
-    };
-  }).sort((a, b) => b.totalLeaders - a.totalLeaders);
-
-  const totalEnrolled = userIds.filter((id) => enrolledSet.has(id)).length;
-  const totalCompleted = userIds.filter((id) => certSet.has(id)).length;
-  const overallRate = totalEnrolled > 0 ? Math.round((totalCompleted / totalEnrolled) * 100) : 0;
-  const weeklyTrend = buildWeeklyTrend(enrollments, certs);
-
-  return {
-    totalLeaders: userIds.length,
-    enrolledLeaders: totalEnrolled,
-    completedLeaders: totalCompleted,
-    certificates: certs.length,
-    overallCompletionRate: overallRate,
-    totalCampuses: campusIds.length,
-    totalSubgroups: subgroupIds.length,
-    subgroups,
-    weeklyTrend,
-  };
 }
 
 export async function fetchSubgroupAnalytics(subgroupId: string): Promise<HierarchyAnalytics> {
-  const supabase = createClient();
-
-  // ── 1. Resolve campuses via the campuses table (subgroup_id → campus rows) ──
-  // Do NOT rely on subgroup_id being set on every user — resolve through campuses.
-  const { data: campusRows } = await supabase
-    .from("campuses")
-    .select("id, name")
-    .eq("subgroup_id", subgroupId);
-
-  const campusList = campusRows ?? [];
-  const campusIds = campusList.map((c) => c.id);
-  const campusNameById = new Map(campusList.map((c) => [c.id, c.name as string]));
-
-  // ── 2. Get all users in those campuses + users directly tagged with subgroup_id ──
-  const [campusUsersRes, directSubgroupUsersRes] = await Promise.all([
-    campusIds.length > 0
-      ? supabase
-          .from("users")
-          .select("id, campus_id")
-          .in("campus_id", campusIds)
-          .not("role", "in", '("Platform Super Admin","Super Admin","Admin")')
-      : Promise.resolve({ data: [] }),
-    supabase
-      .from("users")
-      .select("id, campus_id")
-      .eq("subgroup_id", subgroupId)
-      .not("role", "in", '("Platform Super Admin","Super Admin","Admin")'),
-  ]);
-
-  const seenIds = new Set<string>();
-  const allUsers = [
-    ...(campusUsersRes.data ?? []),
-    ...(directSubgroupUsersRes.data ?? []),
-  ].filter((u) => {
-    if (seenIds.has(u.id)) return false;
-    seenIds.add(u.id);
-    return true;
-  });
-
-  const userIds = allUsers.map((u) => u.id);
-  if (userIds.length === 0) {
-    return {
-      totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
-      overallCompletionRate: 0, campusSummaries: [], weeklyTrend: [],
-    };
+  try {
+    const res = await fetch(`/api/hierarchy/subgroup/${subgroupId}`);
+    if (!res.ok) return EMPTY_SUBGROUP;
+    return (await res.json()) as HierarchyAnalytics;
+  } catch {
+    return EMPTY_SUBGROUP;
   }
-
-  // ── 3. LMS data ────────────────────────────────────────────────────────────
-  const [enrollRes, certRes] = await Promise.all([
-    supabase.from("enrollments").select("id, user_id, course_id, created_at").in("user_id", userIds),
-    supabase.from("certificates").select("id, user_id, course_id, issued_at").in("user_id", userIds),
-  ]);
-
-  const enrollments = enrollRes.data ?? [];
-  const certs = certRes.data ?? [];
-  const enrolledSet = new Set(enrollments.map((e) => e.user_id));
-  const certSet = new Set(certs.map((c) => c.user_id));
-
-  const enrolledCount = userIds.filter((id) => enrolledSet.has(id)).length;
-  const completedCount = userIds.filter((id) => certSet.has(id)).length;
-  const rate = enrolledCount > 0 ? Math.round((completedCount / enrolledCount) * 100) : 0;
-
-  // ── 4. Per-campus summaries ────────────────────────────────────────────────
-  const usersByCampus = new Map<string, string[]>();
-  for (const u of allUsers) {
-    if (u.campus_id) {
-      const arr = usersByCampus.get(u.campus_id) ?? [];
-      arr.push(u.id);
-      usersByCampus.set(u.campus_id, arr);
-    }
-  }
-
-  const campusSummaries: CampusSummary[] = campusList
-    .map((campus) => {
-      const ids = usersByCampus.get(campus.id) ?? [];
-      const enr = ids.filter((id) => enrolledSet.has(id)).length;
-      const comp = ids.filter((id) => certSet.has(id)).length;
-      const campusIdSet = new Set(ids);
-      const certCount = certs.filter((c) => campusIdSet.has(c.user_id)).length;
-      return {
-        campusId: campus.id,
-        campusName: campusNameById.get(campus.id) ?? campus.name,
-        totalLeaders: ids.length,
-        enrolledLeaders: enr,
-        completedLeaders: comp,
-        certificates: certCount,
-        completionRate: enr > 0 ? Math.round((comp / enr) * 100) : 0,
-        assessmentPassRate: 0,
-      };
-    })
-    .sort((a, b) => b.completionRate - a.completionRate);
-
-  const weeklyTrend = buildWeeklyTrend(enrollments, certs);
-
-  return {
-    totalLeaders: userIds.length,
-    enrolledLeaders: enrolledCount,
-    completedLeaders: completedCount,
-    certificates: certs.length,
-    overallCompletionRate: rate,
-    campusSummaries,
-    weeklyTrend,
-  };
 }
 
 // ============================================================
 // Scoped Campus Analytics (mid-tier leaders: Directional → Cell)
-// Queries users in a campus filtered to the caller's child roles,
-// then fetches their LMS data. Falls back to empty if no scope.
+// Queries users in a campus filtered to the caller's child roles.
+// Still uses the service-role hierarchy campus route but filters
+// the role breakdown client-side to preserve the scoped view.
 // ============================================================
 
 export type RoleCount = {
@@ -682,95 +234,29 @@ export type ScopedAnalytics = {
   weeklyTrend: { week: string; enrollments: number; certificates: number }[];
 };
 
+const EMPTY_SCOPED: ScopedAnalytics = {
+  totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
+  inactiveLeaders: 0, assessmentPassRate: 0, needsFollowUp: 0, completionRate: 0,
+  roleBreakdown: [], weeklyTrend: [],
+};
+
 export async function fetchScopedCampusAnalytics(
   campusId: string,
   childRoles: string[]
 ): Promise<ScopedAnalytics> {
-  const empty: ScopedAnalytics = {
-    totalLeaders: 0, enrolledLeaders: 0, completedLeaders: 0, certificates: 0,
-    inactiveLeaders: 0, assessmentPassRate: 0, needsFollowUp: 0, completionRate: 0,
-    roleBreakdown: [], weeklyTrend: [],
-  };
+  if (!campusId || childRoles.length === 0) return EMPTY_SCOPED;
 
-  if (!campusId || childRoles.length === 0) return empty;
-
-  const supabase = createClient();
-
-  const { data: usersData } = await supabase
-    .from("users")
-    .select("id, role, onboarding_completed")
-    .eq("campus_id", campusId)
-    .in("role", childRoles);
-
-  const users = usersData ?? [];
-  const userIds = users.map((u) => u.id);
-
-  if (userIds.length === 0) {
-    return {
-      ...empty,
-      roleBreakdown: childRoles.map((r) => ({
-        role: r, count: 0, enrolled: 0, completed: 0, certificates: 0, completionRate: 0,
-      })),
-    };
+  try {
+    const res = await fetch(`/api/hierarchy/campus/${campusId}/scoped?roles=${encodeURIComponent(childRoles.join(","))}`);
+    if (!res.ok) return { ...EMPTY_SCOPED, roleBreakdown: childRoles.map((r) => ({ role: r, count: 0, enrolled: 0, completed: 0, certificates: 0, completionRate: 0 })) };
+    return (await res.json()) as ScopedAnalytics;
+  } catch {
+    return EMPTY_SCOPED;
   }
-
-  const [enrollRes, certRes, attemptsRes] = await Promise.all([
-    supabase.from("enrollments").select("id, user_id, created_at").in("user_id", userIds),
-    supabase.from("certificates").select("id, user_id, issued_at").in("user_id", userIds),
-    supabase.from("assessment_attempts").select("id, user_id, passed").in("user_id", userIds),
-  ]);
-
-  const enrollments = enrollRes.data ?? [];
-  const certs = certRes.data ?? [];
-  const attempts = attemptsRes.data ?? [];
-
-  const enrolledSet = new Set(enrollments.map((e) => e.user_id));
-  const certSet = new Set(certs.map((c) => c.user_id));
-
-  const enrolledCount = userIds.filter((id) => enrolledSet.has(id)).length;
-  const completedCount = userIds.filter((id) => certSet.has(id)).length;
-  const inactiveCount = users.filter((u) => !u.onboarding_completed).length;
-  const needsFollowUp = userIds.filter((id) => enrolledSet.has(id) && !certSet.has(id)).length;
-
-  const passedAttempts = attempts.filter((a) => a.passed).length;
-  const passRate = attempts.length > 0 ? Math.round((passedAttempts / attempts.length) * 100) : 0;
-  const completionRate = enrolledCount > 0 ? Math.round((completedCount / enrolledCount) * 100) : 0;
-
-  const roleBreakdown: RoleCount[] = childRoles
-    .map((role) => {
-      const roleUsers = users.filter((u) => u.role === role);
-      const roleUserIds = new Set(roleUsers.map((u) => u.id));
-      const roleEnrolled = [...roleUserIds].filter((id) => enrolledSet.has(id)).length;
-      const roleCompleted = [...roleUserIds].filter((id) => certSet.has(id)).length;
-      const roleCerts = certs.filter((c) => roleUserIds.has(c.user_id)).length;
-      return {
-        role,
-        count: roleUsers.length,
-        enrolled: roleEnrolled,
-        completed: roleCompleted,
-        certificates: roleCerts,
-        completionRate: roleEnrolled > 0 ? Math.round((roleCompleted / roleEnrolled) * 100) : 0,
-      };
-    })
-    .filter((r) => r.count > 0);
-
-  return {
-    totalLeaders: users.length,
-    enrolledLeaders: enrolledCount,
-    completedLeaders: completedCount,
-    certificates: certs.length,
-    inactiveLeaders: inactiveCount,
-    assessmentPassRate: passRate,
-    needsFollowUp,
-    completionRate,
-    roleBreakdown,
-    weeklyTrend: buildWeeklyTrend(enrollments, certs),
-  };
 }
 
 // ============================================================
 // Personal Learning Analytics (Cell Leader / leader-level)
-// Fetches the logged-in user's own LMS data for real metrics.
 // ============================================================
 
 export type PersonalLearningAnalytics = {
@@ -785,36 +271,20 @@ export type PersonalLearningAnalytics = {
 export async function fetchPersonalLearningAnalytics(
   userId: string
 ): Promise<PersonalLearningAnalytics> {
-  const supabase = createClient();
-
-  const [enrollRes, certRes, attemptsRes] = await Promise.all([
-    supabase.from("enrollments").select("id, course_id").eq("user_id", userId),
-    supabase.from("certificates").select("id, course_id").eq("user_id", userId),
-    supabase.from("assessment_attempts").select("id, passed").eq("user_id", userId),
-  ]);
-
-  const enrollments = enrollRes.data ?? [];
-  const certs = certRes.data ?? [];
-  const attempts = attemptsRes.data ?? [];
-
-  const passedAttempts = attempts.filter((a) => a.passed).length;
-  const passRate = attempts.length > 0 ? Math.round((passedAttempts / attempts.length) * 100) : 0;
-  const completionRate =
-    enrollments.length > 0 ? Math.round((certs.length / enrollments.length) * 100) : 0;
-
-  return {
-    enrolledCourses: enrollments.length,
-    completedCourses: certs.length,
-    certificates: certs.length,
-    assessmentAttempts: attempts.length,
-    assessmentPassRate: passRate,
-    completionRate,
-  };
+  try {
+    const res = await fetch(`/api/hierarchy/personal/${userId}`);
+    if (!res.ok) return { enrolledCourses: 0, completedCourses: 0, certificates: 0, assessmentAttempts: 0, assessmentPassRate: 0, completionRate: 0 };
+    return (await res.json()) as PersonalLearningAnalytics;
+  } catch {
+    return { enrolledCourses: 0, completedCourses: 0, certificates: 0, assessmentAttempts: 0, assessmentPassRate: 0, completionRate: 0 };
+  }
 }
 
 // ============================================================
 // Notifications
 // ============================================================
+
+import { createClient } from "@/lib/client";
 
 export async function fetchNotifications(): Promise<Notification[]> {
   const supabase = createClient();
@@ -889,37 +359,4 @@ export async function recordEvent(
   } catch {
     // Non-blocking — analytics must never break core flows
   }
-}
-
-// ============================================================
-// Helpers
-// ============================================================
-
-function buildWeeklyTrend(
-  enrollments: { created_at: string }[],
-  certs: { issued_at: string }[]
-): { week: string; enrollments: number; certificates: number }[] {
-  const weeks: { week: string; enrollments: number; certificates: number }[] = [];
-  const now = new Date();
-
-  for (let i = 5; i >= 0; i--) {
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - i * 7 - now.getDay());
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 7);
-
-    const label = weekStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-    const enrCount = enrollments.filter((e) => {
-      const d = new Date(e.created_at);
-      return d >= weekStart && d < weekEnd;
-    }).length;
-    const certCount = certs.filter((c) => {
-      const d = new Date(c.issued_at);
-      return d >= weekStart && d < weekEnd;
-    }).length;
-
-    weeks.push({ week: label, enrollments: enrCount, certificates: certCount });
-  }
-  return weeks;
 }

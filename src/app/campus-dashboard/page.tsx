@@ -257,7 +257,9 @@ export default function CampusDashboardPage() {
     fetchScopedCampusAnalytics(campusId, scope.childRoles as string[]).then(setScopedAnalytics);
   }, [campusId, scope.childRoles, hierarchy.loading]);
 
-  const totalLeaders = campusUsers.length;
+  // Use analytics.totalLeaders (service-role, bypasses RLS) as primary count.
+  // campusUsers is used for the roster display only.
+  const totalLeaders = analytics?.totalLeaders ?? campusUsers.length;
   const inactiveLeaders = useMemo(
     () => campusUsers.filter((u) => !u.onboarding_completed),
     [campusUsers]
@@ -265,10 +267,10 @@ export default function CampusDashboardPage() {
 
   const stats = analytics
     ? [
-        { label: "Total leaders", value: String(totalLeaders || "—"), icon: Users, sub: "Registered" },
+        { label: "Total leaders", value: String(analytics.totalLeaders || "—"), icon: Users, sub: "Registered" },
         { label: "Enrolled", value: String(analytics.enrolledLeaders || "—"), icon: GraduationCap, sub: "In at least 1 course" },
         { label: "Certificates", value: String(analytics.certificates || "—"), icon: Award, sub: "Issued" },
-        { label: "Inactive alerts", value: String(inactiveLeaders.length || "—"), icon: AlertCircle, sub: "Onboarding incomplete" },
+        { label: "Inactive alerts", value: String(analytics.inactiveLeaders || "—"), icon: AlertCircle, sub: "Onboarding incomplete" },
       ]
     : [
         { label: "Total leaders", value: dataLoading ? "…" : String(totalLeaders || "—"), icon: Users, sub: "" },
