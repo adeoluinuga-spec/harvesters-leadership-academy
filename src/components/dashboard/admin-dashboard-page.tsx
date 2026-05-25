@@ -27,14 +27,15 @@ import {
   shellItem,
 } from "@/components/layout/dashboard-shell";
 import { HierarchyExplorer } from "@/components/dashboard/hierarchy-explorer";
+import { SubgroupPerformance } from "@/components/dashboard/subgroup-performance";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
-import { fetchPlatformAnalytics } from "@/lib/analytics";
-import type { PlatformAnalytics } from "@/lib/analytics";
+import { fetchPlatformAnalytics, fetchAllSubgroupPerformance } from "@/lib/analytics";
+import type { PlatformAnalytics, SubgroupSummary } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import {
   WeeklyTrendChart,
@@ -602,6 +603,7 @@ function LoadingSkeleton() {
 export default function AdminDashboardPage() {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [analytics, setAnalytics] = useState<PlatformAnalytics | null>(null);
+  const [subgroupData, setSubgroupData] = useState<SubgroupSummary[]>([]);
   const [operationalStats, setOperationalStats] = useState<OperationalStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -610,13 +612,15 @@ export default function AdminDashboardPage() {
     let active = true;
 
     async function load() {
-      const [profileResult, analyticsData] = await Promise.all([
+      const [profileResult, analyticsData, subgroups] = await Promise.all([
         getCurrentUserProfile(),
         fetchPlatformAnalytics(),
+        fetchAllSubgroupPerformance(),
       ]);
       if (!active) return;
       if (profileResult.profile) setProfile(profileResult.profile);
       setAnalytics(analyticsData);
+      setSubgroupData(subgroups);
       setLoading(false);
     }
 
@@ -654,6 +658,7 @@ export default function AdminDashboardPage() {
             <AlertsSection data={analytics} />
             <KpiCards data={analytics} />
             <AnalyticsSection data={analytics} />
+            <SubgroupPerformance subgroups={subgroupData} />
             <TrendSection data={analytics} />
             <CampusChartSection data={analytics} />
             <ActivityFeed data={analytics} />

@@ -185,6 +185,17 @@ const EMPTY_GROUP: GroupAnalyticsDetailed = {
   subgroups: [], weeklyTrend: [],
 };
 
+export async function fetchAllSubgroupPerformance(): Promise<SubgroupSummary[]> {
+  try {
+    const res = await fetch("/api/hierarchy/platform/subgroups");
+    if (!res.ok) return [];
+    const json = (await res.json()) as { subgroups: SubgroupSummary[] };
+    return json.subgroups;
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchGroupAnalyticsDetailed(groupId: string): Promise<GroupAnalyticsDetailed> {
   try {
     const res = await fetch(`/api/hierarchy/group/${groupId}`);

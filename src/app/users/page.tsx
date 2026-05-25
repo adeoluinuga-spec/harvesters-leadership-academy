@@ -5,9 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
   Award,
+  Building2,
   ChevronDown,
+  ChevronRight,
   Download,
   GraduationCap,
+  LayoutList,
+  Network,
   Pencil,
   Search,
   ShieldOff,
@@ -24,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/client";
 import { cn } from "@/lib/utils";
+import { fetchAllSubgroupPerformance, type SubgroupSummary } from "@/lib/analytics";
 
 // ─── Role constants ───────────────────────────────────────────
 
@@ -389,6 +394,216 @@ function FiltersBar({
   );
 }
 
+// ─── Hierarchy view (admin only) ──────────────────────────────
+
+type LeaderShape = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  designation: string | null;
+  enrolledCourses: number;
+  certificates: number;
+  onboardingCompleted: boolean;
+  isActive: boolean;
+  joinedAt: string;
+};
+
+function HierarchyUsersView() {
+  const [subgroups, setSubgroups] = useState<SubgroupSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedSubgroup, setExpandedSubgroup] = useState<string>("");
+  const [expandedCampus, setExpandedCampus] = useState<string>("");
+  const [campusLeaders, setCampusLeaders] = useState<Map<string, LeaderShape[]>>(new Map());
+  const [loadingCampus, setLoadingCampus] = useState<string>("");
+
+  useEffect(() => {
+    fetchAllSubgroupPerformance().then((data) => {
+      setSubgroups(data);
+      setExpandedSubgroup(data[0]?.subgroupId ?? "");
+      setLoading(false);
+    });
+  }, []);
+
+  async function loadCampusLeaders(campusId: string) {
+    if (campusLeaders.has(campusId)) return;
+    setLoadingCampus(campusId);
+    try {
+      const res = await fetch(`/api/hierarchy/campus/${campusId}/leaders`);
+      if (res.ok) {
+        const json = await res.json() as { leaders: LeaderShape[] };
+        setCampusLeaders((prev) => new Map(prev).set(campusId, json.leaders));
+      }
+    } catch { /* best-effort */ }
+    finally { setLoadingCampus(""); }
+  }
+
+  function toggleSubgroup(id: string) {
+    setExpandedSubgroup((prev) => (prev === id ? "" : id));
+    setExpandedCampus("");
+  }
+
+  function toggleCampus(campusId: string) {
+    const next = expandedCampus === campusId ? "" : campusId;
+    setExpandedCampus(next);
+    if (next) void loadCampusLeaders(next);
+  }
+
+  if (loading) {
+    return (
+      <motion.section variants={shellItem}>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-zinc-100" />)}
+        </div>
+      </motion.section>
+    );
+  }
+
+  if (subgroups.length === 0) {
+    return (
+      <motion.section variants={shellItem}>
+        <div className="rounded-xl border border-dashed border-zinc-200 bg-white py-14 text-center">
+          <Network className="mx-auto size-8 text-zinc-300" />
+          <p className="mt-3 text-sm text-zinc-500">No subgroup data found</p>
+          <p className="mt-1 text-xs text-zinc-400">Ensure leaders have subgroup_id assigned</p>
+        </div>
+      </motion.section>
+    );
+  }
+
+  return (
+    <motion.section variants={shellItem}>
+      <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-zinc-100">
+          <CardTitle className="font-heading text-lg font-semibold text-zinc-950">Leaders by subgroup</CardTitle>
+          <p className="text-sm text-zinc-500">Expand a subgroup → campus → view leaders</p>
+        </CardHeader>
+        <CardContent className="space-y-2 pt-2">
+          {subgroups.map((sg) => {
+            const sgOpen = expandedSubgroup === sg.subgroupId;
+            return (
+              <div key={sg.subgroupId} className="rounded-lg border border-zinc-100">
+                {/* Subgroup row */}
+                <button
+                  onClick={() => toggleSubgroup(sg.subgroupId)}
+                  className="flex w-full items-center justify-between gap-4 p-4 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-9 items-center justify-center rounded-lg bg-zinc-950 text-white">
+                      <Users className="size-4" />
+                    </div>
+                    <div>
+                      <p className="font-heading font-semibold text-zinc-950">{sg.subgroupName}</p>
+                      <p className="text-xs text-zinc-500">
+                        {sg.campusSummaries.length} campus{sg.campusSummaries.length !== 1 ? "es" : ""} · {sg.totalLeaders} leaders
+                        {sg.pastorName ? ` · ${sg.pastorName}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronDown className={cn("size-4 text-zinc-400 transition-transform shrink-0", sgOpen && "rotate-180")} />
+                </button>
+
+                {/* Campuses */}
+                <AnimatePresence initial={false}>
+                  {sgOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="space-y-2 border-t border-zinc-100 p-3">
+                        {sg.campusSummaries.length === 0 && (
+                          <p className="py-4 text-center text-sm text-zinc-400">No campuses in this subgroup</p>
+                        )}
+                        {sg.campusSummaries.map((campus) => {
+                          const campusOpen = expandedCampus === campus.campusId;
+                          const leaders = campusLeaders.get(campus.campusId) ?? [];
+                          const isLoadingThis = loadingCampus === campus.campusId;
+
+                          return (
+                            <div key={campus.campusId} className="rounded-lg border border-zinc-100 bg-zinc-50/50">
+                              {/* Campus row */}
+                              <button
+                                onClick={() => toggleCampus(campus.campusId)}
+                                className="flex w-full items-center justify-between gap-3 p-3 text-left"
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <Building2 className="size-4 shrink-0 text-zinc-400" />
+                                  <div>
+                                    <p className="text-sm font-medium text-zinc-950">{campus.campusName}</p>
+                                    <p className="text-xs text-zinc-400">
+                                      {campus.totalLeaders} leaders · {campus.enrolledLeaders} enrolled · {campus.completionRate}% completion
+                                    </p>
+                                  </div>
+                                </div>
+                                <ChevronRight
+                                  className={cn("size-4 text-zinc-400 transition-transform shrink-0", campusOpen && "rotate-90")}
+                                />
+                              </button>
+
+                              {/* Leaders list */}
+                              <AnimatePresence initial={false}>
+                                {campusOpen && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="space-y-1.5 border-t border-zinc-100 p-3">
+                                      {isLoadingThis && (
+                                        <div className="py-6 text-center text-xs text-zinc-400">Loading leaders…</div>
+                                      )}
+                                      {!isLoadingThis && leaders.length === 0 && (
+                                        <div className="py-6 text-center text-xs text-zinc-400">No leaders found for this campus</div>
+                                      )}
+                                      {leaders.map((leader) => {
+                                        const scopedUser: ScopedUser = {
+                                          id: leader.id,
+                                          fullName: leader.fullName,
+                                          email: leader.email,
+                                          role: leader.role,
+                                          campusId: campus.campusId,
+                                          campusName: campus.campusName,
+                                          subgroupId: sg.subgroupId,
+                                          subgroupName: sg.subgroupName,
+                                          groupId: null,
+                                          groupName: null,
+                                          onboardingCompleted: leader.onboardingCompleted,
+                                          isActive: leader.isActive,
+                                          enrolledCourses: leader.enrolledCourses,
+                                          certificates: leader.certificates,
+                                          assessmentAttempts: 0,
+                                          joinedAt: leader.joinedAt,
+                                          designation: leader.designation,
+                                        };
+                                        return (
+                                          <UserRow key={leader.id} user={scopedUser} showEdit={false} showLms />
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
 // ─── Admin users view ─────────────────────────────────────────
 
 function AdminUsersView() {
@@ -617,6 +832,7 @@ function AccessDenied() {
 export default function UsersPage() {
   const [myRole, setMyRole] = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"list" | "hierarchy">("list");
 
   useEffect(() => {
     const supabase = createClient();
@@ -657,6 +873,26 @@ export default function UsersPage() {
           </div>
           {isAdmin && (
             <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex items-center rounded-lg border border-zinc-200 bg-zinc-50 p-1">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    viewMode === "list" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                  )}
+                >
+                  <LayoutList className="size-4" /> List
+                </button>
+                <button
+                  onClick={() => setViewMode("hierarchy")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    viewMode === "hierarchy" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                  )}
+                >
+                  <Network className="size-4" /> Hierarchy
+                </button>
+              </div>
               <Button variant="outline" onClick={() => window.open("/api/admin/users/export", "_blank")}
                 className="rounded-lg border-zinc-200">
                 <Download className="size-4" /> Export CSV
@@ -686,6 +922,8 @@ export default function UsersPage() {
         </motion.section>
       ) : !hasAccess ? (
         <AccessDenied />
+      ) : isAdmin && viewMode === "hierarchy" ? (
+        <HierarchyUsersView />
       ) : isAdmin ? (
         <AdminUsersView />
       ) : (
