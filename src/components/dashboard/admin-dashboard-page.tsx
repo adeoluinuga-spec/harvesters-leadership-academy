@@ -11,7 +11,6 @@ import {
   Building2,
   CircleCheck,
   GraduationCap,
-  Layers,
   Network,
   Plus,
   ShieldAlert,
@@ -27,7 +26,7 @@ import {
   shellContainer,
   shellItem,
 } from "@/components/layout/dashboard-shell";
-import { PersonalLearningLayer, OversightLayerIntro } from "@/components/dashboard/learning-oversight-layers";
+import { HierarchyExplorer } from "@/components/dashboard/hierarchy-explorer";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -646,18 +645,7 @@ export default function AdminDashboardPage() {
     <ProtectedRoute allowedRoles={["Platform Super Admin", "Super Admin", "Admin"]}>
       <DashboardShell>
         <DashboardHero firstName={firstName} />
-        <PersonalLearningLayer role="Platform Super Admin" />
-        <OversightLayerIntro
-          title="Platform ministry intelligence"
-          description="Live analytics from Harvesters Leadership Academy — leader engagement, campus performance, enrolment trends, assessment outcomes, and certificate milestones."
-          modules={[
-            "Leader engagement",
-            "Campus performance",
-            "Enrolment analytics",
-            "Assessment outcomes",
-            "Certificate milestones",
-          ]}
-        />
+        <HierarchyExplorer />
         <OperationalCards stats={operationalStats} loading={statsLoading} />
         {loading || !analytics ? (
           <LoadingSkeleton />
