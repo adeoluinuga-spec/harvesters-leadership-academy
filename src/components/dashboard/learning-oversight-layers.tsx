@@ -131,6 +131,8 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
 
   const activeCourse = enrolledCourses[0] ?? null;
 
+  const effectiveRole = profile?.role ?? role;
+
   // Recommended: required courses targeted at this user's cadre or "All Leaders", not yet enrolled
   const recommendedLive = allCourses
     .filter(
@@ -141,8 +143,6 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
     )
     .sort((a, b) => (b.is_featured ? 1 : 0) - (a.is_featured ? 1 : 0))
     .slice(0, 3);
-
-  const effectiveRole = profile?.role ?? role;
   const currentRole = profile?.currentLeadershipRole ?? effectiveRole;
   const aspiration = profile?.leadershipAspiration ?? "your next leadership step";
   const aiInsight = activeCourse
