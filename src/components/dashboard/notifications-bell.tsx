@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, Check, CheckCheck, AlertCircle, Info, Award, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/analytics";
+import { createClient } from "@/lib/client";
 import type { Notification } from "@/lib/analytics";
 
 const typeConfig = {
@@ -31,6 +32,7 @@ export function NotificationsBell() {
 
   const unread = notifications.filter((n) => !n.isRead).length;
 
+  // Initial load
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -41,6 +43,65 @@ export function NotificationsBell() {
       }
     });
     return () => { active = false; };
+  }, []);
+
+  // Realtime subscription — listens for new notifications for the current user
+  useEffect(() => {
+    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
+    async function subscribeRealtime() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      channel = supabase
+        .channel(`notifs-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const row = payload.new as {
+              id: string;
+              type: string;
+              title: string;
+              message: string;
+              action_url: string | null;
+              is_read: boolean;
+              created_at: string;
+            };
+            const n: Notification = {
+              id: row.id,
+              type: row.type as Notification["type"],
+              title: row.title,
+              message: row.message,
+              actionUrl: row.action_url ?? undefined,
+              isRead: row.is_read,
+              createdAt: row.created_at,
+            };
+            setNotifications((prev) => {
+              if (prev.some((x) => x.id === n.id)) return prev;
+              return [n, ...prev];
+            });
+          }
+        )
+        .subscribe();
+    }
+
+    subscribeRealtime();
+
+    return () => {
+      if (channel) {
+        const supabase = createClient();
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   // Close on outside click
@@ -125,7 +186,7 @@ export function NotificationsBell() {
               notifications.map((n) => {
                 const cfg = typeConfig[n.type] ?? typeConfig.info;
                 const Icon = cfg.icon;
-                return (
+                const content = (
                   <div
                     key={n.id}
                     className={cn(
@@ -155,9 +216,25 @@ export function NotificationsBell() {
                     </div>
                   </div>
                 );
+
+                return n.actionUrl ? (
+                  <a key={n.id} href={n.actionUrl} onClick={() => handleMarkOne(n.id)}>
+                    {content}
+                  </a>
+                ) : (
+                  content
+                );
               })
             )}
           </div>
+
+          {notifications.length > 0 && (
+            <div className="border-t border-zinc-100 px-4 py-2">
+              <a href="/notifications" className="text-xs font-medium text-zinc-500 hover:text-zinc-900">
+                View all notifications →
+              </a>
+            </div>
+          )}
         </div>
       )}
     </div>

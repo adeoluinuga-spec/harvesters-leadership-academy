@@ -15,6 +15,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   Layers,
+  MessageSquare,
   Network,
   Settings,
   Sparkles,
@@ -27,6 +28,17 @@ import { createClient } from "@/lib/client";
 import { dashboardForRole, normalizeStoredRole } from "@/lib/mock-auth";
 
 const ADMIN_COURSE_ROLES = [
+  "Platform Super Admin",
+  "Super Admin",
+  "Admin",
+  "Group Pastor",
+  "Sub-Group Pastor",
+  "Subgroup Pastor",
+  "Sub-group Pastor",
+  "Campus Pastor",
+];
+
+const COMM_ROLES = [
   "Platform Super Admin",
   "Super Admin",
   "Admin",
@@ -66,6 +78,23 @@ function ManageCoursesLink({ pathname }: { pathname: string }) {
   );
 }
 
+function CommCenterLink({ pathname }: { pathname: string }) {
+  const href = "/dashboard/comms";
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group flex h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition-all hover:bg-white/8 hover:text-white lg:justify-start",
+        active && "bg-white text-black shadow-sm hover:bg-white hover:text-black"
+      )}
+    >
+      <MessageSquare className="size-4 shrink-0" />
+      <span className="hidden lg:inline">Communication</span>
+    </Link>
+  );
+}
+
 const ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];
 
 const adminNavItems = [
@@ -80,6 +109,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const [canManageCourses, setCanManageCourses] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canCommunicate, setCanCommunicate] = useState(false);
   const [dashboardHref, setDashboardHref] = useState("/dashboard/leader");
 
   useEffect(() => {
@@ -92,6 +122,7 @@ export function Sidebar() {
         const role = data?.role ?? "";
         setCanManageCourses(ADMIN_COURSE_ROLES.includes(role));
         setIsAdmin(ADMIN_ROLES.includes(role));
+        setCanCommunicate(COMM_ROLES.includes(role));
         const route = dashboardForRole(normalizeStoredRole(role));
         if (route) setDashboardHref(route);
       } catch {
@@ -139,6 +170,10 @@ export function Sidebar() {
 
         {canManageCourses && (
           <ManageCoursesLink pathname={pathname} />
+        )}
+
+        {canCommunicate && (
+          <CommCenterLink pathname={pathname} />
         )}
 
         {isAdmin && (
