@@ -175,7 +175,8 @@ export async function deleteMessage(id: string): Promise<void> {
 
 export async function fetchMessageDetail(id: string): Promise<{
   message: CommMessage;
-  analytics: { recipient_count: number; delivered_count: number; read_count: number; open_rate: number };
+  analytics: { recipient_count: number; delivered_count: number; read_count: number; open_rate: number } | null;
+  is_sender: boolean;
 } | null> {
   try {
     const res = await fetch(`/api/comms/messages/${id}`);
