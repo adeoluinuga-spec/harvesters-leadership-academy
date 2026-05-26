@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, ClipboardCheck, CheckCircle2, Lock, Loader2, Video } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, CheckCircle2, Lock, Loader2, Video, Sparkles } from "lucide-react";
 
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -325,10 +325,17 @@ export default function NewCoursePage() {
           <ArrowLeft className="size-4" />
           Back to courses
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="font-heading text-xl font-semibold text-zinc-950">New course</h1>
           <p className="text-xs text-zinc-500">Fill in the details and save as draft or publish immediately</p>
         </div>
+        <Link
+          href="/dashboard/admin/ai-course-builder"
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-violet-600 px-4 text-sm font-medium text-white transition-colors hover:bg-violet-700"
+        >
+          <Sparkles className="size-4" />
+          Develop with AI
+        </Link>
       </motion.div>
 
       <form onSubmit={handleSubmit} className="space-y-5">

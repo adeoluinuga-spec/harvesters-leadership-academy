@@ -136,7 +136,7 @@ async function handlePublish(
 
   const courseId = newCourse.id as string;
 
-  // 4. Insert modules and lessons (each module becomes one lesson sharing the main video)
+  // 4. Insert modules, lessons, and per-module assessments
   for (let i = 0; i < course.modules.length; i++) {
     const m = course.modules[i];
 
@@ -153,7 +153,7 @@ async function handlePublish(
 
     if (modErr || !mod) continue;
 
-    // One lesson per module that references the same course video
+    // One lesson per module — shares the course video, segmented by timestamp
     const durationSec = parseTimestampToSeconds(m.timestamp_end) - parseTimestampToSeconds(m.timestamp_start);
 
     await adminDb.from("lessons").insert({
@@ -174,40 +174,38 @@ async function handlePublish(
       resources: [],
       order_index: i,
       is_preview: i === 0,
-      has_checkpoint: m.reflection_questions?.length > 0,
+      has_checkpoint: (m.reflection_questions?.length ?? 0) > 0,
       checkpoint_question: m.reflection_questions?.[0] ?? null,
     });
-  }
 
-  // 5. Insert assessment + questions
-  const assessmentQuestions = course.assessments ?? [];
-  if (assessmentQuestions.length > 0) {
-    const { data: assessment, error: assessErr } = await adminDb
-      .from("assessments")
-      .insert({
-        course_id: courseId,
-        title: `${course.course_title} — Assessment`,
-        passing_score: 70,
-        is_required: true,
-      })
-      .select("id")
-      .single();
+    // Per-module assessment
+    const moduleQuestions = (m.assessment_questions ?? []).filter(
+      (q) => q.question_type !== "reflection"
+    );
+    if (moduleQuestions.length > 0) {
+      const { data: assessment, error: assessErr } = await adminDb
+        .from("assessments")
+        .insert({
+          course_id: courseId,
+          title: `${m.module_title} — Assessment`,
+          passing_score: 70,
+          is_required: true,
+        })
+        .select("id")
+        .single();
 
-    if (!assessErr && assessment) {
-      const questionRows = assessmentQuestions
-        .filter((q) => q.question_type !== "reflection")
-        .map((q, idx) => ({
-          assessment_id: assessment.id,
-          question: q.question,
-          question_type: q.question_type === "true_false" ? "true_false" : "mcq",
-          options: q.options?.length ? q.options : ["True", "False"],
-          correct_option: q.options?.indexOf(q.correct_answer) ?? 0,
-          explanation: q.explanation || null,
-          order_index: idx,
-        }));
-
-      if (questionRows.length > 0) {
-        await adminDb.from("assessment_questions").insert(questionRows);
+      if (!assessErr && assessment) {
+        await adminDb.from("assessment_questions").insert(
+          moduleQuestions.map((q, idx) => ({
+            assessment_id: assessment.id,
+            question: q.question,
+            question_type: q.question_type === "true_false" ? "true_false" : "mcq",
+            options: q.options?.length ? q.options : ["True", "False"],
+            correct_option: Math.max(0, q.options?.indexOf(q.correct_answer) ?? 0),
+            explanation: q.explanation || null,
+            order_index: idx,
+          }))
+        );
       }
     }
   }

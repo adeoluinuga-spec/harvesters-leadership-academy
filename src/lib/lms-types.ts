@@ -207,6 +207,14 @@ export type CourseWithLessons = LMSCourse & {
 
 export type AISourceType = "youtube" | "vimeo" | "transcript_text" | "transcript_file";
 
+export type AIGeneratedQuestion = {
+  question: string;
+  question_type: "mcq" | "true_false" | "reflection";
+  options: string[];
+  correct_answer: string;
+  explanation: string;
+};
+
 export type AIGeneratedModule = {
   module_title: string;
   timestamp_start: string;
@@ -215,14 +223,7 @@ export type AIGeneratedModule = {
   learning_objectives: string[];
   key_takeaways: string[];
   reflection_questions: string[];
-};
-
-export type AIGeneratedQuestion = {
-  question: string;
-  question_type: "mcq" | "true_false" | "reflection";
-  options: string[];
-  correct_answer: string;
-  explanation: string;
+  assessment_questions?: AIGeneratedQuestion[];
 };
 
 export type AIGeneratedCourse = {

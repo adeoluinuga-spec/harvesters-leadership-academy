@@ -1,10 +1,12 @@
 /**
  * AI Course Ingestion — provider abstraction layer.
  *
- * Currently uses a deterministic mock generator so the architecture is
- * in place before connecting a real AI provider (OpenAI, Claude, Gemini).
- * Swap the provider by changing AI_PROVIDER or by passing `provider` to
- * analyzeContent().
+ * Set AI_COURSE_PROVIDER in .env.local to switch providers:
+ *   AI_COURSE_PROVIDER=openai   → GPT-4o (requires OPENAI_API_KEY)
+ *   AI_COURSE_PROVIDER=mock     → deterministic text parser (no key needed)
+ *
+ * If AI_COURSE_PROVIDER is unset, defaults to openai when OPENAI_API_KEY is
+ * present, otherwise falls back to mock automatically.
  */
 
 import type {
@@ -29,9 +31,11 @@ export interface AIIngestionResult {
   provider: AIProvider;
 }
 
-// Change this env variable to switch providers without touching the app.
-const DEFAULT_PROVIDER: AIProvider =
-  (process.env.AI_COURSE_PROVIDER as AIProvider | undefined) ?? "mock";
+const DEFAULT_PROVIDER: AIProvider = (() => {
+  const explicit = process.env.AI_COURSE_PROVIDER as AIProvider | undefined;
+  if (explicit) return explicit;
+  return process.env.OPENAI_API_KEY ? "openai" : "mock";
+})();
 
 // ============================================================
 // Public entry point
@@ -43,24 +47,131 @@ export async function analyzeContent(
 ): Promise<AIIngestionResult> {
   if (!input.transcript || input.transcript.trim().length < 50) {
     throw new Error(
-      "Transcript is too short to generate a course. Provide at least a few paragraphs."
+      "Transcript is too short. Provide at least a few paragraphs of content."
     );
   }
 
   switch (provider) {
     case "openai":
-      // TODO: implement OpenAI integration
-      // return openaiAnalyze(input);
-      throw new Error("OpenAI provider not yet connected. Set AI_COURSE_PROVIDER=mock to use the mock generator.");
+      return { course: await openaiAnalyze(input), provider: "openai" };
     case "claude":
-      // TODO: implement Claude/Anthropic integration
-      throw new Error("Claude provider not yet connected. Set AI_COURSE_PROVIDER=mock to use the mock generator.");
+      throw new Error("Claude provider not yet connected. Set AI_COURSE_PROVIDER=openai or AI_COURSE_PROVIDER=mock.");
     case "gemini":
-      // TODO: implement Gemini integration
-      throw new Error("Gemini provider not yet connected. Set AI_COURSE_PROVIDER=mock to use the mock generator.");
+      throw new Error("Gemini provider not yet connected. Set AI_COURSE_PROVIDER=openai or AI_COURSE_PROVIDER=mock.");
     default:
       return { course: mockAnalyze(input), provider: "mock" };
   }
+}
+
+// ============================================================
+// OpenAI GPT-4o — structured JSON output
+// ============================================================
+
+async function openaiAnalyze(input: AIIngestionInput): Promise<AIGeneratedCourse> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "OPENAI_API_KEY is not set. Add it to .env.local or set AI_COURSE_PROVIDER=mock to use the mock generator."
+    );
+  }
+
+  const systemPrompt = `You are an expert ministry leadership trainer and curriculum designer for Harvesters Leadership Academy, a church-based leadership development platform.
+
+Analyse the provided transcript and return ONLY a valid JSON object. No prose, no markdown — pure JSON.
+
+The JSON must match this exact structure:
+{
+  "course_title": string,
+  "course_description": string,
+  "course_category": "Leadership" | "Discipleship" | "Operations" | "Care" | "Volunteer Growth" | "Strategy" | "Prayer" | "Evangelism" | "Finance" | "General",
+  "target_audience": string,
+  "total_estimated_duration": string,
+  "difficulty_level": "Foundational" | "Intermediate" | "Advanced" | "Executive",
+  "modules": [
+    {
+      "module_title": string,
+      "timestamp_start": string,
+      "timestamp_end": string,
+      "module_summary": string,
+      "learning_objectives": string[],
+      "key_takeaways": string[],
+      "reflection_questions": string[],
+      "assessment_questions": [
+        {
+          "question": string,
+          "question_type": "mcq" | "true_false",
+          "options": string[],
+          "correct_answer": string,
+          "explanation": string
+        }
+      ]
+    }
+  ],
+  "assessments": [],
+  "suggested_tags": string[],
+  "certificate_title": string,
+  "thumbnail_prompt": string
+}
+
+Rules:
+- Generate 4–6 well-structured modules that follow the flow of the transcript
+- Each module must have exactly 2–3 assessment_questions (mix of mcq and true_false)
+- For mcq: provide exactly 4 options; correct_answer must match one option exactly
+- For true_false: options must be exactly ["True", "False"]
+- learning_objectives: 2–3 concise statements per module
+- key_takeaways: 2–3 actionable insights per module
+- reflection_questions: 1–2 open-ended questions per module
+- Timestamps in M:SS or H:MM:SS format, proportional to content length
+- All content must derive directly from the transcript
+- Use ministry and church leadership language throughout
+- assessments field must be an empty array (questions live inside each module)`;
+
+  const userMessage = `Analyse this transcript and generate the course structure:\n\n${input.transcript.slice(0, 15000)}`;
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      response_format: { type: "json_object" },
+      temperature: 0.4,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`OpenAI API error ${response.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const data = (await response.json()) as {
+    choices: Array<{ message: { content: string | null } }>;
+  };
+
+  const content = data.choices[0]?.message?.content;
+  if (!content) throw new Error("OpenAI returned an empty response. Please try again.");
+
+  let parsed: AIGeneratedCourse;
+  try {
+    parsed = JSON.parse(content) as AIGeneratedCourse;
+  } catch {
+    throw new Error("OpenAI returned malformed JSON. Please try again.");
+  }
+
+  // Safety defaults
+  parsed.assessments = [];
+  parsed.modules = (parsed.modules ?? []).map((m) => ({
+    ...m,
+    assessment_questions: m.assessment_questions ?? [],
+  }));
+
+  return parsed;
 }
 
 // ============================================================
@@ -73,7 +184,6 @@ function mockAnalyze(input: AIIngestionInput): AIGeneratedCourse {
   const paragraphs = splitParagraphs(text);
 
   const wordCount = text.split(/\s+/).length;
-  // Average speech rate: 130 words/minute
   const totalMinutes = Math.max(5, Math.round(wordCount / 130));
 
   const title = deriveTitle(sentences);
@@ -82,8 +192,7 @@ function mockAnalyze(input: AIIngestionInput): AIGeneratedCourse {
   const difficulty = inferDifficulty(text);
   const targetAudience = inferAudience(text);
 
-  const modules = deriveModules(paragraphs, totalMinutes);
-  const assessments = deriveAssessments(sentences, modules);
+  const modules = deriveModules(paragraphs, totalMinutes, sentences);
   const tags = deriveTags(text, category);
 
   return {
@@ -94,10 +203,10 @@ function mockAnalyze(input: AIIngestionInput): AIGeneratedCourse {
     total_estimated_duration: formatMinutes(totalMinutes),
     difficulty_level: difficulty,
     modules,
-    assessments,
+    assessments: [],
     suggested_tags: tags,
     certificate_title: `${title} — Certificate of Completion`,
-    thumbnail_prompt: `A professional ministry leadership course cover image representing: ${title}. Clean, editorial, dark background with gold accents.`,
+    thumbnail_prompt: `A professional ministry leadership course cover image for: ${title}. Clean, editorial, dark background with gold accents.`,
   };
 }
 
@@ -106,39 +215,35 @@ function mockAnalyze(input: AIIngestionInput): AIGeneratedCourse {
 // ============================================================
 
 function deriveTitle(sentences: string[]): string {
-  // Look for a sentence that reads like a heading (short, capitalised words, no verb)
   for (const s of sentences.slice(0, 6)) {
     const clean = s.trim().replace(/[.:,;?!]+$/, "");
     const words = clean.split(/\s+/);
     if (words.length >= 3 && words.length <= 10) {
-      // Capitalise each word like a title
       return words.map(titleCase).join(" ");
     }
   }
-  // Fallback: use first 6 words
-  const fallback = sentences[0]?.split(/\s+/).slice(0, 6).map(titleCase).join(" ") ?? "Ministry Leadership Course";
-  return fallback;
+  return (
+    sentences[0]?.split(/\s+/).slice(0, 6).map(titleCase).join(" ") ??
+    "Ministry Leadership Course"
+  );
 }
-
-// ============================================================
-// Description
-// ============================================================
 
 function deriveDescription(paragraphs: string[]): string {
   const first = paragraphs[0]?.trim() ?? "";
-  if (first.length > 50) {
-    return first.length > 280 ? first.slice(0, 277) + "…" : first;
-  }
+  if (first.length > 50) return first.length > 280 ? first.slice(0, 277) + "…" : first;
   const combined = paragraphs.slice(0, 2).join(" ").trim();
   return combined.length > 280 ? combined.slice(0, 277) + "…" : combined;
 }
 
 // ============================================================
-// Module derivation
+// Module derivation (with per-module assessment questions)
 // ============================================================
 
-function deriveModules(paragraphs: string[], totalMinutes: number): AIGeneratedModule[] {
-  // Target 4-6 modules
+function deriveModules(
+  paragraphs: string[],
+  totalMinutes: number,
+  allSentences: string[]
+): AIGeneratedModule[] {
   const targetCount = Math.min(6, Math.max(3, Math.floor(paragraphs.length / 2)));
   const chunkSize = Math.ceil(paragraphs.length / targetCount);
 
@@ -148,7 +253,6 @@ function deriveModules(paragraphs: string[], totalMinutes: number): AIGeneratedM
     if (chunk.join(" ").trim().length > 30) chunks.push(chunk);
   }
 
-  // Distribute time proportionally by word count
   const chunkWords = chunks.map((c) => c.join(" ").split(/\s+/).length);
   const totalWords = chunkWords.reduce((a, b) => a + b, 0);
 
@@ -173,6 +277,7 @@ function deriveModules(paragraphs: string[], totalMinutes: number): AIGeneratedM
       learning_objectives: deriveObjectives(sentences),
       key_takeaways: deriveTakeaways(sentences),
       reflection_questions: deriveReflectionQuestions(sentences, moduleTitle),
+      assessment_questions: deriveModuleAssessments(sentences, moduleTitle),
     };
   });
 }
@@ -207,14 +312,12 @@ function deriveObjectives(sentences: string[]): string[] {
     if (objectives.length >= 3) break;
   }
   if (objectives.length === 0) {
-    // Generate generic objectives from first 3 sentences
     return sentences.slice(0, 3).map((s) => `Understand and apply: ${cleanSentence(s).toLowerCase()}`);
   }
   return objectives.slice(0, 4);
 }
 
 function deriveTakeaways(sentences: string[]): string[] {
-  // Pick substantive middle sentences
   const mid = sentences.slice(Math.floor(sentences.length / 4));
   const picks = mid.filter((s) => s.length > 30 && s.length < 200).slice(0, 3);
   if (picks.length === 0) return sentences.slice(0, 3).map(cleanSentence);
@@ -223,61 +326,36 @@ function deriveTakeaways(sentences: string[]): string[] {
 
 function deriveReflectionQuestions(sentences: string[], moduleTitle: string): string[] {
   return [
-    `How does the concept of "${moduleTitle.toLowerCase()}" apply to your current leadership context?`,
+    `How does "${moduleTitle.toLowerCase()}" apply to your current leadership context?`,
     `What one action will you take this week based on what you learned in this section?`,
-    `How would you explain the key principle from this module to a member of your team?`,
   ];
 }
 
-// ============================================================
-// Assessment derivation
-// ============================================================
+function deriveModuleAssessments(sentences: string[], moduleTitle: string): AIGeneratedQuestion[] {
+  const stem = sentences.find((s) => s.length > 40 && s.length < 180) ?? moduleTitle;
+  const cleanStem = cleanSentence(stem).replace(/[.!?]$/, "");
 
-function deriveAssessments(sentences: string[], modules: AIGeneratedModule[]): AIGeneratedQuestion[] {
-  const questions: AIGeneratedQuestion[] = [];
-
-  // Generate 1 MCQ per module
-  for (let i = 0; i < Math.min(modules.length, 4); i++) {
-    const m = modules[i];
-    const stem = m.key_takeaways[0] ?? m.module_summary;
-    const cleanStem = cleanSentence(stem).replace(/[.!?]$/, "");
-
-    questions.push({
-      question: `Which of the following best describes the principle of "${m.module_title}"?`,
+  return [
+    {
+      question: `Which of the following best captures the central principle of "${moduleTitle}"?`,
       question_type: "mcq",
       options: [
-        cleanStem.length > 10 ? cleanStem : `The core principle of ${m.module_title}`,
-        `A secondary consideration in ${m.module_title.toLowerCase()}`,
-        `An optional framework that only applies in larger organisations`,
-        `A historical concept no longer relevant to modern ministry`,
+        cleanStem.length > 10 ? cleanStem : `The foundational principle of ${moduleTitle}`,
+        `A secondary consideration in ${moduleTitle.toLowerCase()}`,
+        `An optional framework only relevant to larger organisations`,
+        `A historical concept not applicable to modern ministry`,
       ],
-      correct_answer: cleanStem.length > 10 ? cleanStem : `The core principle of ${m.module_title}`,
-      explanation: `This answer captures the central teaching from the "${m.module_title}" module as described in the learning objectives.`,
-    });
-  }
-
-  // Add 2 true/false questions from key sentences
-  const tfSentences = sentences.filter((s) => s.length > 40 && s.length < 180).slice(2, 5);
-  for (const s of tfSentences.slice(0, 2)) {
-    questions.push({
-      question: `True or False: "${cleanSentence(s)}"`,
+      correct_answer: cleanStem.length > 10 ? cleanStem : `The foundational principle of ${moduleTitle}`,
+      explanation: `This answer reflects the core teaching from the "${moduleTitle}" section of the course.`,
+    },
+    {
+      question: `True or False: The principles taught in "${moduleTitle}" can be directly applied to everyday ministry leadership.`,
       question_type: "true_false",
       options: ["True", "False"],
       correct_answer: "True",
-      explanation: "This statement is drawn directly from the course content and reflects a key principle taught in this curriculum.",
-    });
-  }
-
-  // Add 1 reflection question
-  questions.push({
-    question: "Describe one concrete way you will apply the leadership principles from this course within the next 30 days.",
-    question_type: "reflection",
-    options: [],
-    correct_answer: "",
-    explanation: "Reflection questions have no single correct answer. They are evaluated based on depth of engagement and practical specificity.",
-  });
-
-  return questions;
+      explanation: "The content in this module is designed for direct application in ministry contexts.",
+    },
+  ];
 }
 
 // ============================================================
@@ -312,7 +390,6 @@ function inferCategory(text: string): string {
     }
   }
 
-  // Validate against COURSE_CATEGORIES
   return (COURSE_CATEGORIES as readonly string[]).includes(topCategory) ? topCategory : "General";
 }
 
@@ -345,8 +422,7 @@ function deriveTags(text: string, category: string): string[] {
     "ministry", "church", "community", "strategy", "operations",
   ];
   const found = tagKeywords.filter((kw) => lower.includes(kw));
-  const tags = Array.from(new Set([category.toLowerCase(), ...found])).slice(0, 6);
-  return tags;
+  return Array.from(new Set([category.toLowerCase(), ...found])).slice(0, 6);
 }
 
 // ============================================================

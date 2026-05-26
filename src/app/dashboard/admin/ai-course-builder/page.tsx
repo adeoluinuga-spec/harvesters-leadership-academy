@@ -522,6 +522,59 @@ function ModuleEditor({
                 </div>
               </div>
 
+              {/* Per-module assessment questions */}
+              <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Assessment questions
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      update("assessment_questions", [
+                        ...(mod.assessment_questions ?? []),
+                        {
+                          question: "",
+                          question_type: "mcq",
+                          options: ["", "", "", ""],
+                          correct_answer: "",
+                          explanation: "",
+                        },
+                      ])
+                    }
+                    className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[11px] font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+                  >
+                    <Plus className="size-3" />
+                    Add question
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {(mod.assessment_questions ?? []).map((q, qi) => (
+                    <QuestionEditor
+                      key={qi}
+                      question={q}
+                      index={qi}
+                      onChange={(updated) => {
+                        const next = [...(mod.assessment_questions ?? [])];
+                        next[qi] = updated;
+                        update("assessment_questions", next);
+                      }}
+                      onDelete={() =>
+                        update(
+                          "assessment_questions",
+                          (mod.assessment_questions ?? []).filter((_, j) => j !== qi)
+                        )
+                      }
+                    />
+                  ))}
+                  {(mod.assessment_questions ?? []).length === 0 && (
+                    <p className="rounded-lg border border-dashed border-zinc-200 bg-white p-4 text-center text-xs text-zinc-400">
+                      No assessment questions yet — click "Add question" to create one.
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="flex justify-end">
                 <button
                   type="button"
@@ -677,29 +730,7 @@ function ReviewStep({
         learning_objectives: [],
         key_takeaways: [],
         reflection_questions: [],
-      },
-    ]);
-  }
-
-  function updateQuestion(i: number, q: AIGeneratedQuestion) {
-    const next = [...course.assessments];
-    next[i] = q;
-    updateCourse("assessments", next);
-  }
-
-  function deleteQuestion(i: number) {
-    updateCourse("assessments", course.assessments.filter((_, j) => j !== i));
-  }
-
-  function addQuestion() {
-    updateCourse("assessments", [
-      ...course.assessments,
-      {
-        question: "",
-        question_type: "mcq",
-        options: ["", "", "", ""],
-        correct_answer: "",
-        explanation: "",
+        assessment_questions: [],
       },
     ]);
   }
@@ -909,39 +940,6 @@ function ReviewStep({
                 index={i}
                 onChange={(updated) => updateModule(i, updated)}
                 onDelete={() => deleteModule(i)}
-              />
-            ))}
-          </div>
-        </Card>
-      </motion.div>
-
-      {/* Assessments */}
-      <motion.div variants={shellItem}>
-        <Card>
-          <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
-            <div>
-              <h3 className="font-heading text-sm font-semibold text-zinc-950">Assessment questions</h3>
-              <p className="mt-0.5 text-xs text-zinc-500">
-                {course.assessments.length} question{course.assessments.length !== 1 ? "s" : ""} — 70% passing score by default
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={addQuestion}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
-            >
-              <Plus className="size-3.5" />
-              Add question
-            </button>
-          </div>
-          <div className="space-y-3 p-5">
-            {course.assessments.map((q, i) => (
-              <QuestionEditor
-                key={i}
-                question={q}
-                index={i}
-                onChange={(updated) => updateQuestion(i, updated)}
-                onDelete={() => deleteQuestion(i)}
               />
             ))}
           </div>
