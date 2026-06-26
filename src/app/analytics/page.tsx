@@ -46,7 +46,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { courses } from "@/lib/course-data";
 import { campuses, leaders } from "@/lib/hierarchy-data";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
-import { MockRole } from "@/lib/mock-auth";
+import { AcademyRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 type AnalyticsScope = "personal" | "campus" | "subgroup" | "organization" | "ecosystem";
@@ -112,7 +112,7 @@ const chartBlack = "#09090b";
 const chartZinc = "#71717a";
 const chartSoft = "#d4d4d8";
 
-function scopeForRole(role: MockRole): AnalyticsScope {
+function scopeForRole(role: AcademyRole): AnalyticsScope {
   if (role === "Platform Super Admin" || role === "Super Admin" || role === "Admin") return "ecosystem";
   if (role === "Leader") return "personal";
   if (role === "Campus Pastor") return "campus";
@@ -122,7 +122,7 @@ function scopeForRole(role: MockRole): AnalyticsScope {
 }
 
 export default function AnalyticsPage() {
-  const [role, setRole] = useState<MockRole>("Platform Super Admin");
+  const [role, setRole] = useState<AcademyRole>("Platform Super Admin");
   const [profile, setProfile] = useState<AuthProfile | null>(null);
 
   useEffect(() => {
@@ -718,7 +718,7 @@ function weakestCampus(currentCampuses: typeof campuses) {
 }
 
 function buildRecommendations(
-  role: MockRole,
+  role: AcademyRole,
   scope: AnalyticsScope,
   profile: AuthProfile | null
 ): InsightRecommendation[] {

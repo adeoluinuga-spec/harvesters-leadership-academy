@@ -6,10 +6,10 @@ import { LoaderCircle } from "lucide-react";
 
 import { getAuthProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
-import { isControlledPreseedRole, MockRole, roleCanAccess } from "@/lib/mock-auth";
+import { isInviteOnlyRole, AcademyRole, roleCanAccess } from "@/lib/roles";
 
 type ProtectedRouteProps = {
-  allowedRoles: MockRole[];
+  allowedRoles: AcademyRole[];
   children: React.ReactNode;
 };
 
@@ -55,14 +55,14 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
         profile.onboardingCompleted ? "false" : "true"
       );
 
-      if (!profile.onboardingCompleted && !isControlledPreseedRole(profile.role) && pathname !== "/onboarding") {
+      if (!profile.onboardingCompleted && !isInviteOnlyRole(profile.role) && pathname !== "/onboarding") {
         setAllowed(false);
         setChecked(true);
         router.replace("/onboarding");
         return;
       }
 
-      const allowedRoleList = allowedRoleKey.split("|") as MockRole[];
+      const allowedRoleList = allowedRoleKey.split("|") as AcademyRole[];
       const canAccess = roleCanAccess(profile.role, allowedRoleList);
       setAllowed(canAccess);
       setChecked(true);

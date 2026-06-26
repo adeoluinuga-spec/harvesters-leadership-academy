@@ -25,6 +25,8 @@ const CREATOR_ROLES = [
   "Subgroup Pastor",
   "Sub-group Pastor",
   "Campus Pastor",
+  "Campus Admin",
+  "Group Admin",
 ];
 
 function Field({
@@ -143,7 +145,7 @@ export default function NewCoursePage() {
 
         const { data, error: dbError } = await supabase
           .from("users")
-          .select("role")
+          .select("role, group_id, campus_id")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -156,6 +158,7 @@ export default function NewCoursePage() {
 
         const role = data?.role ?? "";
         setUserRole(role);
+        setCreatorScope(role === "Group Admin" ? { management_scope: "group" as const, group_id: data?.group_id ?? null, campus_id: null } : role === "Campus Admin" ? { management_scope: "campus" as const, group_id: null, campus_id: data?.campus_id ?? null } : { management_scope: "platform" as const, group_id: null, campus_id: null });
         setAuthorized(CREATOR_ROLES.includes(role));
         setAuthChecked(true);
       } catch {
@@ -185,6 +188,7 @@ export default function NewCoursePage() {
   const [isRequired, setIsRequired] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
   const [status, setStatus] = useState<CourseStatus>("draft");
+  const [creatorScope, setCreatorScope] = useState<{ management_scope: "platform" | "group" | "campus"; group_id: string | null; campus_id: string | null }>({ management_scope: "platform", group_id: null, campus_id: null });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -219,6 +223,7 @@ export default function NewCoursePage() {
       is_required: isRequired,
       is_featured: isFeatured,
       status,
+      ...creatorScope,
     });
 
     setSaving(false);

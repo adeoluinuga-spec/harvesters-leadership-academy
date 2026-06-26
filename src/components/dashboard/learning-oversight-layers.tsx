@@ -20,10 +20,9 @@ import { shellItem } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { recentlyWatched } from "@/lib/course-data";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
-import { MockRole } from "@/lib/mock-auth";
+import { AcademyRole } from "@/lib/roles";
 import { fetchCoursesWithProgress, canUserSeeCourse } from "@/lib/lms";
 import type { CourseWithProgress } from "@/lib/lms-types";
 import { formatDuration } from "@/lib/lms-types";
@@ -36,34 +35,7 @@ type LearningMetric = {
   icon: LucideIcon;
 };
 
-const learningMetrics: LearningMetric[] = [
-  {
-    label: "Assessments",
-    value: "2 pending",
-    detail: "Next leadership readiness check due this week",
-    icon: ClipboardCheck,
-  },
-  {
-    label: "Certificates",
-    value: "3 earned",
-    detail: "1 certificate close to completion",
-    icon: Award,
-  },
-  {
-    label: "Growth pathway",
-    value: "Level 4",
-    detail: "Building toward next leadership responsibility",
-    icon: Compass,
-  },
-  {
-    label: "Course progress",
-    value: "62%",
-    detail: "Quarterly personal learning pace",
-    icon: LineChart,
-  },
-];
-
-const roleContext: Record<MockRole, string> = {
+const roleContext: Record<string, string> = {
   "Platform Super Admin": "platform-wide tenant governance, AI systems, white-label readiness, and global course architecture",
   "Cell Leader / Assistant HOD": "the cell members you influence and the ministry habits you are forming",
   "Zonal Leader / HOD": "zonal leadership, team development, and readiness signals",
@@ -82,7 +54,7 @@ const roleContext: Record<MockRole, string> = {
   Admin: "platform-wide tenant governance, AI systems, white-label readiness, and global course architecture",
 };
 
-export function PersonalLearningLayer({ role }: { role: MockRole }) {
+export function PersonalLearningLayer({ role }: { role: AcademyRole }) {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [allCourses, setAllCourses] = useState<CourseWithProgress[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<CourseWithProgress[]>([]);
@@ -130,6 +102,12 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
   }, []);
 
   const activeCourse = enrolledCourses[0] ?? null;
+  const learningMetrics: LearningMetric[] = [
+    { label: "Assessments", value: String(enrolledCourses.filter((course) => course.best_attempt?.passed === false).length), detail: "Courses with an assessment still to pass", icon: ClipboardCheck },
+    { label: "Certificates", value: String(enrolledCourses.filter((course) => course.certificate).length), detail: "Certificates earned", icon: Award },
+    { label: "Enrolled courses", value: String(enrolledCourses.length), detail: "Courses currently in your learning plan", icon: Compass },
+    { label: "Course progress", value: `${enrolledCourses.length ? Math.round(enrolledCourses.reduce((sum, course) => sum + course.progress_percent, 0) / enrolledCourses.length) : 0}%`, detail: "Average progress across enrolled courses", icon: LineChart },
+  ];
 
   const effectiveRole = profile?.role ?? role;
 
@@ -146,7 +124,7 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
   const currentRole = profile?.currentLeadershipRole ?? effectiveRole;
   const aspiration = profile?.leadershipAspiration ?? "your next leadership step";
   const aiInsight = activeCourse
-    ? `As a ${effectiveRole} preparing for ${aspiration}, prioritize ${activeCourse.title} alongside ${roleContext[effectiveRole as MockRole] ?? roleContext["Leader"]}.`
+    ? `As a ${effectiveRole} preparing for ${aspiration}, prioritize ${activeCourse.title} alongside ${roleContext[effectiveRole] ?? "your current learning pathway"}.`
     : `As a ${effectiveRole} preparing for ${aspiration}, explore the course library to begin your leadership growth journey.`;
 
   return (
@@ -314,19 +292,19 @@ export function PersonalLearningLayer({ role }: { role: MockRole }) {
           <CardTitle className="font-heading text-lg font-semibold">Recent learning activity</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 pt-1 md:grid-cols-3">
-          {recentlyWatched.slice(0, 3).map((item) => (
-            <div key={item.title} className="rounded-lg border border-zinc-100 p-4">
+          {enrolledCourses.length ? enrolledCourses.slice(0, 3).map((item) => (
+            <div key={item.id} className="rounded-lg border border-zinc-100 p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="font-medium text-zinc-950">{item.title}</p>
                 <CalendarCheck className="size-4 shrink-0 text-zinc-400" />
               </div>
               <Progress
-                value={item.progress}
+                value={item.progress_percent}
                 className="h-2 bg-zinc-100 [&_[data-slot=progress-indicator]]:bg-black"
               />
-              <p className="mt-2 text-xs text-zinc-500">{item.progress}% watched</p>
+              <p className="mt-2 text-xs text-zinc-500">{item.progress_percent}% complete</p>
             </div>
-          ))}
+          )) : <p className="p-4 text-sm text-zinc-500">No learning activity yet. Enrol in a course to begin.</p>}
         </CardContent>
       </Card>
     </motion.section>

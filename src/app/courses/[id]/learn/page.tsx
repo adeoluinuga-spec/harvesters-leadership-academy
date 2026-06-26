@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { courses as staticCourses, recommendedCourses } from "@/lib/course-data";
 import { fetchCourseWithLessons } from "@/lib/lms";
 import { VideoPlayer } from "@/components/lms/video-player";
 import { AssessmentModal } from "@/components/lms/assessment-modal";
@@ -37,32 +36,8 @@ type CourseLearnPageProps = {
 
 const tabs = ["Overview", "Notes", "Transcript", "Resources", "AI Insights"];
 
-const staticAiInsights = [
-  {
-    title: "Key leadership takeaway",
-    body: "Healthy ministry execution begins when leaders can name the culture they are protecting before they name the task they are assigning.",
-    icon: Sparkles,
-  },
-  {
-    title: "Scripture reference",
-    body: "1 Peter 5:2-3 frames leadership as willing shepherding, not control. Use it to examine posture before delegation.",
-    icon: BookOpen,
-  },
-  {
-    title: "AI-generated summary",
-    body: "This section connects stewardship, clarity, and rhythm as the operating system for scalable leadership development.",
-    icon: Bot,
-  },
-  {
-    title: "Action point",
-    body: "Write one sentence that defines the leadership culture your team should feel in every weekly meeting.",
-    icon: CheckCircle2,
-  },
-];
-
 export default function CourseLearnPage({ params }: CourseLearnPageProps) {
   const { id } = use(params);
-  const staticCourse = staticCourses.find((item) => item.id === id) ?? staticCourses[0];
 
   const [live, setLive] = useState<CourseWithLessons | null>(null);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
@@ -95,9 +70,9 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
 
   const lessons: LMSLesson[] = live?.lessons ?? [];
   const completedIds = new Set([...(live?.completed_lesson_ids ?? []), ...optimisticCompleted]);
-  const totalLessons = lessons.length || staticCourse.lessons;
+  const totalLessons = lessons.length;
   const completedCount = completedIds.size;
-  const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : live?.progress_percent ?? staticCourse.progress;
+  const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : live?.progress_percent ?? 0;
   const assessmentReadyPercent = live?.assessment ? 90 : 100;
   const readyForAssessment = progressPercent >= assessmentReadyPercent;
   const hasCertificate = Boolean(live?.certificate || certNumber);
@@ -207,7 +182,7 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
             <VideoPlayer
               videoUrl={currentLesson?.video_url ?? null}
               lessonTitle={currentLesson?.title ?? "Ministry Leadership Session"}
-              courseTitle={live?.title ?? staticCourse.title}
+              courseTitle={live?.title ?? "Course"}
               checkpointQuestion={currentLesson?.checkpoint_question}
               progress={progressPercent}
             />
@@ -217,12 +192,12 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
             <CardContent className="p-5">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-sm text-zinc-500">{live?.title ?? staticCourse.title}</p>
+                  <p className="text-sm text-zinc-500">{live?.title ?? "Course"}</p>
                   <h2 className="font-heading mt-1 text-2xl font-semibold tracking-tight text-zinc-950">
                     {currentLesson?.title ?? "Select a lesson"}
                   </h2>
                   <p className="mt-2 text-sm text-zinc-500">
-                    Instructor: {live?.instructor_name ?? staticCourse.instructor}
+                    Instructor: {live?.instructor_name ?? "Academy instructor"}
                   </p>
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-sm lg:min-w-[360px]">
@@ -321,54 +296,7 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
                     </button>
                   );
                 })
-              : // Static fallback lessons
-                [
-                  { number: "01", title: "The leader as a steward of spiritual culture", duration: "18:42", complete: true, locked: false, checkpoint: true, current: false },
-                  { number: "02", title: "Decision clarity under ministry pressure", duration: "24:16", complete: false, locked: false, checkpoint: true, current: true },
-                  { number: "03", title: "Leading teams through measurable rhythms", duration: "21:08", complete: false, locked: false, checkpoint: false, current: false },
-                  { number: "04", title: "Coaching leaders with pastoral intelligence", duration: "28:33", complete: false, locked: true, checkpoint: true, current: false },
-                  { number: "05", title: "Assessment readiness and certificate review", duration: "16:20", complete: false, locked: true, checkpoint: false, current: false },
-                ].map((lesson) => (
-                  <button
-                    key={lesson.number}
-                    disabled={lesson.locked}
-                    className={cn(
-                      "w-full rounded-lg border p-4 text-left transition-all hover:border-zinc-300 hover:bg-zinc-50",
-                      lesson.current
-                        ? "border-black bg-zinc-950 text-white hover:bg-zinc-950"
-                        : "border-zinc-100 bg-white text-zinc-950"
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex gap-3">
-                        <span
-                          className={cn(
-                            "font-heading flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold",
-                            lesson.current ? "bg-white text-black" : "bg-zinc-100 text-zinc-600"
-                          )}
-                        >
-                          {lesson.number}
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium leading-5">{lesson.title}</p>
-                          <p className={cn("mt-1 text-xs", lesson.current ? "text-zinc-400" : "text-zinc-500")}>
-                            {lesson.duration}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {lesson.checkpoint ? <Bot className="size-4 text-emerald-500" /> : null}
-                        {lesson.locked ? (
-                          <Lock className="size-4 text-zinc-400" />
-                        ) : lesson.complete ? (
-                          <CheckCircle2 className="size-4 text-emerald-500" />
-                        ) : (
-                          <Unlock className="size-4 text-zinc-400" />
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                ))}
+              : <p className="p-4 text-sm text-zinc-500">This course does not have lessons yet.</p>}
           </CardContent>
         </Card>
       </motion.section>
@@ -396,17 +324,7 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
             </CardHeader>
             <CardContent className="pt-1">
               {activeTab === "AI Insights" && (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {staticAiInsights.map((insight) => (
-                    <div key={insight.title} className="rounded-lg border border-zinc-100 p-4">
-                      <div className="mb-4 flex size-9 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700">
-                        <insight.icon className="size-4" />
-                      </div>
-                      <h3 className="font-heading font-semibold text-zinc-950">{insight.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-zinc-500">{insight.body}</p>
-                    </div>
-                  ))}
-                </div>
+                <p className="py-4 text-sm text-zinc-500">AI insights will appear here when an authorised instructor generates them for this lesson.</p>
               )}
 
               {activeTab === "Transcript" && (
@@ -446,7 +364,7 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
               {activeTab === "Overview" && (
                 <div className="py-2">
                   <p className="text-sm leading-7 text-zinc-600">
-                    {currentLesson?.description ?? live?.description ?? staticCourse.description}
+                    {currentLesson?.description ?? live?.description ?? "No lesson overview is available yet."}
                   </p>
                 </div>
               )}
@@ -484,25 +402,7 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
               <p className="text-sm text-zinc-500">Continue your leadership development pathway</p>
             </CardHeader>
             <CardContent className="flex gap-3 overflow-x-auto pt-1">
-              {recommendedCourses.map((related) => (
-                <div
-                  key={related.title}
-                  className="min-w-[260px] rounded-lg border border-zinc-100 bg-white p-4 transition-shadow hover:shadow-lg hover:shadow-zinc-200/70"
-                >
-                  <div className="mb-4 flex h-28 items-end rounded-lg bg-[#0b0b0b] p-3 text-white">
-                    <p className="font-heading text-sm font-semibold leading-5">
-                      Ministry leadership cohort
-                    </p>
-                  </div>
-                  <Badge className="rounded-md bg-zinc-100 text-zinc-700 hover:bg-zinc-100">
-                    {related.category}
-                  </Badge>
-                  <p className="font-heading mt-3 font-semibold leading-snug text-zinc-950">
-                    {related.title}
-                  </p>
-                  <p className="mt-2 text-sm text-zinc-500">{related.duration}</p>
-                </div>
-              ))}
+              <Link href="/courses" className="rounded-lg border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50">Browse live course catalogue</Link>
             </CardContent>
           </Card>
         </div>

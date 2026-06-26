@@ -27,7 +27,7 @@ import {
   type ScopedAnalytics,
   type RoleCount,
 } from "@/lib/analytics";
-import type { MockRole } from "@/lib/mock-auth";
+import type { AcademyRole } from "@/lib/roles";
 
 function healthLabel(rate: number) {
   if (rate >= 80) return "Thriving";
@@ -210,7 +210,7 @@ function RoleBreakdown({ breakdown }: { breakdown: RoleCount[] }) {
                   </div>
                   <div>
                     <p className="font-heading font-semibold text-zinc-950">
-                      {roleDisplayLabel(row.role as MockRole)}
+                      {roleDisplayLabel(row.role as AcademyRole)}
                     </p>
                     <p className="text-sm text-zinc-500">{row.count} leaders</p>
                   </div>
@@ -279,7 +279,7 @@ function MinistryInsights({
   const insights = [
     best && best.completionRate >= 70
       ? {
-          title: `${roleDisplayLabel(best.role as MockRole)} leads with ${best.completionRate}% completion — strong tier performance.`,
+          title: `${roleDisplayLabel(best.role as AcademyRole)} leads with ${best.completionRate}% completion — strong tier performance.`,
           icon: TrendingUp,
         }
       : {
@@ -288,7 +288,7 @@ function MinistryInsights({
         },
     worst && worst.completionRate < 60
       ? {
-          title: `${roleDisplayLabel(worst.role as MockRole)} at ${worst.completionRate}% — pastoral follow-up recommended.`,
+          title: `${roleDisplayLabel(worst.role as AcademyRole)} at ${worst.completionRate}% — pastoral follow-up recommended.`,
           icon: TrendingDown,
         }
       : {
@@ -397,7 +397,7 @@ export default function CommunityDashboardPage() {
   const { campusName, campusId, role } = hierarchy;
 
   const scope = useMemo(
-    () => getLeadershipScope((role || "Community Leader") as MockRole, campusId),
+    () => getLeadershipScope((role || "Community Leader") as AcademyRole, campusId),
     [role, campusId]
   );
 
@@ -437,7 +437,7 @@ export default function CommunityDashboardPage() {
         />
 
         <PersonalLearningLayer
-          role={(role || "Community Leader") as MockRole}
+          role={role || "Community Leader"}
         />
 
         <OversightLayerIntro

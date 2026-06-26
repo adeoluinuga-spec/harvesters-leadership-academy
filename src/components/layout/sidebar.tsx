@@ -25,7 +25,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/client";
-import { dashboardForRole, normalizeStoredRole } from "@/lib/mock-auth";
+import { dashboardForRole, normalizeRole as normalizeStoredRole } from "@/lib/roles";
 
 const ADMIN_COURSE_ROLES = [
   "Platform Super Admin",
@@ -36,6 +36,8 @@ const ADMIN_COURSE_ROLES = [
   "Subgroup Pastor",
   "Sub-group Pastor",
   "Campus Pastor",
+  "Campus Admin",
+  "Group Admin",
 ];
 
 const COMM_ROLES = [
@@ -47,6 +49,8 @@ const COMM_ROLES = [
   "Subgroup Pastor",
   "Sub-group Pastor",
   "Campus Pastor",
+  "Campus Admin",
+  "Group Admin",
 ];
 
 const sidebarItems = [
@@ -96,6 +100,7 @@ function CommCenterLink({ pathname }: { pathname: string }) {
 }
 
 const ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];
+const STRUCTURE_ADMIN_ROLES = [...ADMIN_ROLES, "Group Admin", "Campus Admin"];
 
 const adminNavItems = [
   { label: "AI Course Builder", href: "/dashboard/admin/ai-course-builder", icon: Wand2 },
@@ -110,6 +115,7 @@ export function Sidebar() {
   const [canManageCourses, setCanManageCourses] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [canCommunicate, setCanCommunicate] = useState(false);
+  const [canManageStructure, setCanManageStructure] = useState(false);
   const [dashboardHref, setDashboardHref] = useState("/dashboard/leader");
 
   useEffect(() => {
@@ -123,6 +129,7 @@ export function Sidebar() {
         setCanManageCourses(ADMIN_COURSE_ROLES.includes(role));
         setIsAdmin(ADMIN_ROLES.includes(role));
         setCanCommunicate(COMM_ROLES.includes(role));
+        setCanManageStructure(STRUCTURE_ADMIN_ROLES.includes(role));
         const route = dashboardForRole(normalizeStoredRole(role));
         if (route) setDashboardHref(route);
       } catch {
@@ -200,6 +207,7 @@ export function Sidebar() {
             })}
           </>
         )}
+        {canManageStructure && <Link href="/dashboard/admin/structure" className={cn("group flex h-11 items-center justify-center gap-3 rounded-lg px-3 text-sm text-zinc-400 transition-all hover:bg-white/8 hover:text-white lg:justify-start", pathname === "/dashboard/admin/structure" && "bg-white text-black shadow-sm hover:bg-white hover:text-black")}><Network className="size-4 shrink-0" /><span className="hidden lg:inline">Structure</span></Link>}
       </nav>
 
       <div className="border-t border-white/10 p-3 lg:p-4">

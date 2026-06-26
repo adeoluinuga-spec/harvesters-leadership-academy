@@ -3,21 +3,22 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/client";
 import {
   dashboardForRole,
-  defaultLeadershipProfile,
+  AcademyRole,
   LeadershipAspiration,
-  MockLeadershipProfile,
-  MockRole,
   CurrentLeadershipRole,
-  normalizeStoredRole,
-} from "@/lib/mock-auth";
+  normalizeRole as normalizeStoredRole,
+} from "@/lib/roles";
 
-export type AuthProfile = MockLeadershipProfile & {
+export type AuthProfile = {
   id: string;
   email: string;
   designation: string;
   fullName: string;
   avatarUrl: string;
-  role: MockRole;
+  role: AcademyRole;
+  accountType: "attendee" | "member" | "worker" | "leader";
+  directLeaderId: string | null;
+  ministryUnitId: string | null;
   onboardingCompleted: boolean;
   organizationId: string | null;
   organizationName: string;
@@ -25,6 +26,12 @@ export type AuthProfile = MockLeadershipProfile & {
   campusId: string | null;
   subgroupId: string | null;
   groupId: string | null;
+  campus: string;
+  subgroup: string;
+  group: string;
+  campusPastor: string;
+  currentLeadershipRole: CurrentLeadershipRole;
+  leadershipAspiration: LeadershipAspiration;
 };
 
 type ProfileRow = {
@@ -35,6 +42,9 @@ type ProfileRow = {
   avatar_url?: string | null;
   created_at?: string | null;
   role?: string | null;
+  account_type?: "attendee" | "member" | "worker" | "leader" | null;
+  direct_leader_id?: string | null;
+  ministry_unit_id?: string | null;
   role_id?: string | null;
   organization_id?: string | null;
   campus_id?: string | null;
@@ -51,9 +61,9 @@ type ProfileRow = {
   campus_pastor?: string | null;
   department?: string | null;
   departments?: RelatedName | RelatedName[] | null;
-  current_leadership_role?: MockLeadershipProfile["currentLeadershipRole"] | null;
-  aspirational_leadership_role?: MockLeadershipProfile["leadershipAspiration"] | null;
-  leadership_aspiration?: MockLeadershipProfile["leadershipAspiration"] | null;
+  current_leadership_role?: CurrentLeadershipRole | null;
+  aspirational_leadership_role?: LeadershipAspiration | null;
+  leadership_aspiration?: LeadershipAspiration | null;
   years_in_ministry?: number | string | null;
   onboarding_completed?: boolean | null;
   roles?: RelatedName | RelatedName[] | null;
@@ -92,7 +102,7 @@ export type MinistryCampusOption = {
   groupPastor: string;
   campusPastor: string;
   subgroupPastor: string;
-  source: "supabase" | "fallback";
+  source: "supabase";
 };
 
 export type MinistryLookupOption = {
@@ -100,7 +110,14 @@ export type MinistryLookupOption = {
   name: string;
 };
 
+export type MinistryUnitOption = {
+  id: string;
+  name: string;
+  unitType: "department_zone" | "unit_area" | "cell";
+};
+
 export type OnboardingProfileInput = {
+  accountType: "attendee" | "member" | "worker" | "leader";
   designation: string;
   fullName: string;
   email: string;
@@ -109,13 +126,15 @@ export type OnboardingProfileInput = {
   gender: string;
   campus: MinistryCampusOption;
   roleId: string | null;
-  role: MockRole;
+  role: AcademyRole;
+  directLeaderId: string | null;
+  ministryUnitId: string | null;
   currentLeadershipRole: CurrentLeadershipRole;
   aspirationalLeadershipRole: LeadershipAspiration;
   yearsInMinistry: number | null;
 };
 
-export function normalizeRole(role?: string | null): MockRole {
+export function normalizeRole(role?: string | null): AcademyRole {
   return normalizeStoredRole(role);
 }
 
@@ -206,7 +225,7 @@ export async function ensureUserProfile(
   throw new Error("We could not create your academy profile. Please try again or contact academy support.");
 }
 
-export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leader") {
+export async function getAuthProfile(user: User, fallbackRole: AcademyRole = "Attendee") {
   const supabase = createClient();
 
   let { data } = await supabase
@@ -316,6 +335,9 @@ export async function getAuthProfile(user: User, fallbackRole: MockRole = "Leade
     fullName: data?.full_name ?? (metadata.full_name as string | undefined) ?? user.email ?? "Academy Leader",
     avatarUrl: data?.avatar_url ?? "",
     role,
+    accountType: data?.account_type ?? (role === "Attendee" ? "attendee" : role === "Member" ? "member" : role === "Worker" ? "worker" : "leader"),
+    directLeaderId: data?.direct_leader_id ?? null,
+    ministryUnitId: data?.ministry_unit_id ?? null,
     onboardingCompleted: data?.onboarding_completed ?? false,
     organizationId,
     organizationName: organizationName ?? "Harvesters International Christian Centre",
@@ -465,7 +487,7 @@ export async function fetchMinistryCampuses(): Promise<MinistryCampusOption[]> {
       subgroupId: campus.subgroup_id ?? null,
       subgroupName: subgroup?.name ?? "Unassigned subgroup",
       groupId: subgroup?.group_id ?? null,
-      groupName: group?.name ?? "Group Alpha",
+      groupName: group?.name ?? "Unassigned group",
       groupPastor: "",
       campusPastor: "",
       subgroupPastor: "",
@@ -488,6 +510,24 @@ export async function fetchLookupOptions(table: "roles"): Promise<MinistryLookup
       name: row.name ?? row.title ?? "",
     }))
     .filter((row) => row.id && row.name);
+}
+
+export async function fetchMinistryUnits(campusId: string, accountType: "member" | "worker"): Promise<MinistryUnitOption[]> {
+  if (!campusId) return [];
+  const types = accountType === "member" ? ["cell"] : ["department_zone", "unit_area"];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("ministry_units")
+    .select("id, name, unit_type")
+    .eq("campus_id", campusId)
+    .in("unit_type", types)
+    .order("name");
+  if (error) throw new Error("Ministry structure could not be loaded. Please try again.");
+  return (data ?? []).map((unit) => ({
+    id: unit.id,
+    name: unit.name,
+    unitType: unit.unit_type as MinistryUnitOption["unitType"],
+  }));
 }
 
 export async function saveOnboardingProfile(input: OnboardingProfileInput): Promise<void> {
@@ -514,6 +554,9 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput): Prom
       campusSubgroupId: input.campus.subgroupId ?? null,
       campusGroupId: input.campus.groupId ?? null,
       role: input.role,
+      accountType: input.accountType,
+      directLeaderId: input.directLeaderId,
+      ministryUnitId: input.ministryUnitId,
       roleId: input.roleId ?? null,
       designation: input.designation,
       fullName: input.fullName,
@@ -542,7 +585,7 @@ export async function saveOnboardingProfile(input: OnboardingProfileInput): Prom
   }
 }
 
-export function dashboardForAuthRole(role: MockRole) {
+export function dashboardForAuthRole(role: AcademyRole) {
   return dashboardForRole(role);
 }
 
@@ -595,6 +638,3 @@ export function normalizeDesignation(value?: string | null) {
   const trimmedValue = value?.trim();
   return trimmedValue ? trimmedValue : "None";
 }
-
-// Unused by auth.ts itself but referenced indirectly via mock-auth; keep for tree-shaking
-export { defaultLeadershipProfile };

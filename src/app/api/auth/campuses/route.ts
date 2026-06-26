@@ -34,14 +34,14 @@ export async function GET(request: Request) {
   }
 
   if (!supabaseUrl || !supabaseServiceRoleKey) {
-    // Service role key is required for this route (RLS bypass). Without it, return
-    // empty so fetchMinistryCampuses falls back to its hardcoded data gracefully.
+    // Service role key is required for this route (RLS bypass). Do not substitute
+    // invented campuses when configuration is incomplete.
     if (!supabaseServiceRoleKey) {
       console.warn("[api/auth/campuses] SUPABASE_SERVICE_ROLE_KEY not set — returning empty campus list.");
     } else {
       console.error("[api/auth/campuses] NEXT_PUBLIC_SUPABASE_URL not set.");
     }
-    return Response.json({ campuses: [] });
+    return Response.json({ error: "Campus directory is unavailable." }, { status: 503 });
   }
 
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
   if (campusError || !campusRows?.length) {
     console.error("[api/auth/campuses] Failed to fetch campuses.", campusError?.message);
-    return Response.json({ campuses: [] });
+    return Response.json({ error: "No campuses have been configured yet." }, { status: 404 });
   }
 
   const subgroupIds = [
@@ -103,10 +103,10 @@ export async function GET(request: Request) {
       subgroupId,
       subgroupName: subgroup?.name ?? "Unassigned subgroup",
       groupId,
-      groupName: group?.name ?? "Group Alpha",
-      groupPastor: group?.pastor ?? "Campus Pastor",
-      campusPastor: campus.campus_pastor ?? campus.pastor ?? "Campus Pastor",
-      subgroupPastor: subgroup?.pastor ?? "Sub-group Pastor",
+      groupName: group?.name ?? "Unassigned group",
+      groupPastor: group?.pastor ?? "",
+      campusPastor: campus.campus_pastor ?? campus.pastor ?? "",
+      subgroupPastor: subgroup?.pastor ?? "",
     };
   });
 

@@ -35,7 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getLeadershipScope, roleDisplayLabel } from "@/lib/scope-resolver";
 import { useHierarchy } from "@/hooks/use-hierarchy";
-import type { MockRole } from "@/lib/mock-auth";
+import type { AcademyRole } from "@/lib/roles";
 
 type CampusUser = {
   id: string;
@@ -91,7 +91,7 @@ function RoleBreakdown({ breakdown }: { breakdown: RoleCount[] }) {
                   </div>
                   <div>
                     <p className="font-heading font-semibold text-zinc-950">
-                      {roleDisplayLabel(row.role as MockRole)}
+                      {roleDisplayLabel(row.role as AcademyRole)}
                     </p>
                     <p className="text-sm text-zinc-500">{row.count} leaders</p>
                   </div>
@@ -155,7 +155,7 @@ function CampusMinistryInsights({
   const insights = [
     best && best.completionRate >= 70
       ? {
-          title: `${roleDisplayLabel(best.role as MockRole)} leads with ${best.completionRate}% completion — strong tier performance.`,
+          title: `${roleDisplayLabel(best.role as AcademyRole)} leads with ${best.completionRate}% completion — strong tier performance.`,
           icon: TrendingUp,
         }
       : {
@@ -164,7 +164,7 @@ function CampusMinistryInsights({
         },
     worst && worst.completionRate < 60
       ? {
-          title: `${roleDisplayLabel(worst.role as MockRole)} at ${worst.completionRate}% — pastoral follow-up recommended.`,
+          title: `${roleDisplayLabel(worst.role as AcademyRole)} at ${worst.completionRate}% — pastoral follow-up recommended.`,
           icon: TrendingDown,
         }
       : {
@@ -220,7 +220,7 @@ export default function CampusDashboardPage() {
   const { campusName, campusId, subgroupName, role } = hierarchy;
 
   const scope = useMemo(
-    () => getLeadershipScope((role || "Campus Pastor") as MockRole, campusId),
+    () => getLeadershipScope((role || "Campus Pastor") as AcademyRole, campusId),
     [role, campusId]
   );
 
@@ -309,7 +309,7 @@ export default function CampusDashboardPage() {
         </motion.section>
 
         {/* ── Personal Learning ─────────────────────────────────── */}
-        <PersonalLearningLayer role={(hierarchy.role || "Campus Pastor") as import("@/lib/mock-auth").MockRole} />
+        <PersonalLearningLayer role={hierarchy.role || "Campus Pastor"} />
 
         {/* ── Oversight Intro ───────────────────────────────────── */}
         <OversightLayerIntro

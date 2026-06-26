@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 
 import { dashboardForAuthRole, getCurrentUserProfile } from "@/lib/auth";
-import { isControlledPreseedRole } from "@/lib/mock-auth";
+import { isInviteOnlyRole } from "@/lib/roles";
 
 export default function DashboardRoutePage() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function DashboardRoutePage() {
 
       const { profile } = result;
       const hasDashboardAccess =
-        profile.onboardingCompleted || isControlledPreseedRole(profile.role);
+        profile.onboardingCompleted || isInviteOnlyRole(profile.role);
 
       window.localStorage.setItem(
         "harvesters_profile_incomplete",

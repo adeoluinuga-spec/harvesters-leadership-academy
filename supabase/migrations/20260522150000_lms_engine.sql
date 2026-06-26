@@ -130,6 +130,51 @@ create table if not exists public.lesson_notes (
 -- ============================================================
 -- Indexes
 -- ============================================================
+-- Existing installations may have received the LMS tables before tenant
+-- support. Upgrade the live table before creating tenant-aware indexes.
+alter table public.courses
+  add column if not exists organization_id uuid references public.organizations(id) on delete set null,
+  add column if not exists description text,
+  add column if not exists thumbnail_url text,
+  add column if not exists category text not null default 'General',
+  add column if not exists level text not null default 'All leaders',
+  add column if not exists instructor_name text not null default 'Academy Instructor',
+  add column if not exists instructor_title text,
+  add column if not exists duration_minutes integer not null default 0,
+  add column if not exists is_published boolean not null default false,
+  add column if not exists is_featured boolean not null default false,
+  add column if not exists created_by uuid references auth.users(id) on delete set null,
+  add column if not exists created_at timestamptz not null default timezone('utc', now()),
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
+alter table public.course_modules
+  add column if not exists description text,
+  add column if not exists order_index integer not null default 0,
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table public.lessons
+  add column if not exists module_id uuid references public.course_modules(id) on delete set null,
+  add column if not exists description text,
+  add column if not exists video_url text,
+  add column if not exists duration_seconds integer not null default 0,
+  add column if not exists transcript text,
+  add column if not exists resources jsonb not null default '[]'::jsonb,
+  add column if not exists order_index integer not null default 0,
+  add column if not exists is_preview boolean not null default false,
+  add column if not exists has_checkpoint boolean not null default false,
+  add column if not exists checkpoint_question text,
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table public.assessments
+  add column if not exists is_required boolean not null default false,
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table public.assessment_questions
+  add column if not exists options jsonb not null default '[]'::jsonb,
+  add column if not exists correct_option integer not null default 0,
+  add column if not exists explanation text,
+  add column if not exists order_index integer not null default 0;
+
 create index if not exists courses_slug_idx              on public.courses(slug);
 create index if not exists courses_org_idx               on public.courses(organization_id);
 create index if not exists courses_published_idx         on public.courses(is_published);
@@ -319,7 +364,7 @@ values
   ('a1000000-0000-0000-0000-000000000004', 'pastoral-care-intelligence',       'Pastoral Care Intelligence',       'Equip care leaders with structured listening, escalation, and follow-up practices for healthier communities.',    'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80', 'Care',            'Team leads',      'Pastor Tola Martins',   290, true, false),
   ('a1000000-0000-0000-0000-000000000005', 'volunteer-excellence-framework',   'Volunteer Excellence Framework',   'Create a premium volunteer experience with onboarding, coaching, accountability, and meaningful service pathways.','https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=1200&q=80', 'Volunteer Growth','Coordinators',    'Kemi Johnson',          425, true, false),
   ('a1000000-0000-0000-0000-000000000006', 'assessment-design-for-leaders',    'Assessment Design for Leaders',    'Design assessments that measure ministry readiness, leadership growth, and practical execution.',                  'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80', 'Assessment',      'Academy admins',  'Dr. Niyi Adebayo',      225, true, false)
-on conflict (slug) do update
+on conflict (id) do update
   set title           = excluded.title,
       description     = excluded.description,
       thumbnail_url   = excluded.thumbnail_url,

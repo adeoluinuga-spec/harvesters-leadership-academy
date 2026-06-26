@@ -53,9 +53,21 @@ begin
       and contype = 'f'
       and conname = 'users_id_auth_users_fkey'
     ) then
-      alter table public.users
-        add constraint users_id_auth_users_fkey
-        foreign key (id) references auth.users(id) on delete cascade;
+      -- Preserve legacy profile rows that predate Supabase Auth. A later admin
+      -- reconciliation can link or retire them; do not block all migrations or
+      -- delete people merely to add this optional integrity constraint.
+      if not exists (
+        select 1
+        from public.users pu
+        left join auth.users au on au.id = pu.id
+        where au.id is null
+      ) then
+        alter table public.users
+          add constraint users_id_auth_users_fkey
+          foreign key (id) references auth.users(id) on delete cascade;
+      else
+        raise notice 'Skipping users_id_auth_users_fkey: legacy public.users rows have no auth.users account.';
+      end if;
     end if;
   end if;
 end;

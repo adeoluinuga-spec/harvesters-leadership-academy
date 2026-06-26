@@ -18,6 +18,9 @@ export type CourseFormData = {
   is_required: boolean;
   is_featured: boolean;
   status: CourseStatus;
+  management_scope?: "platform" | "group" | "campus";
+  group_id?: string | null;
+  campus_id?: string | null;
 };
 
 function slugify(text: string): string {
@@ -133,6 +136,9 @@ export async function createCourse(data: CourseFormData): Promise<{ course: LMSC
       is_featured: data.is_featured,
       status: data.status,
       is_published: data.status === "published",
+      management_scope: data.management_scope ?? "platform",
+      group_id: data.group_id ?? null,
+      campus_id: data.campus_id ?? null,
     })
     .select("*")
     .single();

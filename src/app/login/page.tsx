@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authErrorMessage, dashboardForAuthRole, getAuthProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
-import { isControlledPreseedRole } from "@/lib/mock-auth";
+import { isInviteOnlyRole } from "@/lib/roles";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -60,7 +60,7 @@ export default function LoginPage() {
     }
 
     setLoading(false);
-    const shouldOpenDashboard = profile.onboardingCompleted || isControlledPreseedRole(profile.role);
+    const shouldOpenDashboard = profile.onboardingCompleted || isInviteOnlyRole(profile.role);
     window.localStorage.setItem(
       "harvesters_profile_incomplete",
       profile.onboardingCompleted ? "false" : "true"

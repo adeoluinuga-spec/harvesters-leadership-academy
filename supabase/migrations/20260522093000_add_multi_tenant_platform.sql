@@ -26,6 +26,21 @@ alter table public.subgroups
 alter table public.campuses
   add column if not exists organization_id uuid references public.organizations(id);
 
+-- Older academy databases linked a campus only to its subgroup. Keep the
+-- explicit group relationship expected by the current application and derive
+-- it from that subgroup where possible.
+alter table public.campuses
+  add column if not exists group_id uuid references public.groups(id);
+
+update public.campuses
+set group_id = (
+  select subgroups.group_id
+  from public.subgroups
+  where subgroups.id = campuses.subgroup_id
+)
+where group_id is null
+  and subgroup_id is not null;
+
 update public.groups
 set organization_id = (select id from public.organizations where slug = 'harvesters')
 where organization_id is null;
@@ -44,14 +59,14 @@ where organization_id is null;
 update public.campuses
 set organization_id = coalesce(
   (
-    select groups.organization_id
-    from public.groups
-    where groups.id = campuses.group_id
-  ),
-  (
     select subgroups.organization_id
     from public.subgroups
     where subgroups.id = campuses.subgroup_id
+  ),
+  (
+    select groups.organization_id
+    from public.groups
+    where groups.id = campuses.group_id
   ),
   (select id from public.organizations where slug = 'harvesters')
 )

@@ -43,12 +43,16 @@ export function getLeadershipLevel(role: string): number {
   return LEADERSHIP_LEVEL[role] ?? 0;
 }
 
-// Sentinel values that mean "visible to all authenticated leaders"
-const ALL_LEADERS_TARGETS = new Set([
+// Sentinel values that mean "visible to every authenticated learner".
+const ALL_AUTHENTICATED_TARGETS = new Set([
   "All Leaders",
   "All leaders",
   "all leaders",
   "All",
+  "All Members",
+  "All authenticated",
+  "All Authenticated",
+  "All attendees",
 ]);
 
 // Normalise any spelling variant of a role to a single canonical form so that
@@ -82,7 +86,7 @@ export function canUserSeeCourse(userRole: string, targets: string[]): boolean {
   // Admin-level roles always see every published course
   if (["Platform Super Admin", "Super Admin", "Admin"].includes(userRole)) return true;
   // "All Leaders" wildcard in targets — visible to every leader
-  if (targets.some((t) => ALL_LEADERS_TARGETS.has(t))) return true;
+  if (targets.some((t) => ALL_AUTHENTICATED_TARGETS.has(t))) return true;
   // Role match with full variant normalisation on both sides
   const normalized = normalizeRoleForCourse(userRole);
   return targets.some((t) => normalizeRoleForCourse(t) === normalized);

@@ -10,22 +10,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { roles } from "@/lib/role-data";
 import {
   CurrentLeadershipRole,
   leadershipAspirations,
   LeadershipAspiration,
-  MockRole,
-  nextLeadershipRoleMap,
-  selfOnboardingRoles,
-} from "@/lib/mock-auth";
+  AcademyRole,
+  SELF_ONBOARDING_LEADERSHIP_ROLES,
+  suggestedLeadershipAspiration,
+} from "@/lib/roles";
 import {
   dashboardForAuthRole,
   fetchClaimedCampusIds,
   fetchLookupOptions,
+  fetchMinistryUnits,
   fetchMinistryCampuses,
   getCurrentUserProfile,
-  MinistryCampusOption,
+  MinistryCampusOption, MinistryUnitOption,
   normalizeRole,
   saveOnboardingProfile,
 } from "@/lib/auth";
@@ -39,7 +39,7 @@ const leadershipRoleValues = new Set([
   "Campus Pastor", "Sub-Group Pastor", "Group Pastor",
 ]);
 
-function derivedCurrentLeadershipRole(role: MockRole): CurrentLeadershipRole {
+function derivedCurrentLeadershipRole(role: AcademyRole): CurrentLeadershipRole {
   return leadershipRoleValues.has(role) ? (role as CurrentLeadershipRole) : "None";
 }
 
@@ -56,15 +56,13 @@ function campusOptionLabel(campus: MinistryCampusOption): string {
   if (campus.subgroupName && campus.subgroupName !== "Unassigned subgroup") {
     parts.push(campus.subgroupName);
   }
-  if (campus.groupName && campus.groupName !== groupAlphaFallback) {
+  if (campus.groupName && campus.groupName !== "Unassigned group") {
     parts.push(campus.groupName);
   } else if (campus.groupName) {
     parts.push(campus.groupName);
   }
   return parts.join(" — ");
 }
-
-const groupAlphaFallback = "Group Alpha";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -80,14 +78,17 @@ export default function OnboardingPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
-  const [selectedRole, setSelectedRole] = useState<MockRole>("Cell Leader / Assistant HOD");
-  const [assignedRole, setAssignedRole] = useState<MockRole | null>(null);
+  const [selectedRole, setSelectedRole] = useState<AcademyRole>("Attendee");
+  const [assignedRole, setAssignedRole] = useState<AcademyRole | null>(null);
+  const [accountType, setAccountType] = useState<"attendee" | "member" | "worker" | "leader">("attendee");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
   const [campusOptions, setCampusOptions] = useState<MinistryCampusOption[]>([]);
   const [claimedCampusIds, setClaimedCampusIds] = useState<Set<string>>(new Set());
   const [roleOptions, setRoleOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedCampusId, setSelectedCampusId] = useState("");
+  const [ministryUnitOptions, setMinistryUnitOptions] = useState<MinistryUnitOption[]>([]);
+  const [selectedMinistryUnitId, setSelectedMinistryUnitId] = useState("");
   const [leadershipAspiration, setLeadershipAspiration] =
     useState<LeadershipAspiration>("Zonal Leader / HOD");
 
@@ -134,7 +135,7 @@ export default function OnboardingPage() {
         }
 
         const profile = profileResult.profile;
-        const detectedRole: MockRole = profile?.role ?? "Cell Leader / Assistant HOD";
+        const detectedRole: AcademyRole = profile?.role ?? "Attendee";
 
         setCampusOptions(campuses);
         setRoleOptions(roleRows);
@@ -145,6 +146,8 @@ export default function OnboardingPage() {
         setAvatarPreview(profile?.avatarUrl ?? "");
         setSelectedRole(detectedRole);
         setAssignedRole(detectedRole);
+        setAccountType(profile?.accountType ?? (detectedRole === "Worker" ? "worker" : detectedRole === "Member" ? "member" : detectedRole === "Attendee" ? "attendee" : "leader"));
+        setSelectedMinistryUnitId(profile?.ministryUnitId ?? "");
 
         // Campus Pastors: fetch claimed campus IDs (excluding self) and smart-default their campus
         if (detectedRole === "Campus Pastor") {
@@ -161,10 +164,7 @@ export default function OnboardingPage() {
             setSelectedCampusId("");
           }
         } else {
-          // For all other roles, default to Ilupeju Campus or first campus
-          setSelectedCampusId(
-            campuses.find((c) => c.name === "Ilupeju Campus")?.id ?? campuses[0]?.id ?? ""
-          );
+          setSelectedCampusId(profile?.campusId && campuses.some((c) => c.id === profile.campusId) ? profile.campusId : "");
         }
 
         setLoadingLookups(false);
@@ -187,6 +187,19 @@ export default function OnboardingPage() {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (!selectedCampusId || (accountType !== "member" && accountType !== "worker")) {
+      setMinistryUnitOptions([]);
+      if (accountType === "attendee" || accountType === "leader") setSelectedMinistryUnitId("");
+      return;
+    }
+    let active = true;
+    fetchMinistryUnits(selectedCampusId, accountType)
+      .then((units) => { if (active) setMinistryUnitOptions(units); })
+      .catch((unitError) => { if (active) setError(unitError instanceof Error ? unitError.message : "Could not load ministry structure."); });
+    return () => { active = false; };
+  }, [selectedCampusId, accountType]);
+
   // When the role changes to/from Campus Pastor, reset campus selection and re-filter
   useEffect(() => {
     if (isCampusPastor) {
@@ -199,9 +212,8 @@ export default function OnboardingPage() {
 
   // Auto-suggest the next leadership level whenever the selected role changes
   useEffect(() => {
-    const suggested = nextLeadershipRoleMap[selectedRole];
-    if (suggested) setLeadershipAspiration(suggested);
-  }, [selectedRole]);
+    if (accountType === "leader") setLeadershipAspiration(suggestedLeadershipAspiration(selectedRole));
+  }, [selectedRole, accountType]);
 
   function handleAvatarChange(file?: File) {
     setError("");
@@ -297,6 +309,7 @@ export default function OnboardingPage() {
       console.log("[onboarding] finalSubmitPayload:", finalSubmitPayload);
 
       await saveOnboardingProfile({
+        accountType,
         designation,
         fullName: fullName.trim(),
         email: email.trim(),
@@ -306,6 +319,8 @@ export default function OnboardingPage() {
         campus: selectedCampusRecord,
         roleId: selectedRoleOption?.id ?? null,
         role: selectedRole,
+        directLeaderId: null,
+        ministryUnitId: selectedMinistryUnitId || null,
         currentLeadershipRole: derivedCurrentLeadershipRole(selectedRole),
         aspirationalLeadershipRole: leadershipAspiration,
         yearsInMinistry: null,
@@ -396,8 +411,12 @@ export default function OnboardingPage() {
         return false;
       }
 
-      if (!selfOnboardingRoles.includes(selectedRole) && selectedRole !== assignedRole) {
+      if (accountType === "leader" && !SELF_ONBOARDING_LEADERSHIP_ROLES.includes(selectedRole as never) && selectedRole !== assignedRole) {
         setError("This role is pre-created by Platform Super Admin. Please select a leader onboarding role.");
+        return false;
+      }
+      if ((accountType === "member" || accountType === "worker") && !selectedMinistryUnitId) {
+        setError(accountType === "member" ? "Please select your cell." : "Please select your department, zone, unit, or area.");
         return false;
       }
     }
@@ -663,29 +682,64 @@ export default function OnboardingPage() {
                   </div>
                 )}
 
-                {/* Role selector */}
                 <div>
+                  <p className="mb-2 text-sm font-medium text-zinc-700">How do you participate?</p>
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    {[
+                      ["attendee", "Attendee", "I attend this campus but do not yet belong to a group or department."],
+                      ["member", "Cell member", "I belong to a cell or small group."],
+                      ["worker", "Worker", "I serve in a department, zone, unit, or area."],
+                      ["leader", "Leader", "I carry a recognised leadership responsibility."],
+                    ].map(([value, title, description]) => (
+                      <button key={value} type="button" onClick={() => {
+                        const nextType = value as "attendee" | "member" | "worker" | "leader";
+                        setAccountType(nextType);
+                        setSelectedMinistryUnitId("");
+                        if (nextType === "attendee") setSelectedRole("Attendee");
+                        if (nextType === "member") setSelectedRole("Member");
+                        if (nextType === "worker") setSelectedRole("Worker");
+                      }} className={`rounded-lg border p-3 text-left ${accountType === value ? "border-black bg-black text-white" : "border-zinc-200 bg-white text-zinc-950"}`}>
+                        <span className="block text-sm font-semibold">{title}</span>
+                        <span className={`mt-1 block text-xs ${accountType === value ? "text-zinc-300" : "text-zinc-500"}`}>{description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(accountType === "member" || accountType === "worker") ? <label>
+                  <span className="mb-2 block text-sm font-medium text-zinc-700">
+                    {accountType === "member" ? "Select your cell or small group" : "Select your department, zone, unit, or area"}
+                  </span>
+                  <select value={selectedMinistryUnitId} disabled={saving || !selectedCampusId} onChange={(event) => setSelectedMinistryUnitId(event.target.value)} className="h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-950 outline-none transition-all focus:border-zinc-300 focus:ring-3 focus:ring-zinc-300/40">
+                    <option value="">Choose from your campus structure…</option>
+                    {ministryUnitOptions.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+                  </select>
+                  {!ministryUnitOptions.length && selectedCampusId ? <p className="mt-2 text-xs text-zinc-500">No matching structures exist yet. Ask your campus administrator to set one up.</p> : null}
+                </label> : null}
+
+                {/* Leadership role selector */}
+                {accountType === "leader" ? <div>
                   <p className="mb-2 text-sm font-medium text-zinc-700">Role</p>
                   <div className="grid gap-2">
-                    {roles.map((role) => {
-                      const roleName = role.name as MockRole;
-                      const canSelfSelect = selfOnboardingRoles.includes(roleName) || assignedRole === roleName;
+                    {roleOptions.map((role) => {
+                      const roleName = role.name;
+                      const canSelfSelect = SELF_ONBOARDING_LEADERSHIP_ROLES.includes(roleName as never) || assignedRole === roleName;
 
                       return (
                         <button
-                          key={role.name}
+                          key={roleName}
                           disabled={!canSelfSelect || saving}
                           onClick={() => setSelectedRole(roleName)}
                           className={`flex items-center justify-between rounded-lg border p-3 text-left transition-colors ${
-                            selectedRole === role.name
+                            selectedRole === roleName
                               ? "border-black bg-black text-white"
                               : !canSelfSelect
                                 ? "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400"
                                 : "border-zinc-100 bg-white text-zinc-950 hover:bg-zinc-50"
                           }`}
                         >
-                          <span className={`font-medium ${selectedRole === role.name ? "text-white" : !canSelfSelect ? "text-zinc-400" : "text-zinc-950"}`}>
-                            {role.name}
+                          <span className={`font-medium ${selectedRole === roleName ? "text-white" : !canSelfSelect ? "text-zinc-400" : "text-zinc-950"}`}>
+                            {roleName}
                           </span>
                           {!canSelfSelect ? (
                             <Badge className={`rounded-md ${selectedRole === role.name ? "bg-white text-black hover:bg-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-100"}`}>
@@ -696,10 +750,10 @@ export default function OnboardingPage() {
                       );
                     })}
                   </div>
-                </div>
+                </div> : null}
 
                 {/* Leadership growth question */}
-                <label>
+                {accountType === "leader" ? <label>
                   <span className="mb-2 block text-sm font-medium text-zinc-700">
                     What role are you preparing for?
                   </span>
@@ -714,7 +768,7 @@ export default function OnboardingPage() {
                       <option key={aspiration} value={aspiration}>{aspiration}</option>
                     ))}
                   </select>
-                </label>
+                </label> : null}
               </div>
             ) : null}
 

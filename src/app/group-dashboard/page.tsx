@@ -336,7 +336,7 @@ export default function GroupDashboardPage() {
       <DashboardShell searchPlaceholder="Search subgroups, campuses, leaders..." showDate>
         <Hero groupName={groupName} analytics={analytics} />
         <PersonalLearningLayer
-          role={(hierarchy.role || "Group Pastor") as import("@/lib/mock-auth").MockRole}
+          role={hierarchy.role || "Group Pastor"}
         />
         <OversightLayerIntro
           title="Group oversight intelligence"

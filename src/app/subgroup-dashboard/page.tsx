@@ -221,7 +221,7 @@ export default function SubgroupDashboardPage() {
       </motion.section>
 
       {/* ── Personal Learning ─────────────────────────────────── */}
-      <PersonalLearningLayer role={(hierarchy.role || "Sub-Group Pastor") as import("@/lib/mock-auth").MockRole} />
+      <PersonalLearningLayer role={hierarchy.role || "Sub-Group Pastor"} />
 
       {/* ── Oversight Intro ───────────────────────────────────── */}
       <OversightLayerIntro

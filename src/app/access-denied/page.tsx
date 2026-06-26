@@ -9,7 +9,7 @@ import { PermissionExamples } from "@/components/auth/role-components";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { dashboardForRole, normalizeStoredRole } from "@/lib/mock-auth";
+import { dashboardForRole, normalizeRole as normalizeStoredRole } from "@/lib/roles";
 
 function AccessDeniedContent() {
   const searchParams = useSearchParams();

@@ -1,4 +1,4 @@
-import type { MockRole } from "@/lib/mock-auth";
+import type { AcademyRole } from "@/lib/roles";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ export type ScopeType =
 export type LeadershipScope = {
   scopeType: ScopeType;
   scopeId: string | null;
-  childRoles: MockRole[];
+  childRoles: AcademyRole[];
   dashboardTitle: string;
   insightContext: string;
 };
@@ -22,7 +22,7 @@ export type LeadershipScope = {
 // Each entry lists ALL roles that sit below the key role in the hierarchy.
 // Child roles are ordered from nearest to furthest so breakdowns are intuitive.
 
-export const OVERSIGHT_CHILD_ROLES: Partial<Record<MockRole, MockRole[]>> = {
+export const OVERSIGHT_CHILD_ROLES: Partial<Record<AcademyRole, AcademyRole[]>> = {
   "Group Pastor": [
     "Sub-Group Pastor",
     "Campus Pastor",
@@ -87,7 +87,7 @@ export const OVERSIGHT_CHILD_ROLES: Partial<Record<MockRole, MockRole[]>> = {
 // ── Scope resolver ───────────────────────────────────────────────────────────
 
 export function getLeadershipScope(
-  role: MockRole,
+  role: AcademyRole,
   campusId: string | null
 ): LeadershipScope {
   switch (role) {
@@ -187,8 +187,8 @@ export function getLeadershipScope(
 
 // ── Display helpers ──────────────────────────────────────────────────────────
 
-export function roleDisplayLabel(role: MockRole): string {
-  const map: Partial<Record<MockRole, string>> = {
+export function roleDisplayLabel(role: AcademyRole): string {
+  const map: Partial<Record<AcademyRole, string>> = {
     "Directional Leader": "Directional Leaders",
     "District Pastor / Pastoral Leader": "District / Pastoral Leaders",
     "Area Leader": "Area Leaders",

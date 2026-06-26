@@ -7,6 +7,9 @@ type SaveOnboardingBody = {
   campusSubgroupId?: string | null;
   campusGroupId?: string | null;
   role: string;
+  accountType?: "attendee" | "member" | "worker" | "leader";
+  directLeaderId?: string | null;
+  ministryUnitId?: string | null;
   roleId?: string | null;
   designation?: string | null;
   fullName: string;
@@ -83,6 +86,9 @@ export async function POST(request: Request) {
     campusSubgroupId,
     campusGroupId,
     role,
+    accountType,
+    directLeaderId,
+    ministryUnitId,
     roleId,
     ...rest
   } = body;
@@ -228,7 +234,10 @@ export async function POST(request: Request) {
     avatar_url: rest.avatarUrl ?? null,
     phone: (rest.phone ?? "").trim(),
     gender: (rest.gender ?? "").trim(),
-    role,
+    role: accountType === "attendee" ? "Attendee" : accountType === "member" ? "Member" : accountType === "worker" ? "Worker" : role,
+    account_type: accountType ?? "leader",
+    direct_leader_id: isUUID(directLeaderId) ? directLeaderId : null,
+    ministry_unit_id: isUUID(ministryUnitId) ? ministryUnitId : null,
     campus_id: resolvedCampusId,
     subgroup_id: resolvedSubgroupId,
     group_id: resolvedGroupId,

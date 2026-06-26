@@ -7,7 +7,7 @@ import { Award, Bell, GraduationCap, LayoutDashboard } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/client";
-import { dashboardForRole, normalizeStoredRole } from "@/lib/mock-auth";
+import { dashboardForRole, normalizeRole as normalizeStoredRole } from "@/lib/roles";
 
 type NavItem = {
   label: string;

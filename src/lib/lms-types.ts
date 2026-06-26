@@ -2,6 +2,10 @@ export type CourseStatus = "draft" | "published" | "archived";
 export type CourseDifficulty = "Foundational" | "Intermediate" | "Advanced" | "Executive";
 
 export const LEADERSHIP_CADRES = [
+  "All authenticated",
+  "Attendee",
+  "Member",
+  "Worker",
   "All Leaders",
   "Cell Leader",
   "Assistant HOD",

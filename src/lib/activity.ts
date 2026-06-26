@@ -33,9 +33,10 @@ export type AuditEventType =
   | "subgroup_created"
   | "subgroup_updated"
   | "group_created"
-  | "group_updated";
+  | "group_updated"
+  | "ministry_unit_created";
 
-export type EntityType = "user" | "campus" | "subgroup" | "group" | "course";
+export type EntityType = "user" | "campus" | "subgroup" | "group" | "course" | "ministry_unit";
 
 export interface AuditParams {
   supabase: SupabaseClient;
@@ -90,6 +91,12 @@ export const ADMIN_ROLES = [
   "Admin",
 ] as const;
 
+export const SCOPED_OPERATIONAL_ADMIN_ROLES = ["Group Admin", "Campus Admin"] as const;
+
 export function isAdminRole(role: string | null | undefined): boolean {
   return ADMIN_ROLES.includes(role as (typeof ADMIN_ROLES)[number]);
+}
+
+export function isOperationalAdminRole(role: string | null | undefined): boolean {
+  return isAdminRole(role) || SCOPED_OPERATIONAL_ADMIN_ROLES.includes(role as (typeof SCOPED_OPERATIONAL_ADMIN_ROLES)[number]);
 }

@@ -94,7 +94,7 @@ export default function LeaderDashboardPage() {
           </div>
         </motion.section>
 
-        <PersonalLearningLayer role={(hierarchy.role || "Cell Leader / Assistant HOD") as import("@/lib/mock-auth").MockRole} />
+        <PersonalLearningLayer role={hierarchy.role || "Member"} />
 
         <OversightLayerIntro
           title="Personal ministry responsibility intelligence"

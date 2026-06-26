@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.ai_course_generations (
 ALTER TABLE public.ai_course_generations ENABLE ROW LEVEL SECURITY;
 
 -- Only Super Admins and Platform Super Admins can access generation records
+DROP POLICY IF EXISTS "Admins can manage ai_course_generations" ON public.ai_course_generations;
 CREATE POLICY "Admins can manage ai_course_generations"
   ON public.ai_course_generations
   FOR ALL
@@ -35,5 +36,5 @@ CREATE POLICY "Admins can manage ai_course_generations"
   );
 
 -- Index for listing by creator
-CREATE INDEX ai_course_generations_created_by_idx
+CREATE INDEX IF NOT EXISTS ai_course_generations_created_by_idx
   ON public.ai_course_generations (created_by, created_at DESC);
