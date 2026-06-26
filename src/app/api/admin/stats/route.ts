@@ -32,6 +32,10 @@ export async function GET() {
     adminChangesRes,
     enrollmentsRes,
     certificatesRes,
+    leadersRes,
+    workersRes,
+    membersRes,
+    attendeesRes,
   ] = await Promise.all([
     adminDb.from("users").select("*", { count: "exact", head: true }),
     adminDb.from("users").select("*", { count: "exact", head: true })
@@ -52,6 +56,10 @@ export async function GET() {
     adminDb.from("activity_events").select("*", { count: "exact", head: true })
       .gte("created_at", weekAgo)
       .eq("event_type", "certificate_issued"),
+    adminDb.from("users").select("*", { count: "exact", head: true }).eq("account_type", "leader"),
+    adminDb.from("users").select("*", { count: "exact", head: true }).eq("account_type", "worker"),
+    adminDb.from("users").select("*", { count: "exact", head: true }).eq("account_type", "member"),
+    adminDb.from("users").select("*", { count: "exact", head: true }).eq("account_type", "attendee"),
   ]);
 
   return NextResponse.json({
@@ -63,5 +71,9 @@ export async function GET() {
     adminChangesThisWeek: adminChangesRes.count ?? 0,
     enrollmentsThisWeek: enrollmentsRes.count ?? 0,
     certificatesThisWeek: certificatesRes.count ?? 0,
+    leaders: leadersRes.count ?? 0,
+    workers: workersRes.count ?? 0,
+    members: membersRes.count ?? 0,
+    attendees: attendeesRes.count ?? 0,
   });
 }

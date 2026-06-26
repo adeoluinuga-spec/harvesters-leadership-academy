@@ -7,7 +7,6 @@ type CampusRow = {
   id: string;
   name: string | null;
   subgroup_id: string | null;
-  campus_pastor: string | null;
   pastor: string | null;
 };
 type UserRow = { id: string; campus_id: string | null; role: string | null };
@@ -21,7 +20,7 @@ export async function GET() {
   const [groupsRes, subgroupsRes, campusesRes, usersRes] = await Promise.all([
     db.from("groups").select("id, name").order("name"),
     db.from("subgroups").select("id, name, group_id").order("name"),
-    db.from("campuses").select("id, name, subgroup_id, campus_pastor, pastor").order("name"),
+    db.from("campuses").select("id, name, subgroup_id, pastor").order("name"),
     db
       .from("users")
       .select("id, campus_id, role")
@@ -86,7 +85,7 @@ export async function GET() {
         return {
           id: campus.id,
           name: campus.name ?? "Unknown Campus",
-          pastorName: campus.campus_pastor ?? campus.pastor ?? null,
+          pastorName: campus.pastor ?? null,
           totalLeaders: campusUsers.length,
           cadres,
         };

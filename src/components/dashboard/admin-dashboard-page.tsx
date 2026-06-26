@@ -109,6 +109,22 @@ function DashboardHero({ firstName }: { firstName: string }) {
         <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
+            onClick={() => router.push("/dashboard/admin/provision?type=organization")}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          >
+            <Building2 className="size-4" />
+            Add organisation
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/admin/provision?type=group")}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          >
+            <Network className="size-4" />
+            Add group
+          </button>
+          <button
+            type="button"
             onClick={() => router.push("/dashboard/admin/courses/new")}
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-black px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
           >
@@ -473,6 +489,10 @@ type OperationalStats = {
   adminChangesThisWeek: number;
   enrollmentsThisWeek: number;
   certificatesThisWeek: number;
+  leaders: number;
+  workers: number;
+  members: number;
+  attendees: number;
 };
 
 function OperationalCards({ stats, loading }: { stats: OperationalStats | null; loading: boolean }) {
@@ -481,47 +501,45 @@ function OperationalCards({ stats, loading }: { stats: OperationalStats | null; 
       label: "Total Users",
       value: stats?.totalUsers ?? 0,
       icon: Users,
-      desc: "Registered leaders",
+      desc: "People registered on the platform",
+      highlight: false,
+    },
+    {
+      label: "Leaders",
+      value: stats?.leaders ?? 0,
+      icon: UserCheck,
+      desc: "Recognised leadership accounts",
+      highlight: false,
+    },
+    {
+      label: "Workers",
+      value: stats?.workers ?? 0,
+      icon: Users,
+      desc: "Assigned to departments or units",
+      highlight: false,
+    },
+    {
+      label: "Cell Members",
+      value: stats?.members ?? 0,
+      icon: Users,
+      desc: "Assigned to cells or small groups",
+      highlight: false,
+    },
+    {
+      label: "Attendees",
+      value: stats?.attendees ?? 0,
+      icon: UserMinus,
+      desc: "Campus-only discipleship pathway",
       highlight: false,
     },
     {
       label: "Pending Onboarding",
       value: stats?.pendingOnboarding ?? 0,
-      icon: UserCheck,
-      desc: "Haven't completed onboarding",
+      icon: UserX,
+      desc: "Accounts yet to complete setup",
       highlight: (stats?.pendingOnboarding ?? 0) > 0,
       highlightClass: "border-amber-100 bg-amber-50",
       valueClass: "text-amber-700",
-    },
-    {
-      label: "Inactive Users",
-      value: stats?.inactiveUsers ?? 0,
-      icon: UserX,
-      desc: "Deactivated accounts",
-      highlight: (stats?.inactiveUsers ?? 0) > 0,
-      highlightClass: "border-rose-100 bg-rose-50",
-      valueClass: "text-rose-700",
-    },
-    {
-      label: "New This Week",
-      value: stats?.newUsersThisWeek ?? 0,
-      icon: UserMinus,
-      desc: "Leaders registered (7d)",
-      highlight: false,
-    },
-    {
-      label: "Platform Activity",
-      value: stats?.activityThisWeek ?? 0,
-      icon: Activity,
-      desc: "Events this week",
-      highlight: false,
-    },
-    {
-      label: "Admin Changes",
-      value: stats?.adminChangesThisWeek ?? 0,
-      icon: ShieldAlert,
-      desc: "Admin actions (7d)",
-      highlight: false,
     },
     {
       label: "Enrollments (7d)",
