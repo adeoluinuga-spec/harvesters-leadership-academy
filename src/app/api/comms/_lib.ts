@@ -40,6 +40,8 @@ const COMM_ROLES = [
   "Subgroup Pastor",
   "Sub-group Pastor",
   "Campus Pastor",
+  "Group Admin",
+  "Campus Admin",
 ];
 
 const ADMIN_ROLES = ["Platform Super Admin", "Super Admin", "Admin"];

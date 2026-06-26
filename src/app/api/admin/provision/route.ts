@@ -1,5 +1,6 @@
 import { badRequest, requireAdmin, unauthorized } from "../_lib";
 import { logAuditEvent } from "@/lib/activity";
+import { isResendConfigured, sendResendEmail } from "@/lib/resend";
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -11,6 +12,7 @@ export async function POST(request: Request) {
   let body: { type?: "organization" | "group"; name?: string; leaderName?: string; leaderEmail?: string; leaderRole?: string; organizationId?: string };
   try { body = await request.json(); } catch { return badRequest("Invalid JSON."); }
   if (!body.type || !body.name?.trim() || !body.leaderName?.trim() || !body.leaderEmail?.trim()) return badRequest("Type, name, leader name, and leader email are required.");
+  if (!isResendConfigured()) return Response.json({ error: "Resend is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL before sending leadership invitations." }, { status: 503 });
 
   let organizationId = body.organizationId ?? null;
   let groupId: string | null = null;
@@ -37,11 +39,17 @@ export async function POST(request: Request) {
   }
 
   const redirectTo = new URL("/onboarding", request.url).toString();
-  const { data: invite, error: inviteError } = await ctx.adminDb.auth.admin.inviteUserByEmail(body.leaderEmail.trim(), {
-    data: { full_name: body.leaderName.trim(), role: leaderRole },
-    redirectTo,
+  const { data: invite, error: inviteError } = await ctx.adminDb.auth.admin.generateLink({
+    type: "invite", email: body.leaderEmail.trim(), options: { data: { full_name: body.leaderName.trim(), role: leaderRole }, redirectTo },
   });
-  if (inviteError || !invite.user) return Response.json({ error: inviteError?.message ?? "The organisation was created, but the invitation could not be sent." }, { status: 502 });
+  if (inviteError || !invite.user || !invite.properties.action_link) return Response.json({ error: inviteError?.message ?? "The organisation was created, but the invitation could not be generated." }, { status: 502 });
+  await sendResendEmail({
+    to: [{ email: body.leaderEmail.trim(), name: body.leaderName.trim() }],
+    subject: `You have been invited to ${body.name.trim()}`,
+    text: `Hello ${body.leaderName.trim()},\n\nYou have been invited to join Harvesters Leadership Academy as ${leaderRole}. Complete your account setup to accept your leadership assignment.`,
+    actionUrl: invite.properties.action_link,
+    actionLabel: "Accept invitation",
+  });
 
   const { error: profileError } = await ctx.adminDb.from("users").upsert({
     id: invite.user.id, email: body.leaderEmail.trim(), full_name: body.leaderName.trim(), role: leaderRole,

@@ -186,6 +186,7 @@ Database change history lives in `supabase/migrations/`; `phase3-migration.sql` 
 | Supabase | Auth, Postgres, RLS and storage | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
 | OpenAI | AI course ingestion/generation | `OPENAI_API_KEY` |
 | Vimeo | Course video playback when Vimeo links are used | video URLs; no dedicated environment variable currently found |
+| Resend | Branded leadership invitations and communication email delivery | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, optional `RESEND_REPLY_TO` |
 
 Never expose `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, database passwords or user passwords to the client, source control or documentation.
 

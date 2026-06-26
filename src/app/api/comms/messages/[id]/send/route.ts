@@ -7,6 +7,7 @@ import {
   commsForbidden,
   type AudienceScope,
 } from "../../../_lib";
+import { sendResendEmail } from "@/lib/resend";
 
 // POST /api/comms/messages/[id]/send
 // Resolves recipients for the message's audience scope, inserts
@@ -74,6 +75,20 @@ export async function POST(
     priority: msg.priority,
   });
 
+  let email = { sent: 0, skipped: recipientIds.length, configured: false };
+  try {
+    const { data: recipients } = await ctx.db.from("users").select("email, full_name").in("id", recipientIds);
+    email = await sendResendEmail({
+      to: (recipients ?? []).map((recipient) => ({ email: recipient.email ?? "", name: recipient.full_name })),
+      subject: msg.title,
+      text: msg.body,
+      actionUrl: msg.cta_url ?? null,
+      actionLabel: msg.cta_label ?? null,
+    });
+  } catch (error) {
+    console.error("[comms] Resend delivery failed", error);
+  }
+
   // Mark message as sent
   await ctx.db
     .from("communication_messages")
@@ -84,5 +99,5 @@ export async function POST(
     })
     .eq("id", id);
 
-  return Response.json({ ok: true, recipient_count: recipientIds.length });
+  return Response.json({ ok: true, recipient_count: recipientIds.length, email });
 }
