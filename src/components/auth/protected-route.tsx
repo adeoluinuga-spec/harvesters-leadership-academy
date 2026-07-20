@@ -6,7 +6,7 @@ import { LoaderCircle } from "lucide-react";
 
 import { getAuthProfile } from "@/lib/auth";
 import { createClient } from "@/lib/client";
-import { isInviteOnlyRole, AcademyRole, roleCanAccess } from "@/lib/roles";
+import { dashboardForRole, isInviteOnlyRole, AcademyRole, roleCanAccess } from "@/lib/roles";
 
 type ProtectedRouteProps = {
   allowedRoles: AcademyRole[];
@@ -39,7 +39,7 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
       let profile;
 
       try {
-        profile = await getAuthProfile(data.session.user, "Cell Leader / Assistant HOD");
+        profile = await getAuthProfile(data.session.user, "Attendee");
       } catch (profileError) {
         console.error("[protected-route] Failed to fetch or create academy profile", profileError);
         setAllowed(false);
@@ -64,6 +64,16 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
 
       const allowedRoleList = allowedRoleKey.split("|") as AcademyRole[];
       const canAccess = roleCanAccess(profile.role, allowedRoleList);
+      if (!canAccess && pathname.startsWith("/dashboard")) {
+        const dashboardPath = dashboardForRole(profile.role);
+        if (dashboardPath !== pathname) {
+          setAllowed(false);
+          setChecked(true);
+          router.replace(dashboardPath);
+          return;
+        }
+      }
+
       setAllowed(canAccess);
       setChecked(true);
 

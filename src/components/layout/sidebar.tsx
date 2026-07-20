@@ -25,43 +25,24 @@ import {
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/client";
-import { dashboardForRole, normalizeRole as normalizeStoredRole } from "@/lib/roles";
-
-const ADMIN_COURSE_ROLES = [
-  "Platform Super Admin",
-  "Super Admin",
-  "Admin",
-  "Group Pastor",
-  "Sub-Group Pastor",
-  "Subgroup Pastor",
-  "Sub-group Pastor",
-  "Campus Pastor",
-  "Campus Admin",
-  "Group Admin",
-];
-
-const COMM_ROLES = [
-  "Platform Super Admin",
-  "Super Admin",
-  "Admin",
-  "Group Pastor",
-  "Sub-Group Pastor",
-  "Subgroup Pastor",
-  "Sub-group Pastor",
-  "Campus Pastor",
-  "Campus Admin",
-  "Group Admin",
-];
+import {
+  ADMIN_COURSE_ROLES,
+  COMMUNICATION_ROLES,
+  OVERSIGHT_ROLES,
+  dashboardForRole,
+  normalizeRole as normalizeStoredRole,
+  roleCanAccess,
+} from "@/lib/roles";
 
 const sidebarItems = [
   { label: "My Dashboard", href: "/dashboard/leader", icon: LayoutDashboard },
   { label: "Courses", href: "/courses", icon: GraduationCap },
   { label: "AI Intelligence", href: "/ai-course-intelligence", icon: Brain },
   { label: "Notifications", href: "/notifications", icon: Bell },
-  { label: "Users", href: "/users", icon: Users },
+  { label: "Users", href: "/users", icon: Users, allowedRoles: [...OVERSIGHT_ROLES] },
   { label: "Assessments", href: "/assessments", icon: ClipboardCheck },
   { label: "Certificates", href: "/certificates", icon: Award },
-  { label: "Analytics", href: "/analytics", icon: BarChart3 },
+  { label: "Analytics", href: "/analytics", icon: BarChart3, allowedRoles: [...OVERSIGHT_ROLES] },
   { label: "Settings", href: "#", icon: Settings },
 ];
 
@@ -117,6 +98,7 @@ export function Sidebar() {
   const [canCommunicate, setCanCommunicate] = useState(false);
   const [canManageStructure, setCanManageStructure] = useState(false);
   const [dashboardHref, setDashboardHref] = useState("/dashboard/leader");
+  const [userRole, setUserRole] = useState("");
 
   useEffect(() => {
     async function checkRole() {
@@ -126,9 +108,10 @@ export function Sidebar() {
         if (!user) return;
         const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
         const role = data?.role ?? "";
-        setCanManageCourses(ADMIN_COURSE_ROLES.includes(role));
+        setUserRole(role);
+        setCanManageCourses((ADMIN_COURSE_ROLES as readonly string[]).includes(role));
         setIsAdmin(ADMIN_ROLES.includes(role));
-        setCanCommunicate(COMM_ROLES.includes(role));
+        setCanCommunicate((COMMUNICATION_ROLES as readonly string[]).includes(role));
         setCanManageStructure(STRUCTURE_ADMIN_ROLES.includes(role));
         const route = dashboardForRole(normalizeStoredRole(role));
         if (route) setDashboardHref(route);
@@ -155,6 +138,10 @@ export function Sidebar() {
 
       <nav className="flex flex-1 flex-col gap-1 px-3 py-6 lg:px-4">
         {sidebarItems.map((navItem) => {
+          if (navItem.allowedRoles && !roleCanAccess(userRole, navItem.allowedRoles)) {
+            return null;
+          }
+
           const href = navItem.label === "My Dashboard" ? dashboardHref : navItem.href;
           const active =
             href !== "#" &&

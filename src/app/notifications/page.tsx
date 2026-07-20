@@ -6,8 +6,6 @@ import {
   AlertCircle,
   Award,
   Bell,
-  BookOpenCheck,
-  Brain,
   CheckCircle2,
   ChevronDown,
   HeartHandshake,
@@ -31,6 +29,7 @@ import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
 import { fetchNotifications, markNotificationRead } from "@/lib/analytics";
 import type { Notification } from "@/lib/analytics";
 import { createMessage, sendMessage, SCOPE_LABELS, type AudienceScope } from "@/lib/comms";
+import { AUTHENTICATED_ROLES, COMMUNICATION_ROLES } from "@/lib/roles";
 
 type NotifFilter = "All" | "Unread" | "info" | "warning" | "alert" | "success";
 
@@ -208,18 +207,28 @@ function BroadcastInterface({ senderRole }: { senderRole: string }) {
 
 // ─── Notification card (real data) ────────────────────────────
 
-function NotificationCard({ notification, onRead }: { notification: Notification; onRead: (id: string) => void }) {
+function formatTimeAgo(createdAt: string, now: number) {
+  const diff = now - new Date(createdAt).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "Just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function NotificationCard({
+  notification,
+  now,
+  onRead,
+}: {
+  notification: Notification;
+  now: number;
+  onRead: (id: string) => void;
+}) {
   const Icon = typeIconMap[notification.type] ?? Info;
   const typeStyle = typeStyleMap[notification.type] ?? "bg-zinc-100 text-zinc-700 ring-zinc-200";
-  const timeAgo = (() => {
-    const diff = Date.now() - new Date(notification.createdAt).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return "Just now";
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
-  })();
+  const timeAgo = formatTimeAgo(notification.createdAt, now);
 
   return (
     <motion.div variants={shellItem} whileHover={{ y: -2 }}>
@@ -282,10 +291,12 @@ export default function NotificationsPage() {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingNotifs, setLoadingNotifs] = useState(true);
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
     let active = true;
     async function load() {
+      setNow(Date.now());
       const [profileResult, notifs] = await Promise.all([
         getCurrentUserProfile(),
         fetchNotifications(),
@@ -313,9 +324,10 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const followUps = notifications.filter((n) => n.type === "warning" || n.type === "alert").length;
   const reminders = notifications.filter((n) => n.type === "info").length;
+  const canBroadcast = COMMUNICATION_ROLES.some((role) => role === profile?.role);
 
   return (
-    <ProtectedRoute allowedRoles={["Leader", "Campus Pastor", "Sub-Group Pastor", "Group Pastor", "Platform Super Admin", "Super Admin"]}>
+    <ProtectedRoute allowedRoles={[...AUTHENTICATED_ROLES]}>
       <DashboardShell searchPlaceholder="Search notifications, broadcasts, reminders..." showDate={false}>
         <motion.section variants={shellItem} className="grid gap-5 xl:grid-cols-[1fr_380px]">
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">
@@ -414,7 +426,7 @@ export default function NotificationsPage() {
               ) : (
                 <motion.div variants={shellContainer} className="space-y-3">
                   {filtered.map((n) => (
-                    <NotificationCard key={n.id} notification={n} onRead={handleRead} />
+                    <NotificationCard key={n.id} notification={n} now={now} onRead={handleRead} />
                   ))}
                 </motion.div>
               )}
@@ -453,6 +465,7 @@ export default function NotificationsPage() {
           </Card>
         </motion.section>
 
+        {canBroadcast ? (
         <motion.section variants={shellItem}>
           <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
             <CardHeader className="border-b border-zinc-100">
@@ -477,6 +490,7 @@ export default function NotificationsPage() {
             <BroadcastInterface senderRole={profile?.role ?? "Leader"} />
           </Card>
         </motion.section>
+        ) : null}
       </DashboardShell>
     </ProtectedRoute>
   );
