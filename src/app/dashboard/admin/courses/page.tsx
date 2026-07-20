@@ -81,27 +81,35 @@ function StatCard({ label, value, icon: Icon, accent }: { label: string; value: 
 function CourseCard({ course, onStatusChange, onDelete }: {
   course: AdminCourse;
   onStatusChange: (id: string, status: CourseStatus) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, status: "deleted" | "archived") => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function togglePublish() {
     setBusy(true);
+    setError(null);
     setMenuOpen(false);
     const currentStatus: CourseStatus = course.status ?? (course.is_published ? "published" : "draft");
     const next: CourseStatus = currentStatus === "published" ? "draft" : "published";
-    await changeCourseStatus(course.id, next);
-    onStatusChange(course.id, next);
+    const result = await changeCourseStatus(course.id, next);
+    if (result.error) setError(result.error);
+    else onStatusChange(course.id, next);
     setBusy(false);
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${course.title}"? This cannot be undone.`)) return;
+    const message = course.enrollment_count > 0
+      ? `Archive "${course.title}"? Learner history exists, so this course will be unpublished and archived instead of permanently deleted.`
+      : `Delete "${course.title}"? This cannot be undone.`;
+    if (!confirm(message)) return;
     setMenuOpen(false);
     setBusy(true);
-    await deleteCourse(course.id);
-    onDelete(course.id);
+    setError(null);
+    const result = await deleteCourse(course.id);
+    if (result.error) setError(result.error);
+    else onDelete(course.id, result.archived ? "archived" : "deleted");
     setBusy(false);
   }
 
@@ -240,6 +248,11 @@ function CourseCard({ course, onStatusChange, onDelete }: {
             </AnimatePresence>
           </div>
         </div>
+        {error ? (
+          <div className="mt-3 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            {error}
+          </div>
+        ) : null}
       </div>
 
       {menuOpen && (
@@ -266,8 +279,12 @@ export default function AdminCoursesPage() {
     setCourses((prev) => prev.map((c) => c.id === id ? { ...c, status, is_published: status === "published" } : c));
   }
 
-  function handleDelete(id: string) {
-    setCourses((prev) => prev.filter((c) => c.id !== id));
+  function handleDelete(id: string, status: "deleted" | "archived") {
+    setCourses((prev) =>
+      status === "archived"
+        ? prev.map((c) => c.id === id ? { ...c, status: "archived", is_published: false } : c)
+        : prev.filter((c) => c.id !== id)
+    );
   }
 
   const filtered = courses.filter((c) => {

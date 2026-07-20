@@ -68,6 +68,9 @@ export type LMSCourse = {
   is_published: boolean;
   is_featured: boolean;
   status: CourseStatus;
+  management_scope: "platform" | "group" | "campus" | null;
+  group_id: string | null;
+  campus_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
