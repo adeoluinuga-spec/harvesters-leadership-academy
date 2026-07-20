@@ -459,8 +459,8 @@ export default function NewCoursePage() {
 
         {/* Leadership targeting */}
         <SectionCard
-          title="Leadership cadre targeting"
-          description="Select which leadership roles this course is intended for. Leave empty to make it visible to all roles."
+          title="Course audience targeting"
+          description="Select attendees, members, workers, or leadership cadres for this course. Leave empty to make it visible to all roles."
         >
           <LeadershipCadreSelect value={leadershipTargets} onChange={setLeadershipTargets} />
         </SectionCard>

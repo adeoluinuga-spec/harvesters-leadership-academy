@@ -441,8 +441,8 @@ export default function EditCoursePage({ params }: EditPageProps) {
 
         {/* Leadership targeting */}
         <SectionCard
-          title="Leadership cadre targeting"
-          description="Select which leadership roles this course is intended for"
+          title="Course audience targeting"
+          description="Select attendees, members, workers, or leadership cadres for this course"
         >
           <LeadershipCadreSelect value={leadershipTargets} onChange={setLeadershipTargets} />
         </SectionCard>

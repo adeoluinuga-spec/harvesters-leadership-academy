@@ -44,7 +44,7 @@ export function LeadershipCadreSelect({ value, onChange, className }: Props) {
         <div className={cn("flex size-4 items-center justify-center rounded border", allSelected ? "border-white bg-white" : "border-zinc-300")}>
           {allSelected ? <Check className="size-2.5 text-zinc-900" /> : null}
         </div>
-        All leadership cadres
+        All course audiences
       </button>
 
       <div className="flex flex-wrap gap-2">

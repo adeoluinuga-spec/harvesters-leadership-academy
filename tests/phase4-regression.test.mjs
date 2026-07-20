@@ -107,3 +107,22 @@ describe("hosted video support", () => {
     assert.doesNotMatch(coursePage, /extractVimeoId|vimeoEmbedUrl/);
   });
 });
+
+describe("course audience targeting", () => {
+  const lmsTypes = source("src/lib/lms-types.ts");
+  const newCourse = source("src/app/dashboard/admin/courses/new/page.tsx");
+  const editCourse = source("src/app/dashboard/admin/courses/[id]/edit/page.tsx");
+
+  it("keeps learner roles available for course targeting", () => {
+    assert.match(lmsTypes, /"Attendee"/);
+    assert.match(lmsTypes, /"Member"/);
+    assert.match(lmsTypes, /"Worker"/);
+  });
+
+  it("labels course targeting as broader than leadership-only cadres", () => {
+    assert.match(newCourse, /Course audience targeting/);
+    assert.match(editCourse, /Course audience targeting/);
+    assert.match(newCourse, /attendees, members, workers/);
+    assert.match(editCourse, /attendees, members, workers/);
+  });
+});
