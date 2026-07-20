@@ -202,7 +202,7 @@ Never expose `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, database passwords o
 
 The current production build passes (`npm run build`). The lint check still has pre-existing React-effect, unused-code, and formatting warnings/errors that should be resolved before release hardening.
 
-The README is still the stock Next.js README and should eventually be replaced or point here.
+The README now contains project-specific setup, deployment and launch guidance. Keep it in sync with this Bible when operational assumptions change.
 
 ## 9. Operating principles
 
@@ -218,4 +218,4 @@ The README is still the stock Next.js README and should eventually be replaced o
 1. Assign the first Group Admin and Campus Admin users with their matching `group_id` or `campus_id`.
 2. Populate each campus structure in Structure Management.
 3. Fix the remaining lint failures and add scope-focused end-to-end tests.
-4. Replace the default README with a short setup guide that links to this Bible.
+4. Run the launch checklist in `docs/launch-checklist.md` against the production Supabase and Vercel projects.
