@@ -1,15 +1,19 @@
-import { requireAdmin, unauthorized, badRequest } from "../../_lib";
+import { badRequest, requireScopedAdmin, scopedGroupIds, scopedSubgroupIds, scopeForbidden, unauthorized } from "../../_lib";
 import { logAuditEvent } from "@/lib/activity";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await requireAdmin();
+  const ctx = await requireScopedAdmin();
   if (!ctx) return unauthorized();
 
   const { id } = await params;
   if (!id) return badRequest("Subgroup ID required.");
+  const allowedSubgroupIds = await scopedSubgroupIds(ctx);
+  if (allowedSubgroupIds !== "all" && !allowedSubgroupIds.includes(id)) {
+    return scopeForbidden();
+  }
 
   let body: { name?: string; groupId?: string | null };
   try {
@@ -27,6 +31,15 @@ export async function PATCH(
   const updates: Record<string, unknown> = {};
   if (body.name !== undefined) updates.name = body.name.trim();
   if (body.groupId !== undefined) updates.group_id = body.groupId;
+  if (ctx.scope === "campus" && body.groupId !== undefined) {
+    return scopeForbidden("Campus admins cannot move subgroups.");
+  }
+  if (body.groupId !== undefined) {
+    const allowedGroupIds = await scopedGroupIds(ctx);
+    if (allowedGroupIds !== "all" && body.groupId && !allowedGroupIds.includes(body.groupId)) {
+      return scopeForbidden();
+    }
+  }
 
   if (Object.keys(updates).length === 0) return badRequest("Nothing to update.");
 

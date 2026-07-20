@@ -7,9 +7,13 @@ type CampusRow = {
   id: string;
   name: string | null;
   subgroup_id: string | null;
-  pastor: string | null;
 };
-type UserRow = { id: string; campus_id: string | null; role: string | null };
+type UserRow = {
+  id: string;
+  campus_id: string | null;
+  role: string | null;
+  full_name: string | null;
+};
 
 export async function GET() {
   const ctx = await getHierarchyDb();
@@ -20,13 +24,23 @@ export async function GET() {
   const [groupsRes, subgroupsRes, campusesRes, usersRes] = await Promise.all([
     db.from("groups").select("id, name").order("name"),
     db.from("subgroups").select("id, name, group_id").order("name"),
-    db.from("campuses").select("id, name, subgroup_id, pastor").order("name"),
+    db.from("campuses").select("id, name, subgroup_id").order("name"),
     db
       .from("users")
-      .select("id, campus_id, role")
+      .select("id, campus_id, role, full_name")
       .not("role", "is", null)
       .not("role", "in", NOT_PLATFORM_ADMIN),
   ]);
+
+  const queryError = groupsRes.error ?? subgroupsRes.error ?? campusesRes.error ?? usersRes.error;
+  if (queryError) {
+    console.error("[hierarchy/explorer] failed to load hierarchy", {
+      message: queryError.message,
+      code: queryError.code,
+      details: queryError.details,
+    });
+    return NextResponse.json({ error: queryError.message }, { status: 500 });
+  }
 
   const groups = (groupsRes.data ?? []) as GroupRow[];
   const subgroups = (subgroupsRes.data ?? []) as SubgroupRow[];
@@ -35,8 +49,12 @@ export async function GET() {
 
   // Build lookup maps
   const usersByCampus = new Map<string, UserRow[]>();
+  const campusPastorByCampus = new Map<string, string>();
   for (const u of users) {
     if (!u.campus_id) continue;
+    if (u.role === "Campus Pastor" && !campusPastorByCampus.has(u.campus_id)) {
+      campusPastorByCampus.set(u.campus_id, u.full_name ?? "");
+    }
     const arr = usersByCampus.get(u.campus_id) ?? [];
     arr.push(u);
     usersByCampus.set(u.campus_id, arr);
@@ -85,7 +103,7 @@ export async function GET() {
         return {
           id: campus.id,
           name: campus.name ?? "Unknown Campus",
-          pastorName: campus.pastor ?? null,
+          pastorName: campusPastorByCampus.get(campus.id) ?? null,
           totalLeaders: campusUsers.length,
           cadres,
         };

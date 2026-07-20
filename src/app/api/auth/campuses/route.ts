@@ -5,21 +5,25 @@ type CampusRow = {
   name?: string | null;
   group_id?: string | null;
   subgroup_id?: string | null;
-  pastor?: string | null;
-  campus_pastor?: string | null;
 };
 
 type SubgroupRow = {
   id?: string | null;
   name?: string | null;
-  pastor?: string | null;
   group_id?: string | null;
 };
 
 type GroupRow = {
   id?: string | null;
   name?: string | null;
-  pastor?: string | null;
+};
+
+type PastorRow = {
+  full_name?: string | null;
+  role?: string | null;
+  campus_id?: string | null;
+  subgroup_id?: string | null;
+  group_id?: string | null;
 };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -55,7 +59,7 @@ export async function GET(request: Request) {
 
   const { data: campusRows, error: campusError } = await adminClient
     .from("campuses")
-    .select("id, name, group_id, subgroup_id, pastor, campus_pastor")
+    .select("id, name, group_id, subgroup_id")
     .order("name")
     .returns<CampusRow[]>();
 
@@ -75,14 +79,14 @@ export async function GET(request: Request) {
     subgroupIds.length
       ? adminClient
           .from("subgroups")
-          .select("id, name, pastor, group_id")
+          .select("id, name, group_id")
           .in("id", subgroupIds)
           .returns<SubgroupRow[]>()
       : Promise.resolve({ data: [] as SubgroupRow[] }),
     directGroupIds.length
       ? adminClient
           .from("groups")
-          .select("id, name, pastor")
+          .select("id, name")
           .in("id", directGroupIds)
           .returns<GroupRow[]>()
       : Promise.resolve({ data: [] as GroupRow[] }),
@@ -90,6 +94,32 @@ export async function GET(request: Request) {
 
   const subgroupsById = new Map((subgroupRows ?? []).map((s) => [s.id!, s]));
   const groupsById = new Map((groupRows ?? []).map((g) => [g.id!, g]));
+
+  const { data: pastorRows } = await adminClient
+    .from("users")
+    .select("full_name, role, campus_id, subgroup_id, group_id")
+    .in("role", ["Campus Pastor", "Sub-group Pastor", "Subgroup Pastor", "Group Pastor"])
+    .returns<PastorRow[]>();
+
+  const campusPastorByCampus = new Map<string, string>();
+  const subgroupPastorBySubgroup = new Map<string, string>();
+  const groupPastorByGroup = new Map<string, string>();
+
+  for (const pastor of pastorRows ?? []) {
+    if (pastor.role === "Campus Pastor" && pastor.campus_id && !campusPastorByCampus.has(pastor.campus_id)) {
+      campusPastorByCampus.set(pastor.campus_id, pastor.full_name ?? "");
+    }
+    if (
+      ["Sub-group Pastor", "Subgroup Pastor"].includes(pastor.role ?? "") &&
+      pastor.subgroup_id &&
+      !subgroupPastorBySubgroup.has(pastor.subgroup_id)
+    ) {
+      subgroupPastorBySubgroup.set(pastor.subgroup_id, pastor.full_name ?? "");
+    }
+    if (pastor.role === "Group Pastor" && pastor.group_id && !groupPastorByGroup.has(pastor.group_id)) {
+      groupPastorByGroup.set(pastor.group_id, pastor.full_name ?? "");
+    }
+  }
 
   const campuses = campusRows.map((campus) => {
     const subgroupId = campus.subgroup_id ?? null;
@@ -104,9 +134,9 @@ export async function GET(request: Request) {
       subgroupName: subgroup?.name ?? "Unassigned subgroup",
       groupId,
       groupName: group?.name ?? "Unassigned group",
-      groupPastor: group?.pastor ?? "",
-      campusPastor: campus.campus_pastor ?? campus.pastor ?? "",
-      subgroupPastor: subgroup?.pastor ?? "",
+      groupPastor: groupId ? groupPastorByGroup.get(groupId) ?? "" : "",
+      campusPastor: campus.id ? campusPastorByCampus.get(campus.id) ?? "" : "",
+      subgroupPastor: subgroupId ? subgroupPastorBySubgroup.get(subgroupId) ?? "" : "",
     };
   });
 

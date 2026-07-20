@@ -1,17 +1,24 @@
-import { requireAdmin, unauthorized, badRequest } from "../_lib";
+import { badRequest, requireScopedAdmin, scopedGroupIds, scopeForbidden, unauthorized } from "../_lib";
 import { logAuditEvent } from "@/lib/activity";
 
 export async function GET() {
-  const ctx = await requireAdmin();
+  const ctx = await requireScopedAdmin();
   if (!ctx) return unauthorized();
+  const allowedGroupIds = await scopedGroupIds(ctx);
 
-  const { data, error } = await ctx.adminDb
+  let query = ctx.adminDb
     .from("groups")
     .select(`
       id, name,
       subgroups(id, name, campuses(id))
     `)
     .order("name");
+  if (allowedGroupIds !== "all") {
+    if (allowedGroupIds.length === 0) return Response.json({ groups: [] });
+    query = query.in("id", allowedGroupIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
@@ -74,8 +81,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const ctx = await requireAdmin();
+  const ctx = await requireScopedAdmin();
   if (!ctx) return unauthorized();
+  if (ctx.scope !== "platform") return scopeForbidden("Only platform admins can create groups.");
 
   let body: { name?: string };
   try {

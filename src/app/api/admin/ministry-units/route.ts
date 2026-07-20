@@ -1,4 +1,4 @@
-import { badRequest, requireScopedAdmin, unauthorized } from "../_lib";
+import { badRequest, requireScopedAdmin, scopedCampusIds, unauthorized } from "../_lib";
 import { logAuditEvent } from "@/lib/activity";
 
 const UNIT_TYPES = ["direction", "team_district", "subteam_community", "department_zone", "unit_area", "cell"] as const;
@@ -14,8 +14,8 @@ export async function GET(request: Request) {
     .order("name");
   if (ctx.scope === "campus") query = query.eq("campus_id", ctx.campusId);
   else if (ctx.scope === "group") {
-    const { data: campuses } = await ctx.adminDb.from("campuses").select("id").eq("group_id", ctx.groupId);
-    query = query.in("campus_id", (campuses ?? []).map((campus) => campus.id));
+    const campusIds = await scopedCampusIds(ctx);
+    query = campusIds === "all" ? query : campusIds.length ? query.in("campus_id", campusIds) : query.eq("campus_id", "__none__");
   } else if (campusId) query = query.eq("campus_id", campusId);
   const { data, error } = await query;
   if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -31,8 +31,8 @@ export async function POST(request: Request) {
   if (!UNIT_TYPES.includes(body.unitType as typeof UNIT_TYPES[number])) return badRequest("Invalid structure type.");
   if (ctx.scope === "campus" && body.campusId !== ctx.campusId) return unauthorized();
   if (ctx.scope === "group") {
-    const { data: campus } = await ctx.adminDb.from("campuses").select("group_id").eq("id", body.campusId).maybeSingle<{ group_id: string | null }>();
-    if (campus?.group_id !== ctx.groupId) return unauthorized();
+    const campusIds = await scopedCampusIds(ctx);
+    if (campusIds !== "all" && !campusIds.includes(body.campusId)) return unauthorized();
   }
   const { data: campus } = await ctx.adminDb.from("campuses").select("organization_id").eq("id", body.campusId).maybeSingle<{ organization_id: string | null }>();
   const organizationId = body.organizationId ?? campus?.organization_id;

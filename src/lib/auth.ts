@@ -58,7 +58,6 @@ type ProfileRow = {
   group_name?: string | null;
   group?: string | null;
   groups?: RelatedName | RelatedName[] | null;
-  campus_pastor?: string | null;
   department?: string | null;
   departments?: RelatedName | RelatedName[] | null;
   current_leadership_role?: CurrentLeadershipRole | null;
@@ -88,8 +87,6 @@ type LookupRow = {
   group_id?: string | number | null;
   subgroup_id?: string | number | null;
   slug?: string | null;
-  campus_pastor?: string | null;
-  pastor?: string | null;
 };
 
 export type MinistryCampusOption = {
@@ -290,7 +287,7 @@ export async function getAuthProfile(user: User, fallbackRole: AcademyRole = "At
     campusId
       ? supabase
           .from("campuses")
-          .select("name, campus_pastor, pastor")
+          .select("name")
           .eq("id", campusId)
           .maybeSingle<LookupRow>()
           .then((r) => {
@@ -326,7 +323,26 @@ export async function getAuthProfile(user: User, fallbackRole: AcademyRole = "At
   const campusName = campusRow?.name ?? (data?.campus || null);
   const subgroupName = subgroupRow?.name ?? null;
   const groupName = groupRow?.name ?? null;
-  const campusPastor = campusRow?.campus_pastor ?? campusRow?.pastor ?? null;
+  const campusPastor = campusId
+    ? await supabase
+        .from("users")
+        .select("full_name")
+        .eq("campus_id", campusId)
+        .eq("role", "Campus Pastor")
+        .limit(1)
+        .maybeSingle<{ full_name: string | null }>()
+        .then((r) => {
+          if (r.error) {
+            console.error("[auth] campus pastor query failed", {
+              userId: user.id,
+              campusId,
+              message: r.error.message,
+              code: r.error.code,
+            });
+          }
+          return r.data?.full_name ?? null;
+        })
+    : null;
 
   return {
     id: user.id,

@@ -74,7 +74,9 @@ export default function CampusesAdminPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void Promise.resolve().then(load);
+  }, []);
 
   async function handleAdd() {
     if (!addName.trim()) return;
@@ -143,7 +145,7 @@ export default function CampusesAdminPage() {
   );
 
   return (
-    <ProtectedRoute allowedRoles={["Platform Super Admin", "Super Admin", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Platform Super Admin", "Super Admin", "Admin", "Group Admin", "Campus Admin"]}>
       <DashboardShell searchPlaceholder="Search campuses...">
 
         {/* Hero */}

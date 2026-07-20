@@ -1,15 +1,19 @@
-import { requireAdmin, unauthorized, badRequest } from "../../_lib";
+import { badRequest, requireScopedAdmin, scopedCampusIds, scopedSubgroupIds, scopeForbidden, unauthorized } from "../../_lib";
 import { logAuditEvent } from "@/lib/activity";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await requireAdmin();
+  const ctx = await requireScopedAdmin();
   if (!ctx) return unauthorized();
 
   const { id } = await params;
   if (!id) return badRequest("Campus ID required.");
+  const allowedCampusIds = await scopedCampusIds(ctx);
+  if (allowedCampusIds !== "all" && !allowedCampusIds.includes(id)) {
+    return scopeForbidden();
+  }
 
   let body: {
     name?: string;
@@ -33,6 +37,15 @@ export async function PATCH(
   if (body.name !== undefined) updates.name = body.name.trim();
   if (body.subgroupId !== undefined) updates.subgroup_id = body.subgroupId;
   if (body.isActive !== undefined) updates.is_active = body.isActive;
+  if (ctx.scope === "campus" && (body.subgroupId !== undefined || body.isActive !== undefined)) {
+    return scopeForbidden("Campus admins cannot move or archive campuses.");
+  }
+  if (body.subgroupId !== undefined) {
+    const allowedSubgroupIds = await scopedSubgroupIds(ctx);
+    if (allowedSubgroupIds !== "all" && body.subgroupId && !allowedSubgroupIds.includes(body.subgroupId)) {
+      return scopeForbidden();
+    }
+  }
 
   if (Object.keys(updates).length === 0) return badRequest("Nothing to update.");
 

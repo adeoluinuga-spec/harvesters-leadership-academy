@@ -1,11 +1,12 @@
-import { requireAdmin, unauthorized, badRequest } from "../_lib";
+import { badRequest, requireScopedAdmin, scopedGroupIds, scopedSubgroupIds, scopeForbidden, unauthorized } from "../_lib";
 import { logAuditEvent } from "@/lib/activity";
 
 export async function GET() {
-  const ctx = await requireAdmin();
+  const ctx = await requireScopedAdmin();
   if (!ctx) return unauthorized();
+  const allowedSubgroupIds = await scopedSubgroupIds(ctx);
 
-  const { data, error } = await ctx.adminDb
+  let query = ctx.adminDb
     .from("subgroups")
     .select(`
       id, name, group_id,
@@ -13,6 +14,12 @@ export async function GET() {
       campuses(id, name)
     `)
     .order("name");
+  if (allowedSubgroupIds !== "all") {
+    if (allowedSubgroupIds.length === 0) return Response.json({ subgroups: [] });
+    query = query.in("id", allowedSubgroupIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
@@ -57,8 +64,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const ctx = await requireAdmin();
+  const ctx = await requireScopedAdmin();
   if (!ctx) return unauthorized();
+  if (ctx.scope === "campus") return scopeForbidden("Campus admins cannot create subgroups.");
 
   let body: { name?: string; groupId?: string };
   try {
@@ -68,10 +76,15 @@ export async function POST(request: Request) {
   }
 
   if (!body.name?.trim()) return badRequest("Subgroup name is required.");
+  const allowedGroupIds = await scopedGroupIds(ctx);
+  const groupId = ctx.scope === "group" ? ctx.groupId : body.groupId ?? null;
+  if (allowedGroupIds !== "all" && (!groupId || !allowedGroupIds.includes(groupId))) {
+    return scopeForbidden();
+  }
 
   const { data, error } = await ctx.adminDb
     .from("subgroups")
-    .insert({ name: body.name.trim(), group_id: body.groupId ?? null })
+    .insert({ name: body.name.trim(), group_id: groupId })
     .select("id, name")
     .single();
 
@@ -84,7 +97,7 @@ export async function POST(request: Request) {
     eventType: "subgroup_created",
     entityType: "subgroup",
     entityId: data.id,
-    metadata: { name: data.name, groupId: body.groupId ?? null },
+    metadata: { name: data.name, groupId },
   });
 
   return Response.json({ subgroup: data }, { status: 201 });

@@ -49,7 +49,9 @@ export default function GroupsAdminPage() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void Promise.resolve().then(load);
+  }, []);
 
   async function handleAdd() {
     if (!addName.trim()) return;
@@ -84,7 +86,7 @@ export default function GroupsAdminPage() {
   );
 
   return (
-    <ProtectedRoute allowedRoles={["Platform Super Admin", "Super Admin", "Admin"]}>
+    <ProtectedRoute allowedRoles={["Platform Super Admin", "Super Admin", "Admin", "Group Admin", "Campus Admin"]}>
       <DashboardShell searchPlaceholder="Search groups...">
 
         <motion.section variants={shellItem} className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm md:p-8">

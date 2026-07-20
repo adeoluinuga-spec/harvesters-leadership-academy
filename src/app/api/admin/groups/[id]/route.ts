@@ -1,15 +1,19 @@
-import { requireAdmin, unauthorized, badRequest } from "../../_lib";
+import { badRequest, requireScopedAdmin, scopedGroupIds, scopeForbidden, unauthorized } from "../../_lib";
 import { logAuditEvent } from "@/lib/activity";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await requireAdmin();
+  const ctx = await requireScopedAdmin();
   if (!ctx) return unauthorized();
 
   const { id } = await params;
   if (!id) return badRequest("Group ID required.");
+  const allowedGroupIds = await scopedGroupIds(ctx);
+  if (allowedGroupIds !== "all" && !allowedGroupIds.includes(id)) {
+    return scopeForbidden();
+  }
 
   let body: { name?: string };
   try {
