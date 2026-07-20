@@ -18,7 +18,7 @@ type NavItem = {
 
 export function MobileNav() {
   const pathname = usePathname();
-  const [dashboardHref, setDashboardHref] = useState("/dashboard/leader");
+  const [dashboardHref, setDashboardHref] = useState("/dashboard/attendee");
 
   useEffect(() => {
     let mounted = true;

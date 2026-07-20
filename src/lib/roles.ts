@@ -74,7 +74,7 @@ export const AUTHENTICATED_ROLES = [
   ...OVERSIGHT_ROLES,
 ] as const;
 export const INVITE_ONLY_ROLES = [
-  "Platform Super Admin", "Group Pastor", "Sub-Group Pastor", "Campus Pastor", "Campus Admin", "Super Admin", "Admin",
+  "Platform Super Admin", "Group Pastor", "Group Admin", "Sub-Group Pastor", "Campus Pastor", "Campus Admin", "Super Admin", "Admin",
 ] as const;
 
 export const SELF_ONBOARDING_LEADERSHIP_ROLES = [
@@ -128,7 +128,7 @@ export function normalizeRole(role?: string | null): AcademyRole {
 }
 
 export function dashboardForRole(role?: string | null) {
-  return dashboardRoutes[normalizeRole(role)] ?? "/dashboard/leader";
+  return dashboardRoutes[normalizeRole(role)] ?? "/dashboard/attendee";
 }
 
 export function roleCanAccess(role: string, allowedRoles: string[]) {

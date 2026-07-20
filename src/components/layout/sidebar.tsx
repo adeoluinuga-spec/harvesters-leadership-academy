@@ -97,7 +97,7 @@ export function Sidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [canCommunicate, setCanCommunicate] = useState(false);
   const [canManageStructure, setCanManageStructure] = useState(false);
-  const [dashboardHref, setDashboardHref] = useState("/dashboard/leader");
+  const [dashboardHref, setDashboardHref] = useState("/dashboard/attendee");
   const [userRole, setUserRole] = useState("");
 
   useEffect(() => {
@@ -108,12 +108,13 @@ export function Sidebar() {
         if (!user) return;
         const { data } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
         const role = data?.role ?? "";
-        setUserRole(role);
-        setCanManageCourses((ADMIN_COURSE_ROLES as readonly string[]).includes(role));
-        setIsAdmin(ADMIN_ROLES.includes(role));
-        setCanCommunicate((COMMUNICATION_ROLES as readonly string[]).includes(role));
-        setCanManageStructure(STRUCTURE_ADMIN_ROLES.includes(role));
-        const route = dashboardForRole(normalizeStoredRole(role));
+        const normalizedRole = normalizeStoredRole(role);
+        setUserRole(normalizedRole);
+        setCanManageCourses(roleCanAccess(normalizedRole, [...ADMIN_COURSE_ROLES]));
+        setIsAdmin(roleCanAccess(normalizedRole, ADMIN_ROLES));
+        setCanCommunicate(roleCanAccess(normalizedRole, [...COMMUNICATION_ROLES]));
+        setCanManageStructure(roleCanAccess(normalizedRole, STRUCTURE_ADMIN_ROLES));
+        const route = dashboardForRole(normalizedRole);
         if (route) setDashboardHref(route);
       } catch {
         // silently ignore — non-critical
