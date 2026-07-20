@@ -85,3 +85,25 @@ describe("scoped admin structure hardening", () => {
     assert.match(subgroups, /requireScopedAdmin/);
   });
 });
+
+describe("hosted video support", () => {
+  const videoHelper = source("src/lib/video.ts");
+  const coursePage = source("src/app/courses/[id]/page.tsx");
+  const courseApi = source("src/app/api/lms/admin-course-actions/route.ts");
+  const lessonBuilder = source("src/app/dashboard/admin/courses/[id]/lessons/page.tsx");
+
+  it("keeps YouTube as a first-class hosted video provider", () => {
+    assert.match(videoHelper, /extractYouTubeId/);
+    assert.match(videoHelper, /youtubeEmbedUrl/);
+    assert.match(videoHelper, /youtu\.be/);
+    assert.match(videoHelper, /shorts/);
+  });
+
+  it("uses the shared hosted video helper across public and admin surfaces", () => {
+    assert.match(coursePage, /parseVideoUrl/);
+    assert.match(courseApi, /normalizeVideoUrl/);
+    assert.match(lessonBuilder, /normalizeVideoUrl/);
+    assert.match(lessonBuilder, /YouTube link/);
+    assert.doesNotMatch(coursePage, /extractVimeoId|vimeoEmbedUrl/);
+  });
+});

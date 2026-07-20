@@ -42,7 +42,7 @@ import {
   type ModuleFormData,
 } from "@/lib/course-management";
 import type { AdminCourse, LMSLesson } from "@/lib/lms-types";
-import { extractVimeoId, normalizeVimeoUrl, vimeoEmbedUrl } from "@/lib/vimeo";
+import { normalizeVideoUrl, parseVideoUrl } from "@/lib/video";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -193,7 +193,7 @@ function LessonEditor({
 
     const payload: LessonFormData = {
       ...form,
-      video_url: form.video_url.trim() ? normalizeVimeoUrl(form.video_url.trim()) : "",
+      video_url: form.video_url.trim() ? normalizeVideoUrl(form.video_url.trim()) : "",
       duration_seconds: inputToSeconds(durationInput),
       resources: form.resources.filter((r) => r.title.trim() && r.url.trim()),
     };
@@ -213,7 +213,7 @@ function LessonEditor({
     }
   }
 
-  const vimeoId = form.video_url.trim() ? extractVimeoId(form.video_url) : null;
+  const video = parseVideoUrl(form.video_url);
 
   const resourceTypeIcon = (type: string) => {
     if (type === "pdf") return <FileText className="size-3.5 text-zinc-400" />;
@@ -271,37 +271,37 @@ function LessonEditor({
           </Field>
 
           {/* Video URL */}
-          <Field label="Vimeo URL" hint="Paste any Vimeo link — watch URL or embed URL, both work">
+          <Field label="Video URL" hint="Paste a YouTube link. Vimeo and direct video links still work.">
             <div className="relative">
               <Video className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400" />
               <Input
                 value={form.video_url}
                 onChange={(e) => set("video_url", e.target.value)}
-                placeholder="https://vimeo.com/123456789"
+                placeholder="https://www.youtube.com/watch?v=..."
                 className="pl-8"
               />
             </div>
           </Field>
 
-          {/* Vimeo live preview */}
-          {vimeoId && (
+          {/* Hosted video live preview */}
+          {video && video.provider !== "direct" && (
             <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-950">
               <div className="relative aspect-video">
                 <iframe
-                  key={vimeoId}
-                  src={vimeoEmbedUrl(vimeoId)}
+                  key={video.embedUrl}
+                  src={video.embedUrl}
                   className="h-full w-full"
-                  allow="fullscreen; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
-                  title="Vimeo preview"
+                  title="Video preview"
                 />
               </div>
               <div className="flex items-center gap-2 border-t border-white/10 px-3 py-2">
                 <div className="size-1.5 rounded-full bg-emerald-400" />
                 <p className="text-xs text-zinc-400">
-                  Vimeo video · ID {vimeoId}
+                  {video.provider === "youtube" ? "YouTube" : "Vimeo"} video{video.id ? ` - ID ${video.id}` : ""}
                 </p>
-                <p className="ml-auto text-xs text-zinc-500">Will be saved as embed URL</p>
+                <p className="ml-auto text-xs text-zinc-500">Will be saved as a clean URL</p>
               </div>
             </div>
           )}

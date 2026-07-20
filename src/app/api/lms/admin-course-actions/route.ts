@@ -1,7 +1,7 @@
 import { badRequest, requireScopedAdmin, scopedCampusIds, scopeForbidden, unauthorized } from "@/app/api/admin/_lib";
 import { logAuditEvent } from "@/lib/activity";
 import type { CourseStatus } from "@/lib/lms-types";
-import { normalizeVimeoUrl } from "@/lib/vimeo";
+import { normalizeVideoUrl } from "@/lib/video";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type CourseScope = "platform" | "group" | "campus";
@@ -108,7 +108,7 @@ function coursePayload(body: CoursePayload) {
   if (body.description !== undefined) payload.description = body.description.trim() || null;
   if (body.overview !== undefined) payload.overview = body.overview.trim() || null;
   if (body.thumbnail_url !== undefined) payload.thumbnail_url = body.thumbnail_url.trim() || null;
-  if (body.video_url !== undefined) payload.video_url = body.video_url.trim() ? normalizeVimeoUrl(body.video_url.trim()) : null;
+  if (body.video_url !== undefined) payload.video_url = body.video_url.trim() ? normalizeVideoUrl(body.video_url.trim()) : null;
   if (body.category !== undefined) payload.category = body.category;
   if (body.instructor_name !== undefined) payload.instructor_name = body.instructor_name.trim();
   if (body.instructor_title !== undefined) payload.instructor_title = body.instructor_title.trim() || null;

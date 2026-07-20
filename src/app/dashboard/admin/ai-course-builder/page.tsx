@@ -860,13 +860,13 @@ function ReviewStep({
             </Field>
 
             <div className="md:col-span-2">
-              <Field label="Video URL" hint="The single hosted video that learners watch — Vimeo or YouTube">
+              <Field label="Video URL" hint="The single hosted video that learners watch - YouTube preferred, Vimeo supported">
                 <div className="relative">
                   <Video className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400" />
                   <Input
                     value={videoUrl}
                     onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://vimeo.com/…"
+                    placeholder="https://www.youtube.com/watch?v=..."
                     className="pl-8"
                   />
                 </div>

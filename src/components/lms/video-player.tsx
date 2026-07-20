@@ -5,31 +5,7 @@ import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-
-type VideoEmbed =
-  | { type: "youtube" | "vimeo"; embedUrl: string }
-  | { type: "direct"; embedUrl: string }
-  | { type: "none" };
-
-function parseVideoUrl(url: string | null): VideoEmbed {
-  if (!url) return { type: "none" };
-
-  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  if (ytMatch)
-    return {
-      type: "youtube",
-      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1`,
-    };
-
-  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
-  if (vimeoMatch)
-    return {
-      type: "vimeo",
-      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0`,
-    };
-
-  return { type: "direct", embedUrl: url };
-}
+import { parseVideoUrl } from "@/lib/video";
 
 type VideoPlayerProps = {
   videoUrl: string | null;
@@ -50,7 +26,7 @@ export function VideoPlayer({
 }: VideoPlayerProps) {
   const embed = parseVideoUrl(videoUrl);
 
-  if (embed.type === "none") {
+  if (!embed) {
     return (
       <PlaceholderPlayer
         lessonTitle={lessonTitle}
@@ -62,7 +38,7 @@ export function VideoPlayer({
     );
   }
 
-  if (embed.type === "direct") {
+  if (embed.provider === "direct") {
     return (
       <div className="relative aspect-video overflow-hidden bg-black">
         <video src={embed.embedUrl} controls className="h-full w-full object-contain" />

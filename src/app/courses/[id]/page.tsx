@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { fetchSimpleCourseDetail, type SimpleCourseDetail } from "@/lib/lms";
 import { formatDuration } from "@/lib/lms-types";
-import { extractVimeoId, vimeoEmbedUrl } from "@/lib/vimeo";
+import { parseVideoUrl } from "@/lib/video";
 
 type CourseDetailPageProps = { params: Promise<{ id: string }> };
 
@@ -102,7 +102,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
     .filter(Boolean)
     .join(" · ");
 
-  const vimeoId = course.video_url ? extractVimeoId(course.video_url) : null;
+  const video = parseVideoUrl(course.video_url);
 
   return (
     <DashboardShell searchPlaceholder="Search courses..." showDate={false}>
@@ -189,24 +189,29 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
       </motion.section>
 
       {/* ── Video embed — full-bleed on mobile ──────────────────── */}
-      {vimeoId && (
+      {video && (
         <motion.section
           variants={shellItem}
           id="video"
           className="-mx-5 scroll-mt-24 sm:mx-0 sm:scroll-mt-20"
         >
           <div className="overflow-hidden border-y border-zinc-200 bg-zinc-950 sm:rounded-xl sm:border shadow-sm">
-            {/* 16:9 responsive container — iframe positioned absolutely inside */}
-            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-              <iframe
-                src={vimeoEmbedUrl(vimeoId)}
-                className="absolute inset-0 h-full w-full"
-                allow="autoplay; fullscreen; picture-in-picture; clipboard-write"
-                allowFullScreen
-                title={course.title}
-                style={{ border: 0 }}
-              />
-            </div>
+            {video.provider === "direct" ? (
+              <div className="relative aspect-video w-full">
+                <video src={video.embedUrl} controls className="h-full w-full object-contain" />
+              </div>
+            ) : (
+              <div className="relative aspect-video w-full">
+                <iframe
+                  src={video.embedUrl}
+                  className="absolute inset-0 h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  title={course.title}
+                  style={{ border: 0 }}
+                />
+              </div>
+            )}
             {!isEnrolled && !isAdmin && (
               <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-3">
                 <p className="text-sm text-zinc-400">
@@ -228,7 +233,7 @@ export default function CourseDetailPage({ params }: CourseDetailPageProps) {
       )}
 
       {/* ── No video placeholder ─────────────────────────────────── */}
-      {!vimeoId && (
+      {!video && (
         <motion.section variants={shellItem}>
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white py-14">
             <PlayCircle className="size-10 text-zinc-300" />

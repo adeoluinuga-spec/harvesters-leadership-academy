@@ -320,14 +320,14 @@ export default function EditCoursePage({ params }: EditPageProps) {
         </SectionCard>
 
         {/* Video */}
-        <SectionCard title="Course video" description="Paste any Vimeo link — watch URL or embed URL both work">
-          <Field label="Vimeo URL" hint="e.g. https://vimeo.com/123456789">
+        <SectionCard title="Course video" description="Paste a YouTube link. Vimeo and direct video links still work.">
+          <Field label="Video URL" hint="e.g. https://www.youtube.com/watch?v=...">
             <div className="relative">
               <Video className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400" />
               <Input
                 value={videoUrl}
                 onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://vimeo.com/123456789"
+                placeholder="https://www.youtube.com/watch?v=..."
                 className="pl-8"
               />
             </div>
