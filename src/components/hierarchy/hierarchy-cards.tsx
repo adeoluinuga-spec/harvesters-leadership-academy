@@ -7,10 +7,28 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Campus, HealthStatus, Leader } from "@/lib/hierarchy-data";
 import { cn } from "@/lib/utils";
 
-export function statusClasses(status: HealthStatus | Leader["status"]) {
+type CampusCardData = {
+  name: string;
+  pastor: string;
+  status: "Thriving" | "Stable" | "Declining" | "Needs Attention";
+  leaders: number;
+  active: number;
+  inactive: number;
+  engagement: number;
+};
+
+type LeaderCardData = {
+  id: string;
+  initials: string;
+  name: string;
+  role: string;
+  status: "Active" | "Stable" | "Not Enrolled" | "Declining" | "Needs Attention";
+  campus: string;
+};
+
+export function statusClasses(status: CampusCardData["status"] | LeaderCardData["status"]) {
   if (status === "Thriving" || status === "Active") {
     return "border-emerald-100 bg-emerald-50 text-emerald-700";
   }
@@ -20,7 +38,7 @@ export function statusClasses(status: HealthStatus | Leader["status"]) {
   return "border-amber-100 bg-amber-50 text-amber-700";
 }
 
-export function CampusCard({ campus }: { campus: Campus }) {
+export function CampusCard({ campus }: { campus: CampusCardData }) {
   return (
     <Card className="rounded-xl border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-lg hover:shadow-zinc-200/60">
       <CardHeader className="flex-row items-start justify-between space-y-0">
@@ -61,7 +79,7 @@ export function CampusCard({ campus }: { campus: Campus }) {
   );
 }
 
-export function LeaderCard({ leader }: { leader: Leader }) {
+export function LeaderCard({ leader }: { leader: LeaderCardData }) {
   return (
     <Link href={`/leaders/${leader.id}`} className="block">
       <Card className="rounded-xl border-zinc-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-zinc-200/60">

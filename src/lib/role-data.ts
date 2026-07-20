@@ -104,24 +104,3 @@ export const roles = [
     icon: LayoutDashboard,
   },
 ];
-
-export const invitationProfiles = [
-  {
-    name: "Pastor Adeolu Osinuga",
-    role: "Campus Pastor",
-    assignment: "Ilupeju Campus",
-    invitedBy: "Pastor Gbenga Agboola",
-  },
-  {
-    name: "Pastor Gbenga Agboola",
-    role: "Sub-Group Pastor",
-    assignment: "Magodo Subgroup",
-    invitedBy: "Pastor Mayowa Agboade",
-  },
-  {
-    name: "Pastor Mayowa Agboade",
-    role: "Group Pastor",
-    assignment: "Group Alpha",
-    invitedBy: "Harvesters Executive Office",
-  },
-];

@@ -3,10 +3,10 @@
  *
  * Set AI_COURSE_PROVIDER in .env.local to switch providers:
  *   AI_COURSE_PROVIDER=openai   → GPT-4o (requires OPENAI_API_KEY)
- *   AI_COURSE_PROVIDER=mock     → deterministic text parser (no key needed)
+ *   AI_COURSE_PROVIDER=local    -> deterministic transcript parser (no key needed)
  *
  * If AI_COURSE_PROVIDER is unset, defaults to openai when OPENAI_API_KEY is
- * present, otherwise falls back to mock automatically.
+ * present, otherwise falls back to the local parser automatically.
  */
 
 import type {
@@ -18,7 +18,7 @@ import type {
 } from "@/lib/lms-types";
 import { COURSE_CATEGORIES } from "@/lib/lms-types";
 
-export type AIProvider = "mock" | "openai" | "claude" | "gemini";
+export type AIProvider = "local" | "openai" | "claude" | "gemini";
 
 export interface AIIngestionInput {
   sourceType: AISourceType;
@@ -34,7 +34,7 @@ export interface AIIngestionResult {
 const DEFAULT_PROVIDER: AIProvider = (() => {
   const explicit = process.env.AI_COURSE_PROVIDER as AIProvider | undefined;
   if (explicit) return explicit;
-  return process.env.OPENAI_API_KEY ? "openai" : "mock";
+  return process.env.OPENAI_API_KEY ? "openai" : "local";
 })();
 
 // ============================================================
@@ -55,11 +55,11 @@ export async function analyzeContent(
     case "openai":
       return { course: await openaiAnalyze(input), provider: "openai" };
     case "claude":
-      throw new Error("Claude provider not yet connected. Set AI_COURSE_PROVIDER=openai or AI_COURSE_PROVIDER=mock.");
+      throw new Error("Claude provider not yet connected. Set AI_COURSE_PROVIDER=openai or AI_COURSE_PROVIDER=local.");
     case "gemini":
-      throw new Error("Gemini provider not yet connected. Set AI_COURSE_PROVIDER=openai or AI_COURSE_PROVIDER=mock.");
+      throw new Error("Gemini provider not yet connected. Set AI_COURSE_PROVIDER=openai or AI_COURSE_PROVIDER=local.");
     default:
-      return { course: mockAnalyze(input), provider: "mock" };
+      return { course: localAnalyze(input), provider: "local" };
   }
 }
 
@@ -71,7 +71,7 @@ async function openaiAnalyze(input: AIIngestionInput): Promise<AIGeneratedCourse
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "OPENAI_API_KEY is not set. Add it to .env.local or set AI_COURSE_PROVIDER=mock to use the mock generator."
+      "OPENAI_API_KEY is not set. Add it to .env.local or set AI_COURSE_PROVIDER=local to use the local transcript parser."
     );
   }
 
@@ -175,10 +175,10 @@ Rules:
 }
 
 // ============================================================
-// Mock generator — deterministic, transcript-driven
+// Local parser - deterministic, transcript-driven
 // ============================================================
 
-function mockAnalyze(input: AIIngestionInput): AIGeneratedCourse {
+function localAnalyze(input: AIIngestionInput): AIGeneratedCourse {
   const text = input.transcript.trim();
   const sentences = splitSentences(text);
   const paragraphs = splitParagraphs(text);
@@ -192,7 +192,7 @@ function mockAnalyze(input: AIIngestionInput): AIGeneratedCourse {
   const difficulty = inferDifficulty(text);
   const targetAudience = inferAudience(text);
 
-  const modules = deriveModules(paragraphs, totalMinutes, sentences);
+  const modules = deriveModules(paragraphs, totalMinutes);
   const tags = deriveTags(text, category);
 
   return {
@@ -241,8 +241,7 @@ function deriveDescription(paragraphs: string[]): string {
 
 function deriveModules(
   paragraphs: string[],
-  totalMinutes: number,
-  allSentences: string[]
+  totalMinutes: number
 ): AIGeneratedModule[] {
   const targetCount = Math.min(6, Math.max(3, Math.floor(paragraphs.length / 2)));
   const chunkSize = Math.ceil(paragraphs.length / targetCount);

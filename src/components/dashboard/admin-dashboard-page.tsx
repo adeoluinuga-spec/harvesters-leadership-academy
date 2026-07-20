@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Activity,
   AlertCircle,
   Award,
   BookOpenCheck,
@@ -13,7 +12,6 @@ import {
   GraduationCap,
   Network,
   Plus,
-  ShieldAlert,
   TrendingUp,
   UserCheck,
   UserMinus,
@@ -30,7 +28,6 @@ import { HierarchyExplorer } from "@/components/dashboard/hierarchy-explorer";
 import { SubgroupPerformance } from "@/components/dashboard/subgroup-performance";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { AuthProfile, getCurrentUserProfile } from "@/lib/auth";
@@ -369,10 +366,6 @@ function ActivityFeed({ data }: { data: PlatformAnalytics }) {
   const feed = data.recentEvents.slice(0, 4);
 
   if (feed.length === 0) {
-    // Fallback static items if no events yet
-    const staticFeed = [
-      { title: "Platform live", body: "Analytics engine active — events will appear here as leaders engage", time: "Now" },
-    ];
     return (
       <motion.section variants={shellItem}>
         <Card className="rounded-xl border-zinc-200 bg-white shadow-sm">
@@ -383,12 +376,9 @@ function ActivityFeed({ data }: { data: PlatformAnalytics }) {
             <p className="mt-1 text-sm text-zinc-500">Ministry platform events</p>
           </CardHeader>
           <CardContent className="pt-4">
-            {staticFeed.map((item) => (
-              <div key={item.title} className="rounded-lg border border-zinc-100 p-4">
-                <p className="font-medium text-zinc-950">{item.title}</p>
-                <p className="mt-2 text-sm text-zinc-500">{item.body}</p>
-              </div>
-            ))}
+            <div className="rounded-lg border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
+              No platform activity has been recorded yet.
+            </div>
           </CardContent>
         </Card>
       </motion.section>

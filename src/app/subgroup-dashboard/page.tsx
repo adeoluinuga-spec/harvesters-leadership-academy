@@ -11,7 +11,6 @@ import { IntelligencePanel } from "@/components/hierarchy/hierarchy-cards";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { subgroupInsights } from "@/lib/hierarchy-data";
 import { createClient } from "@/lib/client";
 import { fetchSubgroupAnalytics, type HierarchyAnalytics } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
@@ -20,8 +19,6 @@ import { useHierarchy } from "@/hooks/use-hierarchy";
 type RealCampus = {
   id: string;
   name: string | null;
-  pastor: string | null;
-  campus_pastor: string | null;
 };
 
 type SubgroupUser = {
@@ -33,8 +30,8 @@ type SubgroupUser = {
   campus_id: string | null;
 };
 
-function campusPastorName(campus: RealCampus): string {
-  return campus.campus_pastor ?? campus.pastor ?? "Campus Pastor";
+function campusPastorName(campus: RealCampus, pastorsByCampus: Map<string, string>): string {
+  return pastorsByCampus.get(campus.id) ?? "Campus Pastor";
 }
 
 function healthLabel(pct: number): string {
@@ -55,6 +52,7 @@ export default function SubgroupDashboardPage() {
 
   const [realCampuses, setRealCampuses] = useState<RealCampus[]>([]);
   const [subgroupUsers, setSubgroupUsers] = useState<SubgroupUser[]>([]);
+  const [pastorsByCampus, setPastorsByCampus] = useState<Map<string, string>>(new Map());
   const [dataLoading, setDataLoading] = useState(true);
   const [expanded, setExpanded] = useState<string>("");
   const [lmsAnalytics, setLmsAnalytics] = useState<HierarchyAnalytics | null>(null);
@@ -62,19 +60,24 @@ export default function SubgroupDashboardPage() {
   useEffect(() => {
     if (hierarchy.loading) return;
 
+    let active = true;
+
     if (!subgroupId) {
-      setDataLoading(false);
-      return;
+      window.setTimeout(() => {
+        if (active) setDataLoading(false);
+      }, 0);
+      return () => {
+        active = false;
+      };
     }
 
-    let active = true;
     const supabase = createClient();
 
     (async () => {
       // Step 1: campuses for this subgroup (authoritative list)
       const campusResult = await supabase
         .from("campuses")
-        .select("id, name, pastor, campus_pastor")
+        .select("id, name")
         .eq("subgroup_id", subgroupId);
 
       if (!active) return;
@@ -128,6 +131,14 @@ export default function SubgroupDashboardPage() {
         return true;
       });
 
+      const pastorMap = new Map<string, string>();
+      for (const user of allUsers) {
+        if (user.role === "Campus Pastor" && user.campus_id && !pastorMap.has(user.campus_id)) {
+          pastorMap.set(user.campus_id, user.full_name ?? "");
+        }
+      }
+
+      setPastorsByCampus(pastorMap);
       setSubgroupUsers(allUsers);
       setDataLoading(false);
     })();
@@ -164,6 +175,20 @@ export default function SubgroupDashboardPage() {
   const certificates = lmsAnalytics?.certificates ?? null;
   const needsFollowUp =
     lmsAnalytics ? Math.max(0, lmsAnalytics.enrolledLeaders - lmsAnalytics.completedLeaders) : null;
+  const subgroupInsights = useMemo(() => {
+    if (!lmsAnalytics) {
+      return ["Subgroup learning intelligence will appear once academy analytics finish loading."];
+    }
+
+    return [
+      `${lmsAnalytics.enrolledLeaders.toLocaleString()} leader${lmsAnalytics.enrolledLeaders === 1 ? "" : "s"} enrolled across ${subgroupName}.`,
+      `${lmsAnalytics.certificates.toLocaleString()} certificate${lmsAnalytics.certificates === 1 ? "" : "s"} issued in this subgroup.`,
+      needsFollowUp && needsFollowUp > 0
+        ? `${needsFollowUp.toLocaleString()} enrolled leader${needsFollowUp === 1 ? "" : "s"} need completion follow-up.`
+        : "No enrolled leaders are currently waiting on certificate follow-up.",
+      `${lmsAnalytics.campusSummaries.length.toLocaleString()} campus${lmsAnalytics.campusSummaries.length === 1 ? "" : "es"} reporting academy activity.`,
+    ];
+  }, [lmsAnalytics, needsFollowUp, subgroupName]);
 
   const kpis = [
     {
@@ -272,7 +297,7 @@ export default function SubgroupDashboardPage() {
                     <CardTitle className="font-heading text-lg font-semibold text-zinc-950">
                       {campus.name ?? "Unnamed Campus"}
                     </CardTitle>
-                    <p className="mt-1 text-sm text-zinc-500">{campusPastorName(campus)}</p>
+                    <p className="mt-1 text-sm text-zinc-500">{campusPastorName(campus, pastorsByCampus)}</p>
                   </div>
                   <Badge className={cn("rounded-md border hover:bg-inherit", healthClasses(pct))}>
                     {health}
@@ -332,7 +357,7 @@ export default function SubgroupDashboardPage() {
                     >
                       <div>
                         <p className="font-heading font-semibold text-zinc-950">{campus.name ?? "Unnamed Campus"}</p>
-                        <p className="text-sm text-zinc-500">{campusPastorName(campus)}</p>
+                        <p className="text-sm text-zinc-500">{campusPastorName(campus, pastorsByCampus)}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <Badge className={cn("rounded-md border hover:bg-inherit", healthClasses(pct))}>
