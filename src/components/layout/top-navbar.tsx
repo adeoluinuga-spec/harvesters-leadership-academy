@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { LogOut, Search } from "lucide-react";
 import { useRouter } from "next/navigation";

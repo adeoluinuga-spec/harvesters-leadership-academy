@@ -326,7 +326,7 @@ export default function RemindersPage() {
       <motion.div variants={shellItem} className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
         <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600" />
         <p className="text-xs text-amber-800 leading-relaxed">
-          Reminder rules match leaders based on their activity data and send in-app notifications. Use "Run now" to trigger a rule manually, or configure automatic scheduling in your infrastructure.
+          Reminder rules match leaders based on their activity data and send in-app notifications. Use &ldquo;Run now&rdquo; to trigger a rule manually, or configure automatic scheduling in your infrastructure.
         </p>
       </motion.div>
 

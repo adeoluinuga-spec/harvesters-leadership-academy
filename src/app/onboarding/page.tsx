@@ -51,6 +51,11 @@ const designationOptions = ["Pastor", "Dcns", "Dcn", "Minister", "Pst", "Bro", "
 const acceptedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxAvatarSize = 5 * 1024 * 1024;
 
+function buildAvatarPath(userId: string, fileName: string): string {
+  const fileExtension = fileName.split(".").pop()?.toLowerCase() || "jpg";
+  return `${userId}/${Date.now()}.${fileExtension}`;
+}
+
 function campusOptionLabel(campus: MinistryCampusOption): string {
   const parts = [campus.name];
   if (campus.subgroupName && campus.subgroupName !== "Unassigned subgroup") {
@@ -188,12 +193,15 @@ export default function OnboardingPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!selectedCampusId || (accountType !== "member" && accountType !== "worker")) {
-      setMinistryUnitOptions([]);
-      if (accountType === "attendee" || accountType === "leader") setSelectedMinistryUnitId("");
-      return;
-    }
     let active = true;
+    if (!selectedCampusId || (accountType !== "member" && accountType !== "worker")) {
+      Promise.resolve().then(() => {
+        if (!active) return;
+        setMinistryUnitOptions([]);
+        if (accountType === "attendee" || accountType === "leader") setSelectedMinistryUnitId("");
+      });
+      return () => { active = false; };
+    }
     fetchMinistryUnits(selectedCampusId, accountType)
       .then((units) => { if (active) setMinistryUnitOptions(units); })
       .catch((unitError) => { if (active) setError(unitError instanceof Error ? unitError.message : "Could not load ministry structure."); });
@@ -205,14 +213,19 @@ export default function OnboardingPage() {
     if (isCampusPastor) {
       // Don't auto-reset if they already have a valid, unclaimed selection
       if (selectedCampusId && !claimedCampusIds.has(selectedCampusId)) return;
-      setSelectedCampusId("");
+      Promise.resolve().then(() => setSelectedCampusId(""));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCampusPastor]);
 
   // Auto-suggest the next leadership level whenever the selected role changes
   useEffect(() => {
-    if (accountType === "leader") setLeadershipAspiration(suggestedLeadershipAspiration(selectedRole));
+    if (accountType !== "leader") return;
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) setLeadershipAspiration(suggestedLeadershipAspiration(selectedRole));
+    });
+    return () => { active = false; };
   }, [selectedRole, accountType]);
 
   function handleAvatarChange(file?: File) {
@@ -245,8 +258,7 @@ export default function OnboardingPage() {
       throw new Error("Your session has expired. Please sign in again before uploading a profile picture.");
     }
 
-    const fileExtension = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
-    const filePath = `${authData.user.id}/${Date.now()}.${fileExtension}`;
+    const filePath = buildAvatarPath(authData.user.id, avatarFile.name);
     const { error: uploadError } = await supabase.storage
       .from("avatars")
       .upload(filePath, avatarFile, { cacheControl: "3600", contentType: avatarFile.type, upsert: true });

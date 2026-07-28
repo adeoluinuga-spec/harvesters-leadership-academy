@@ -30,9 +30,6 @@ export function fmt(n: number) {
 }
 
 export function CampusCard({ campus }: { campus: CampusSummary }) {
-  const enrollmentPct =
-    campus.totalLeaders > 0 ? Math.round((campus.enrolledLeaders / campus.totalLeaders) * 100) : 0;
-
   return (
     <div className="rounded-lg border border-zinc-100 p-4">
       <div className="mb-3 flex items-start justify-between gap-3">

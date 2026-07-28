@@ -121,8 +121,8 @@ The GitHub smoke workflow runs tests and `next build` on pushes and pull request
 - OpenAI provider configured or `AI_COURSE_PROVIDER=local` selected.
 - Resend configured if invitation and email delivery are needed.
 - `npm run smoke` passes.
-- Known lint cleanup is either resolved or explicitly accepted for launch.
+- `npm run lint` passes.
 
 ## Known Follow-Up
 
-The production build and regression tests pass. `npm run lint` still has pre-existing cleanup work noted in [PROJECT_BIBLE.md](PROJECT_BIBLE.md); treat that as the next hardening item before a stricter launch gate.
+The production build, regression tests, and `npm run lint` all pass. The next hardening item is scope-focused end-to-end tests; see [PROJECT_BIBLE.md](PROJECT_BIBLE.md) for the recommended launch sequence.

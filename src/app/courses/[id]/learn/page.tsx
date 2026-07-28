@@ -76,7 +76,7 @@ export default function CourseLearnPage({ params }: CourseLearnPageProps) {
       .catch(() => {});
   }, [id]);
 
-  const lessons = live?.lessons ?? [];
+  const lessons = useMemo(() => live?.lessons ?? [], [live?.lessons]);
   const completedIds = useMemo(
     () => new Set([...(live?.completed_lesson_ids ?? []), ...optimisticCompleted]),
     [live?.completed_lesson_ids, optimisticCompleted]

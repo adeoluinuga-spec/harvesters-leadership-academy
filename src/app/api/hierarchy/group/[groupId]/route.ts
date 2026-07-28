@@ -58,7 +58,6 @@ export async function GET(
   const campusList = campusRows ?? [];
   const campusIds = campusList.map((c) => c.id);
   const campusNameById = new Map(campusList.map((c) => [c.id, c.name ?? "Unknown Campus"]));
-  const campusSubgroupById = new Map(campusList.map((c) => [c.id, c.subgroup_id ?? ""]));
 
   // 3. All users via campus traversal + direct group_id fallback
   const [campusUsersRes, directGroupUsersRes] = await Promise.all([

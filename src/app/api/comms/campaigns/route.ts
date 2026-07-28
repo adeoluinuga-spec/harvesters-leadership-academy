@@ -16,7 +16,7 @@ export async function GET() {
 
   // Enrich with message stats
   const ids = (data ?? []).map((c: { id: string }) => c.id);
-  let msgStats: Record<string, { count: number; recipients: number }> = {};
+  const msgStats: Record<string, { count: number; recipients: number }> = {};
   if (ids.length > 0) {
     const { data: msgs } = await ctx.db
       .from("communication_messages")

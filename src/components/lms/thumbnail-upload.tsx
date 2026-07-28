@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/client";
@@ -70,9 +71,12 @@ export function ThumbnailUpload({ value, onChange, className }: Props) {
     <div className={cn("space-y-2", className)}>
       {value ? (
         <div className="relative w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
-          <img
+          <Image
             src={value}
             alt="Course thumbnail"
+            width={640}
+            height={360}
+            unoptimized
             className="aspect-video w-full object-cover"
           />
           <button

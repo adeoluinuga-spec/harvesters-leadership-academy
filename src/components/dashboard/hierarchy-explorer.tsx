@@ -13,7 +13,7 @@ import {
   Award,
   ArrowLeft,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { shellItem } from "@/components/layout/dashboard-shell";
 import { cn } from "@/lib/utils";
 
@@ -528,21 +528,22 @@ export function HierarchyExplorer() {
   }, []);
 
   // Fetch leaders when at campus level
+  const selectedCampusId = selectedCampus?.id ?? null;
   useEffect(() => {
-    if (view !== "leaders" || !selectedCampus) {
-      setLeaders([]);
-      return;
-    }
     let active = true;
-    setLeadersLoading(true);
+    if (view !== "leaders" || !selectedCampusId) {
+      Promise.resolve().then(() => { if (active) setLeaders([]); });
+      return () => { active = false; };
+    }
+    Promise.resolve().then(() => { if (active) setLeadersLoading(true); });
     const qs = roleFilter ? `?role=${encodeURIComponent(roleFilter)}` : "";
-    fetch(`/api/hierarchy/campus/${selectedCampus.id}/leaders${qs}`)
+    fetch(`/api/hierarchy/campus/${selectedCampusId}/leaders${qs}`)
       .then((r) => r.json())
       .then((d) => { if (active) setLeaders((d as { leaders: LeaderRecord[] }).leaders ?? []); })
       .catch(() => { if (active) setLeaders([]); })
       .finally(() => { if (active) setLeadersLoading(false); });
     return () => { active = false; };
-  }, [view, selectedCampus?.id, roleFilter]);
+  }, [view, selectedCampusId, roleFilter]);
 
   // Navigation helpers
   const goToGroups = () => {

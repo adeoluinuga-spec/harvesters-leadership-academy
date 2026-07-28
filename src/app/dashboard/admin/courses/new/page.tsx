@@ -123,6 +123,7 @@ export default function NewCoursePage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   const [userRole, setUserRole] = useState<string>("");
+  const [creatorScope, setCreatorScope] = useState<{ management_scope: "platform" | "group" | "campus"; group_id: string | null; campus_id: string | null }>({ management_scope: "platform", group_id: null, campus_id: null });
   const authCheckRan = useRef(false);
 
   useEffect(() => {
@@ -188,7 +189,6 @@ export default function NewCoursePage() {
   const [isRequired, setIsRequired] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
   const [status, setStatus] = useState<CourseStatus>("draft");
-  const [creatorScope, setCreatorScope] = useState<{ management_scope: "platform" | "group" | "campus"; group_id: string | null; campus_id: string | null }>({ management_scope: "platform", group_id: null, campus_id: null });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

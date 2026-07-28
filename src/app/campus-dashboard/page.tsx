@@ -6,7 +6,6 @@ import {
   AlertCircle,
   Award,
   BookOpen,
-  CheckCircle2,
   GraduationCap,
   HeartHandshake,
   TrendingDown,
@@ -231,7 +230,10 @@ export default function CampusDashboardPage() {
 
   useEffect(() => {
     if (hierarchy.loading) return;
-    if (!campusId) { setDataLoading(false); return; }
+    if (!campusId) {
+      Promise.resolve().then(() => setDataLoading(false));
+      return;
+    }
 
     let active = true;
     const supabase = createClient();

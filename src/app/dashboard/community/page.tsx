@@ -407,7 +407,7 @@ export default function CommunityDashboardPage() {
   useEffect(() => {
     if (hierarchy.loading) return;
     if (!campusId || scope.childRoles.length === 0) {
-      setAnalyticsLoading(false);
+      Promise.resolve().then(() => setAnalyticsLoading(false));
       return;
     }
     fetchScopedCampusAnalytics(campusId, scope.childRoles as string[]).then((data) => {

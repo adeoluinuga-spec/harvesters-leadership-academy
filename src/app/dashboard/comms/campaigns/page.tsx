@@ -8,9 +8,6 @@ import {
   Layers,
   Loader2,
   Plus,
-  Send,
-  Trash2,
-  Users,
   X,
 } from "lucide-react";
 import { CommsShell } from "@/components/comms/comms-shell";

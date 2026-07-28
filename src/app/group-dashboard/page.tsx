@@ -322,7 +322,7 @@ export default function GroupDashboardPage() {
   useEffect(() => {
     if (hierarchy.loading) return;
     if (!groupId) {
-      setAnalyticsLoading(false);
+      Promise.resolve().then(() => setAnalyticsLoading(false));
       return;
     }
     fetchGroupAnalyticsDetailed(groupId).then((data) => {

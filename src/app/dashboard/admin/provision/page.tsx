@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Building2, CheckCircle2, Network, Send } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -9,12 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function ProvisionPage() {
-  const params = useSearchParams(); const router = useRouter();
+  const params = useSearchParams();
   const type = params.get("type") === "organization" ? "organization" : "group";
+  return <ProvisionForm key={type} type={type} />;
+}
+
+function ProvisionForm({ type }: { type: "organization" | "group" }) {
+  const router = useRouter();
   const [name, setName] = useState(""); const [leaderName, setLeaderName] = useState(""); const [leaderEmail, setLeaderEmail] = useState("");
   const [role, setRole] = useState(type === "group" ? "Group Pastor" : "Platform Super Admin");
   const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [done, setDone] = useState(false);
-  useEffect(() => { setRole(type === "group" ? "Group Pastor" : "Platform Super Admin"); setDone(false); setError(""); }, [type]);
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError("");
     try { const response = await fetch("/api/admin/provision", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, name, leaderName, leaderEmail, leaderRole: role }) }); const json = await response.json(); if (!response.ok) throw new Error(json.error ?? "Provisioning failed."); setDone(true); }

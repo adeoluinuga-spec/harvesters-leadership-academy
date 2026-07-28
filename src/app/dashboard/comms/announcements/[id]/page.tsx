@@ -54,7 +54,7 @@ export default function AnnouncementDetailPage() {
   useEffect(() => {
     if (!id) return;
     let active = true;
-    setLoading(true);
+    Promise.resolve().then(() => { if (active) setLoading(true); });
 
     fetchMessageDetail(id).then((data) => {
       if (!active) return;

@@ -53,7 +53,6 @@ const OVERSIGHT_ROLES = [
   "Assistant HOD",
   "Cell Leader / Assistant HOD",
 ];
-const ALL_OVERSIGHT = [...ADMIN_ROLES, ...OVERSIGHT_ROLES];
 
 const ALL_ROLES = [
   "Cell Leader / Assistant HOD",
@@ -642,7 +641,7 @@ function AdminUsersView() {
     finally { setLoading(false); }
   }, [page, search, roleFilter, campusFilter, onboardingFilter, activeFilter]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
 
   useEffect(() => {
     Promise.all([
@@ -755,7 +754,7 @@ function ScopedUsersView({ myRole }: { myRole: string }) {
     finally { setLoading(false); }
   }, [page, search, roleFilter, onboardingFilter, activeFilter]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
 
   const totalPages = Math.ceil(total / limit);
 

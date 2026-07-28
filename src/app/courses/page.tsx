@@ -5,7 +5,6 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  Award,
   BookOpen,
   CheckCircle2,
   Clock3,
@@ -29,7 +28,7 @@ import {
 } from "@/components/layout/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -200,7 +200,7 @@ Never expose `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, database passwords o
 
 ### Immediate technical debt
 
-The current production build passes (`npm run build`). The lint check still has pre-existing React-effect, unused-code, and formatting warnings/errors that should be resolved before release hardening.
+The current production build passes (`npm run build`) and `npm run lint` is clean — the earlier React-effect, unused-code, and formatting debt has been resolved.
 
 The README now contains project-specific setup, deployment and launch guidance. Keep it in sync with this Bible when operational assumptions change.
 
@@ -217,5 +217,5 @@ The README now contains project-specific setup, deployment and launch guidance. 
 
 1. Assign the first Group Admin and Campus Admin users with their matching `group_id` or `campus_id`.
 2. Populate each campus structure in Structure Management.
-3. Fix the remaining lint failures and add scope-focused end-to-end tests.
+3. Add scope-focused end-to-end tests.
 4. Run the launch checklist in `docs/launch-checklist.md` against the production Supabase and Vercel projects.

@@ -27,7 +27,7 @@ function timeAgo(iso: string): string {
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
 
   const unread = notifications.filter((n) => !n.isRead).length;
@@ -35,7 +35,6 @@ export function NotificationsBell() {
   // Initial load
   useEffect(() => {
     let active = true;
-    setLoading(true);
     fetchNotifications().then((data) => {
       if (active) {
         setNotifications(data);

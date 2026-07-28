@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -124,7 +125,7 @@ function CourseCard({ course, onStatusChange, onDelete }: {
       {/* Thumbnail */}
       <div className="relative aspect-video w-full overflow-hidden bg-zinc-100">
         {course.thumbnail_url ? (
-          <img src={course.thumbnail_url} alt={course.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          <Image src={course.thumbnail_url} alt={course.title} fill unoptimized className="object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <GraduationCap className="size-10 text-zinc-300" />

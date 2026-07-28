@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -359,7 +359,6 @@ function QuestionEditor({
 export default function AssessmentBuilderPage() {
   const params = useParams<{ id: string }>();
   const courseId = params.id;
-  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -403,7 +402,7 @@ export default function AssessmentBuilderPage() {
     setLoading(false);
   }, [courseId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
 
   function setField<K extends keyof AssessmentDraft>(key: K, value: AssessmentDraft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));

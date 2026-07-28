@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   // Attach read counts
   const ids = (data ?? []).map((m: { id: string }) => m.id);
-  let readCounts: Record<string, number> = {};
+  const readCounts: Record<string, number> = {};
   if (ids.length > 0) {
     const { data: reads } = await ctx.db
       .from("message_reads")

@@ -2,11 +2,9 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
-  BookOpen,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -14,7 +12,6 @@ import {
   FileText,
   GraduationCap,
   HelpCircle,
-  Link2,
   Loader2,
   Pencil,
   Plus,
@@ -24,7 +21,6 @@ import {
 } from "lucide-react";
 
 import { DashboardShell, shellItem } from "@/components/layout/dashboard-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   fetchAdminCourseById,
@@ -215,11 +211,6 @@ function LessonEditor({
 
   const video = parseVideoUrl(form.video_url);
 
-  const resourceTypeIcon = (type: string) => {
-    if (type === "pdf") return <FileText className="size-3.5 text-zinc-400" />;
-    if (type === "video") return <Video className="size-3.5 text-zinc-400" />;
-    return <Link2 className="size-3.5 text-zinc-400" />;
-  };
 
   return (
     <motion.div
@@ -507,9 +498,11 @@ function ModuleCard({
   const [localForm, setLocalForm] = useState(editForm);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const [prevEditForm, setPrevEditForm] = useState(editForm);
+  if (prevEditForm !== editForm) {
+    setPrevEditForm(editForm);
     setLocalForm(editForm);
-  }, [editForm]);
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
@@ -723,7 +716,6 @@ type EditingModuleId = string | null;
 
 export default function LessonsPage({ params }: PageProps) {
   const { id: courseId } = use(params);
-  const router = useRouter();
 
   const [course, setCourse] = useState<AdminCourse | null>(null);
   const [modules, setModules] = useState<ModuleWithLessons[]>([]);
@@ -751,7 +743,7 @@ export default function LessonsPage({ params }: PageProps) {
     setExpandedModules(new Set(mods.map((m) => m.id)));
   }, [courseId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
 
   // ── Module actions ──────────────────────────────────────────
 
@@ -958,7 +950,11 @@ export default function LessonsPage({ params }: PageProps) {
               onToggle={() =>
                 setExpandedModules((prev) => {
                   const next = new Set(prev);
-                  next.has(module.id) ? next.delete(module.id) : next.add(module.id);
+                  if (next.has(module.id)) {
+                    next.delete(module.id);
+                  } else {
+                    next.add(module.id);
+                  }
                   return next;
                 })
               }

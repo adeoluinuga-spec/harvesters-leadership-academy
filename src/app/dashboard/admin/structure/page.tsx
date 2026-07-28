@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Network, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Button } from "@/components/ui/button";
@@ -22,15 +22,18 @@ function StructurePage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function loadUnits(id = campusId) {
+  const loadUnits = useCallback(async (id = campusId) => {
     const response = await fetch(`/api/admin/ministry-units${id ? `?campusId=${id}` : ""}`);
     const json = await response.json();
     if (!response.ok) throw new Error(json.error ?? "Could not load campus structure.");
     setUnits(json.units ?? []);
-  }
+  }, [campusId]);
 
   useEffect(() => { fetchMinistryCampuses().then((data) => { setCampuses(data); if (data[0]) setCampusId(data[0].id); }).catch((e) => setError(e.message)); }, []);
-  useEffect(() => { if (campusId) loadUnits().catch((e) => setError(e.message)); }, [campusId]);
+  useEffect(() => {
+    if (!campusId) return;
+    Promise.resolve().then(() => loadUnits()).catch((e) => setError(e.message));
+  }, [campusId, loadUnits]);
 
   const eligibleParents = useMemo(() => {
     const index = order.indexOf(unitType);

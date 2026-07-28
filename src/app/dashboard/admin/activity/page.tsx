@@ -147,7 +147,7 @@ export default function ActivityLogPage() {
     }
   }, [page, search, eventTypeFilter, dateFrom, dateTo]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
 
   const totalPages = Math.ceil(total / limit);
 

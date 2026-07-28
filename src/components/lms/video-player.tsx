@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Pause, Play, Radio } from "lucide-react";
+import { Bot, Play, Radio } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";

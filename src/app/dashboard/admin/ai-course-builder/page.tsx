@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
   FileText,
   Loader2,
   Lock,
@@ -569,7 +568,7 @@ function ModuleEditor({
                   ))}
                   {(mod.assessment_questions ?? []).length === 0 && (
                     <p className="rounded-lg border border-dashed border-zinc-200 bg-white p-4 text-center text-xs text-zinc-400">
-                      No assessment questions yet — click "Add question" to create one.
+                      No assessment questions yet — click &ldquo;Add question&rdquo; to create one.
                     </p>
                   )}
                 </div>
@@ -969,7 +968,7 @@ function ReviewStep({
 // Step 4 — Published
 // ============================================================
 
-function PublishedStep({ courseId, slug }: { courseId: string; slug: string }) {
+function PublishedStep({ courseId }: { courseId: string }) {
   const router = useRouter();
   return (
     <motion.div
@@ -1203,7 +1202,7 @@ export default function AICourseBuilderPage() {
           </motion.div>
         ) : step === "published" && publishedData ? (
           <motion.div key="published" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <PublishedStep courseId={publishedData.courseId} slug={publishedData.slug} />
+            <PublishedStep courseId={publishedData.courseId} />
           </motion.div>
         ) : null}
       </AnimatePresence>

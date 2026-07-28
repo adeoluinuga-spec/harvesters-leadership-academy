@@ -34,7 +34,7 @@ import {
   type AudienceScope,
   type MessagePriority,
 } from "@/lib/comms";
-import { COURSE_CATEGORIES, LEADERSHIP_CADRES } from "@/lib/lms-types";
+import { LEADERSHIP_CADRES } from "@/lib/lms-types";
 
 // ─── Compose form state ────────────────────────────────────────
 
@@ -447,7 +447,6 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     fetchMessages({ type: "announcement" }).then((data) => {
       if (active) { setMessages(data); setLoading(false); }
     });
